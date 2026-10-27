@@ -1,0 +1,1854 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Painel OLT UpDown</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+/* Layout: barra navy do UPDOWN NOC com as abas das OLTs; cada tela segue
+   faixa de estado → alertas → saúde (medidores) → uplinks e placas → portas PON
+   em cartões ou mapa de calor. Tokens copiados de public/css/noc/tokens.css. */
+:root{
+  --brand-500:#0b74ff; --brand-400:#2f8bff; --brand-600:#0a5ed6;
+  --cyan-400:#1dc9ff; --cyan-300:#6adfff; --purple-400:#a56bff;
+  --grad-brand:linear-gradient(135deg,#0b74ff 0%,#1dc9ff 100%);
+  --grad-warn:linear-gradient(90deg,#ffb020,#ff8a3d);
+  --grad-danger:linear-gradient(90deg,#ff5f74,#ff3d68);
+  --grad-ok:linear-gradient(90deg,#2fd6a0,#1dc9ff);
+  --ok-500:#2fd6a0; --warn-500:#ffb020; --danger-500:#ff5f74; --info-500:#1dc9ff;
+  --font-sans:Inter,"Segoe UI Variable","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  --fs-10:.625rem; --fs-11:.6875rem; --fs-12:.75rem; --fs-13:.8125rem; --fs-14:.875rem;
+  --fs-16:1rem; --fs-20:1.25rem; --fs-24:1.5rem; --fs-32:2rem;
+  --lh-tight:1.15; --lh-base:1.55; --tracking-caps:.12em;
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px; --s-6:24px; --s-8:32px; --s-10:40px; --s-12:48px; --s-16:64px;
+  --r-1:6px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:22px; --r-full:999px;
+  --dur-1:120ms; --dur-2:200ms; --dur-3:320ms; --ease:cubic-bezier(.2,.7,.3,1); --ease-out:cubic-bezier(.16,1,.3,1);
+  --page-max:1560px; --z-drawer:60; --z-modal:70; --z-toast:90;
+  --on-solid:#ffffff; --on-warn:#1f1400;
+  --appbar-bg:#01017a; --appbar-fg:#ffffff; --appbar-dim:rgba(255,255,255,.72);
+  --appbar-soft:rgba(255,255,255,.08); --appbar-line:rgba(255,255,255,.15); --appbar-on:rgba(29,201,255,.22);
+
+  /* tema escuro (padrão — sala de NOC) */
+  color-scheme:dark;
+  --bg:#050d17; --bg-grid:rgba(110,180,240,.05); --bg-glow-1:rgba(11,116,255,.20); --bg-glow-2:rgba(29,201,255,.09);
+  --surface-1:#08192b; --surface-2:#0c2438; --surface-3:#103049; --surface-input:#061626;
+  --line:rgba(122,190,240,.14); --line-strong:rgba(122,190,240,.28);
+  --text-1:#eaf6ff; --text-2:#ffffff; --text-3:#7191a7; --text-on-brand:#ffffff;
+  --shadow-1:0 1px 2px rgba(0,0,0,.35); --shadow-2:0 12px 32px rgba(0,0,0,.38); --shadow-3:0 28px 70px rgba(0,0,0,.52); --shadow-brand:0 12px 30px rgba(11,116,255,.28);
+  --ok-bg:rgba(47,214,160,.12); --ok-line:rgba(47,214,160,.32); --ok-text:#6ceabd;
+  --warn-bg:rgba(255,176,32,.12); --warn-line:rgba(255,176,32,.30); --warn-text:#ffd07a;
+  --danger-bg:rgba(255,95,116,.12); --danger-line:rgba(255,95,116,.30); --danger-text:#ff9caa;
+  --info-bg:rgba(29,201,255,.12); --info-line:rgba(29,201,255,.30); --info-text:#8fe4ff;
+  --focus-ring:0 0 0 3px rgba(29,201,255,.45);
+  --kicker:var(--cyan-400);
+  --scrim:rgba(2,8,16,.62);
+  --heat-1:rgba(29,201,255,.10); --heat-2:rgba(29,201,255,.22); --heat-3:rgba(29,201,255,.38); --heat-4:rgba(29,201,255,.58);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme:light;
+    --bg:#eef3f9; --bg-grid:rgba(11,116,255,.05); --bg-glow-1:rgba(11,116,255,.10); --bg-glow-2:rgba(29,201,255,.10);
+    --surface-1:#ffffff; --surface-2:#f5f8fc; --surface-3:#e9f0f8; --surface-input:#ffffff;
+    --line:rgba(14,48,82,.13); --line-strong:rgba(14,48,82,.26);
+    --text-1:#0a1c2e; --text-2:#000000; --text-3:#6b849b;
+    --shadow-1:0 1px 2px rgba(12,40,70,.07); --shadow-2:0 10px 26px rgba(12,40,70,.10); --shadow-3:0 24px 60px rgba(12,40,70,.16); --shadow-brand:0 10px 26px rgba(11,116,255,.22);
+    --ok-bg:rgba(9,154,106,.10); --ok-line:rgba(9,154,106,.28); --ok-text:#0a7a55;
+    --warn-bg:rgba(184,118,0,.10); --warn-line:rgba(184,118,0,.28); --warn-text:#8a5c00;
+    --danger-bg:rgba(206,32,58,.09); --danger-line:rgba(206,32,58,.26); --danger-text:#b3182f;
+    --info-bg:rgba(11,116,255,.09); --info-line:rgba(11,116,255,.26); --info-text:#0a5ed6;
+    --focus-ring:0 0 0 3px rgba(11,116,255,.35);
+    --kicker:var(--brand-600);
+    --scrim:rgba(10,28,46,.40);
+    --heat-1:rgba(11,116,255,.07); --heat-2:rgba(11,116,255,.16); --heat-3:rgba(11,116,255,.30); --heat-4:rgba(11,116,255,.48);
+  }
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#eef3f9; --bg-grid:rgba(11,116,255,.05); --bg-glow-1:rgba(11,116,255,.10); --bg-glow-2:rgba(29,201,255,.10);
+  --surface-1:#ffffff; --surface-2:#f5f8fc; --surface-3:#e9f0f8; --surface-input:#ffffff;
+  --line:rgba(14,48,82,.13); --line-strong:rgba(14,48,82,.26);
+  --text-1:#0a1c2e; --text-2:#000000; --text-3:#6b849b;
+  --shadow-1:0 1px 2px rgba(12,40,70,.07); --shadow-2:0 10px 26px rgba(12,40,70,.10); --shadow-3:0 24px 60px rgba(12,40,70,.16); --shadow-brand:0 10px 26px rgba(11,116,255,.22);
+  --ok-bg:rgba(9,154,106,.10); --ok-line:rgba(9,154,106,.28); --ok-text:#0a7a55;
+  --warn-bg:rgba(184,118,0,.10); --warn-line:rgba(184,118,0,.28); --warn-text:#8a5c00;
+  --danger-bg:rgba(206,32,58,.09); --danger-line:rgba(206,32,58,.26); --danger-text:#b3182f;
+  --info-bg:rgba(11,116,255,.09); --info-line:rgba(11,116,255,.26); --info-text:#0a5ed6;
+  --focus-ring:0 0 0 3px rgba(11,116,255,.35);
+  --kicker:var(--brand-600);
+  --scrim:rgba(10,28,46,.40);
+  --heat-1:rgba(11,116,255,.07); --heat-2:rgba(11,116,255,.16); --heat-3:rgba(11,116,255,.30); --heat-4:rgba(11,116,255,.48);
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#050d17; --bg-grid:rgba(110,180,240,.05); --bg-glow-1:rgba(11,116,255,.20); --bg-glow-2:rgba(29,201,255,.09);
+  --surface-1:#08192b; --surface-2:#0c2438; --surface-3:#103049; --surface-input:#061626;
+  --line:rgba(122,190,240,.14); --line-strong:rgba(122,190,240,.28);
+  --text-1:#eaf6ff; --text-2:#ffffff; --text-3:#7191a7;
+  --shadow-1:0 1px 2px rgba(0,0,0,.35); --shadow-2:0 12px 32px rgba(0,0,0,.38); --shadow-3:0 28px 70px rgba(0,0,0,.52); --shadow-brand:0 12px 30px rgba(11,116,255,.28);
+  --ok-bg:rgba(47,214,160,.12); --ok-line:rgba(47,214,160,.32); --ok-text:#6ceabd;
+  --warn-bg:rgba(255,176,32,.12); --warn-line:rgba(255,176,32,.30); --warn-text:#ffd07a;
+  --danger-bg:rgba(255,95,116,.12); --danger-line:rgba(255,95,116,.30); --danger-text:#ff9caa;
+  --info-bg:rgba(29,201,255,.12); --info-line:rgba(29,201,255,.30); --info-text:#8fe4ff;
+  --focus-ring:0 0 0 3px rgba(29,201,255,.45);
+  --kicker:var(--cyan-400);
+  --scrim:rgba(2,8,16,.62);
+  --heat-1:rgba(29,201,255,.10); --heat-2:rgba(29,201,255,.22); --heat-3:rgba(29,201,255,.38); --heat-4:rgba(29,201,255,.58);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+img{max-width:100%}
+html,body{min-height:100%}
+body{
+  margin:0;font-family:var(--font-sans);font-size:var(--fs-14);line-height:var(--lh-base);color:var(--text-1);
+  background:
+    radial-gradient(900px 520px at 8% -6%, var(--bg-glow-1), transparent 60%),
+    radial-gradient(760px 480px at 100% 0%, var(--bg-glow-2), transparent 58%),
+    var(--bg);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased;
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--appbar-bg)}
+button,input,select{font:inherit}
+:focus-visible{outline:2px solid var(--cyan-400);outline-offset:2px;border-radius:var(--r-sm)}
+:root[data-theme="light"] :focus-visible{outline-color:var(--brand-500)}
+.skip-link{position:absolute;left:var(--s-4);top:-64px;z-index:100;background:var(--surface-1);color:var(--text-1);padding:var(--s-2) var(--s-4);border-radius:var(--r-sm);border:1px solid var(--line-strong)}
+.skip-link:focus{top:calc(env(safe-area-inset-top,0px) + var(--s-2))}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.kicker{margin:0;font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--kicker)}
+.muted{color:var(--text-3)}
+.gutter{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.inner{max-width:var(--page-max);margin:0 auto}
+
+/* ---------- barra superior ---------- */
+.appbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:var(--appbar-bg);color:var(--appbar-fg);border-bottom:1px solid var(--appbar-line)}
+.bar{display:flex;align-items:center;gap:var(--s-3) var(--s-5);flex-wrap:wrap;padding-block:var(--s-3)}
+.brand{display:flex;align-items:center;gap:var(--s-3);min-width:0;margin-right:var(--s-2)}
+.brand img{height:30px;width:auto;display:block}
+.brand b{display:block;font-size:var(--fs-16);font-weight:700;letter-spacing:-.01em;line-height:1.1}
+.brand small{display:block;font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--appbar-dim)}
+.tabs{display:flex;gap:var(--s-1);padding:var(--s-1);border:1px solid var(--appbar-line);border-radius:var(--r-lg);background:var(--appbar-soft);overflow-x:auto;scrollbar-width:none;max-width:100%}
+.tabs::-webkit-scrollbar{display:none}
+.tab{display:inline-flex;align-items:center;gap:var(--s-2);min-height:40px;padding:0 var(--s-4);border:0;border-radius:var(--r-md);background:transparent;color:var(--appbar-dim);font-size:var(--fs-13);font-weight:650;white-space:nowrap;cursor:pointer;transition:background var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
+.tab:hover{color:var(--appbar-fg);background:var(--appbar-soft)}
+.tab[aria-selected="true"]{background:var(--grad-brand);color:var(--text-on-brand);box-shadow:var(--shadow-brand)}
+.tab .tab-sub{font-weight:500;opacity:.8}
+.tab-count{font-family:var(--font-mono);font-size:var(--fs-11);font-weight:700;min-width:22px;text-align:center;padding:1px 7px;border-radius:var(--r-full);background:var(--danger-500);color:var(--on-solid)}
+.tab-count[hidden]{display:none}
+.bar-right{margin-left:auto;display:flex;align-items:center;gap:var(--s-2);flex-wrap:wrap}
+.src-pill{display:inline-flex;align-items:center;gap:var(--s-2);min-height:36px;padding:0 var(--s-3);border-radius:var(--r-full);border:1px solid var(--appbar-line);background:var(--appbar-soft);color:var(--appbar-fg);font-size:var(--fs-12);font-weight:650;cursor:pointer}
+.src-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--warn-500)}
+.src-pill[data-state="live"] .dot{background:var(--ok-500);animation:pulse 2.2s var(--ease) infinite}
+.src-pill[data-state="error"] .dot{background:var(--danger-500)}
+.src-pill .upd{color:var(--appbar-dim);font-family:var(--font-mono);font-weight:500}
+.icon-btn{width:36px;height:36px;display:inline-grid;place-items:center;border-radius:var(--r-sm);border:1px solid var(--appbar-line);background:transparent;color:var(--appbar-fg);cursor:pointer;transition:background var(--dur-1) var(--ease)}
+.icon-btn:hover{background:var(--appbar-soft)}
+.icon-btn[aria-pressed="true"]{background:var(--appbar-on);border-color:rgba(29,201,255,.6)}
+.icon-btn svg{width:18px;height:18px}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,214,160,.55)}70%{box-shadow:0 0 0 7px rgba(47,214,160,0)}100%{box-shadow:0 0 0 0 rgba(47,214,160,0)}}
+
+.demo-band{background:var(--warn-bg);border-bottom:1px solid var(--warn-line)}
+.demo-band .inner{display:flex;align-items:center;gap:var(--s-2) var(--s-4);flex-wrap:wrap;padding-block:var(--s-2);font-size:var(--fs-13);color:var(--text-1)}
+.demo-band strong{color:var(--warn-text)}
+
+/* ---------- tela ---------- */
+main{padding-block:var(--s-6) var(--s-16)}
+main .inner{display:flex;flex-direction:column;gap:var(--s-5)}
+.olt-head{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--s-4);flex-wrap:wrap}
+.olt-head h1{margin:var(--s-1) 0 0;font-size:var(--fs-32);line-height:var(--lh-tight);font-weight:700;letter-spacing:-.02em;text-wrap:balance}
+.olt-head .meta{margin:var(--s-1) 0 0;color:var(--text-3);font-size:var(--fs-13)}
+.head-actions{display:flex;gap:var(--s-2);flex-wrap:wrap}
+
+/* faixa de estado (mesmo desenho do .traf-pulse) */
+.pulse{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.pulse-item{display:grid;gap:var(--s-1);padding:var(--s-4) var(--s-5);background:var(--surface-1);min-width:0}
+.pulse-item>span{display:flex;align-items:center;gap:var(--s-2);font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
+.pulse-item>strong{font-size:var(--fs-24);letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1;font-weight:700}
+.pulse-item>strong .unit{font-size:.55em;color:var(--text-3);font-weight:600;letter-spacing:0;margin-left:.25em}
+.pulse-item>small{font-size:var(--fs-11);color:var(--text-3)}
+.pulse-item.is-danger>strong{color:var(--danger-text)}
+.pulse-item.is-warn>strong{color:var(--warn-text)}
+.pulse-item.is-ok>strong{color:var(--ok-text)}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none}
+.sw.in{background:var(--cyan-400)} .sw.out{background:var(--purple-400)}
+
+/* botões */
+.btn{display:inline-flex;align-items:center;gap:var(--s-2);min-height:32px;padding:0 var(--s-3);border-radius:var(--r-sm);border:1px solid var(--line-strong);background:var(--surface-2);color:var(--text-1);font-size:var(--fs-13);font-weight:600;cursor:pointer;transition:border-color var(--dur-1) var(--ease),background var(--dur-1) var(--ease);text-decoration:none}
+.btn:hover{border-color:var(--cyan-400)}
+.btn svg{width:16px;height:16px}
+.btn-primary{display:inline-flex;align-items:center;gap:var(--s-2);min-height:36px;padding:0 var(--s-5);border:0;border-radius:var(--r-md);background:var(--grad-brand);color:var(--text-on-brand);font-weight:600;cursor:pointer;box-shadow:var(--shadow-1);transition:transform var(--dur-1),box-shadow var(--dur-1)}
+.btn-primary:hover{box-shadow:var(--shadow-brand);transform:translateY(-1px)}
+.btn-ghost{background:transparent}
+
+/* badges */
+.badge{display:inline-flex;align-items:center;gap:var(--s-1);font-size:var(--fs-10);font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px var(--s-2);border-radius:var(--r-full);white-space:nowrap}
+.badge--ok{background:var(--ok-bg);color:var(--ok-text);border:1px solid var(--ok-line)}
+.badge--warn{background:var(--warn-bg);color:var(--warn-text);border:1px solid var(--warn-line)}
+.badge--danger{background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-line)}
+.badge--info{background:var(--info-bg);color:var(--info-text);border:1px solid var(--info-line)}
+.badge--idle{background:var(--surface-3);color:var(--text-3);border:1px solid var(--line)}
+
+/* ---------- alertas ---------- */
+.alerts{border:1px solid var(--danger-line);background:var(--danger-bg);border-radius:var(--r-lg);padding:var(--s-4)}
+.alerts-h{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3);flex-wrap:wrap;margin-bottom:var(--s-3)}
+.alerts-h h2{margin:0;font-size:var(--fs-16);font-weight:700;display:flex;align-items:center;gap:var(--s-2)}
+.alerts-h h2 svg{width:18px;height:18px;color:var(--danger-500)}
+.alert-list{list-style:none;margin:0;padding:0;display:grid;gap:var(--s-2)}
+.alert{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--s-2) var(--s-4);align-items:center;padding:var(--s-3) var(--s-4);background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-md)}
+.alert .dotsev{width:10px;height:10px;border-radius:50%;background:var(--danger-500);box-shadow:0 0 0 4px var(--danger-bg)}
+.alert.ack .dotsev{background:var(--text-3);box-shadow:none}
+.alert-t{font-weight:650;overflow-wrap:anywhere}
+.alert-s{font-size:var(--fs-13);color:var(--text-3);overflow-wrap:anywhere}
+.alert-s b{font-family:var(--font-mono);font-weight:600;color:var(--danger-text)}
+.alert-act{display:flex;gap:var(--s-2);flex-wrap:wrap}
+@media (max-width:640px){.alert{grid-template-columns:auto minmax(0,1fr)}.alert-act{grid-column:1/-1}}
+.all-ok{display:flex;align-items:center;gap:var(--s-3);padding:var(--s-3) var(--s-4);border:1px solid var(--ok-line);background:var(--ok-bg);border-radius:var(--r-md);font-size:var(--fs-13)}
+.all-ok .dotsev{width:10px;height:10px;border-radius:50%;background:var(--ok-500);flex:none}
+.hist{margin-top:var(--s-3);font-size:var(--fs-13)}
+.hist summary{cursor:pointer;color:var(--text-3);font-weight:600}
+.hist ul{list-style:none;margin:var(--s-2) 0 0;padding:0;display:grid;gap:var(--s-1)}
+.hist li{display:flex;gap:var(--s-2) var(--s-3);flex-wrap:wrap;color:var(--text-3)}
+.hist li b{color:var(--text-1);font-weight:600}
+
+/* ---------- cartões ---------- */
+.card{position:relative;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s-5);min-width:0}
+.card-h{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-2) var(--s-3);flex-wrap:wrap;margin-bottom:var(--s-3)}
+.card-h h2{margin:0;font-size:var(--fs-16);font-weight:700;letter-spacing:-.01em}
+.card-h small{color:var(--text-3);font-size:var(--fs-12)}
+
+.grid-health{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:var(--s-4)}
+.hcard{overflow:hidden;display:grid;gap:var(--s-2)}
+.hcard::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--grad-brand);opacity:.8}
+.hcard.is-warn::before{background:var(--grad-warn)} .hcard.is-danger::before{background:var(--grad-danger)}
+.hcard-h{display:flex;justify-content:space-between;align-items:center;gap:var(--s-2)}
+.hcard-h label{font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
+.hbody{display:grid;grid-template-columns:132px minmax(0,1fr);gap:var(--s-4);align-items:center}
+.gauge{width:132px;height:auto;display:block}
+.gauge-track{fill:none;stroke:var(--surface-3);stroke-linecap:round}
+.gauge-value{fill:none;stroke:var(--cyan-400);stroke-linecap:round;transition:stroke-dasharray var(--dur-3) var(--ease-out)}
+.gauge-value.is-warn{stroke:var(--warn-500)} .gauge-value.is-danger{stroke:var(--danger-500)}
+.gauge-tick{stroke-width:2;stroke-linecap:round}
+.gauge-tick.w{stroke:var(--warn-500)} .gauge-tick.c{stroke:var(--danger-500)}
+.gauge-label{fill:var(--text-1);font:800 26px var(--font-sans);text-anchor:middle;font-variant-numeric:tabular-nums}
+.gauge-sub{fill:var(--text-3);font:600 9px var(--font-sans);text-anchor:middle;text-transform:uppercase;letter-spacing:.1em}
+.hside{display:grid;gap:var(--s-2);min-width:0}
+.hside dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px var(--s-3);font-size:var(--fs-12)}
+.hside dt{color:var(--text-3)} .hside dd{margin:0;font-family:var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.hside .where{font-size:var(--fs-11);color:var(--text-3);overflow-wrap:anywhere}
+@media (max-width:380px){.hbody{grid-template-columns:1fr}.gauge{margin:0 auto}}
+
+.grid-mid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:var(--s-4)}
+@media (max-width:1000px){.grid-mid{grid-template-columns:minmax(0,1fr)}}
+
+/* sparkline e gráficos (iguais ao painel de Tráfego) */
+.spark{display:block;width:100%;height:34px;overflow:visible}
+.spark-in{fill:none;stroke:var(--cyan-400);stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.spark-out{fill:none;stroke:var(--purple-400);stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke;opacity:.95}
+.spark-fill{fill:var(--cyan-400);opacity:.12}
+.spark-thr{stroke:var(--danger-500);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke;opacity:.75}
+.chart{display:block;width:100%;height:auto;overflow:visible}
+.chart-grid{stroke:var(--line);stroke-width:1}
+.chart-axis{fill:var(--text-3);font:600 10px var(--font-mono)}
+.chart-in{fill:none;stroke:var(--cyan-400);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.chart-out{fill:none;stroke:var(--purple-400);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.chart-cursor{stroke:var(--line-strong);stroke-width:1;stroke-dasharray:3 3}
+.chart-dot{fill:var(--surface-1);stroke-width:2.5}
+.chart-dot.in{stroke:var(--cyan-400)} .chart-dot.out{stroke:var(--purple-400)}
+.stop-in{stop-color:var(--cyan-400)} .stop-out{stop-color:var(--purple-400)}
+.chart-thr{stroke:var(--danger-500);stroke-width:1.2;stroke-dasharray:5 4}
+.chart-thr-label{fill:var(--danger-text);font:700 10px var(--font-mono)}
+.chart-legend{display:flex;gap:var(--s-2) var(--s-4);flex-wrap:wrap;font-size:var(--fs-11);color:var(--text-2);align-items:center}
+.chart-legend span{display:inline-flex;align-items:center;gap:6px}
+.chart-legend .dim{color:var(--text-3)}
+.thr-sw{width:14px;height:0;border-top:2px dashed var(--danger-500);display:inline-block}
+
+/* medidores de direção */
+.dm{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:var(--s-2);align-items:center;font-family:var(--font-mono);font-size:var(--fs-12);font-variant-numeric:tabular-nums}
+.dm .ar{font-weight:700;text-align:center}
+.dm.in .ar{color:var(--cyan-400)} .dm.out .ar{color:var(--purple-400)}
+.dm .v{white-space:nowrap;text-align:right;min-width:78px}
+.track{position:relative;height:6px;border-radius:var(--r-full);background:var(--surface-3)}
+.track i{position:absolute;left:0;top:0;bottom:0;border-radius:inherit;background:var(--cyan-400);transition:width var(--dur-3) var(--ease-out)}
+.dm.out .track i{background:var(--purple-400)}
+.track::after{content:"";position:absolute;left:var(--thr-pos,90%);top:-3px;bottom:-3px;width:2px;border-radius:1px;background:var(--danger-500);opacity:.6}
+.dm.is-warn .track i{background:var(--warn-500)}
+.dm.is-danger .track i{background:var(--danger-500)}
+.dm.is-danger .v{color:var(--danger-text)} .dm.is-warn .v{color:var(--warn-text)}
+
+/* uplinks */
+.uplinks{list-style:none;margin:0;padding:0;display:grid;gap:var(--s-2)}
+.up-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);gap:var(--s-2) var(--s-5);align-items:center;padding:var(--s-3) var(--s-4);text-align:left;color:inherit;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);cursor:pointer;transition:border-color var(--dur-1) var(--ease)}
+.up-row:hover{border-color:var(--line-strong)}
+.up-row.is-danger{border-color:var(--danger-line);background:var(--danger-bg)}
+.up-row.is-warn{border-color:var(--warn-line)}
+.up-row.member{margin-left:var(--s-5);width:calc(100% - var(--s-5));background:transparent}
+.up-id{display:block;min-width:0}
+.pon .dmw{display:grid;gap:var(--s-1)}
+.pon .spk{display:block}
+.up-id .mono{font-weight:700}
+.up-id .alias{display:block;font-size:var(--fs-12);color:var(--text-3);overflow-wrap:anywhere}
+.up-meters{display:grid;gap:var(--s-1)}
+@media (max-width:760px){.up-row{grid-template-columns:minmax(0,1fr)}.up-row .spark{display:none}}
+.tag{display:inline-block;margin-left:var(--s-2);font-family:var(--font-sans);font-size:var(--fs-10);font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:1px var(--s-2);border-radius:var(--r-full);background:var(--info-bg);color:var(--info-text);border:1px solid var(--info-line);vertical-align:1px}
+.note{margin:var(--s-3) 0 0;font-size:var(--fs-12);color:var(--text-3)}
+
+/* tabela das placas */
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:var(--fs-13)}
+.tbl th{text-align:left;font-size:var(--fs-10);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);padding:var(--s-2);border-bottom:1px solid var(--line)}
+.tbl td{padding:var(--s-2);border-bottom:1px solid var(--line);font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl td:first-child{font-family:var(--font-sans);font-weight:600}
+.tbl .r{text-align:right}
+.tbl tr:last-child td{border-bottom:0}
+.tbl td.is-warn{color:var(--warn-text)} .tbl td.is-danger{color:var(--danger-text)}
+
+/* ---------- portas PON ---------- */
+.pon-head{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--s-3);flex-wrap:wrap}
+.pon-head h2{margin:var(--s-1) 0 0;font-size:var(--fs-20);font-weight:700;letter-spacing:-.02em}
+.toolbar{display:flex;flex-wrap:wrap;gap:var(--s-3);align-items:center;padding:var(--s-3);margin-top:var(--s-3);background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-lg)}
+.chips{display:flex;flex-wrap:wrap;gap:var(--s-2)}
+.chip{display:inline-flex;align-items:center;gap:var(--s-2);min-height:32px;padding:0 var(--s-3);border-radius:var(--r-full);border:1px solid var(--line-strong);background:transparent;color:var(--text-3);font-size:var(--fs-13);font-weight:600;cursor:pointer}
+.chip b{font-family:var(--font-mono);font-weight:700;color:var(--text-1)}
+.chip:hover{border-color:var(--cyan-400)}
+.chip[aria-pressed="true"]{background:var(--info-bg);border-color:var(--info-line);color:var(--text-1)}
+.chip.c b{color:var(--danger-text)} .chip.c[aria-pressed="true"]{background:var(--danger-bg);border-color:var(--danger-line)}
+.chip.w b{color:var(--warn-text)} .chip.w[aria-pressed="true"]{background:var(--warn-bg);border-color:var(--warn-line)}
+.search{display:flex;align-items:center;gap:var(--s-2);flex:1 1 220px;min-width:0;height:36px;padding:0 var(--s-3);background:var(--surface-input);border:1px solid var(--line);border-radius:var(--r-sm);color:var(--text-3)}
+.search svg{width:16px;height:16px;flex:none}
+.search input{flex:1;min-width:0;border:0;background:transparent;color:var(--text-1);outline:none}
+.search:focus-within{border-color:var(--cyan-400);box-shadow:var(--focus-ring)}
+.sel{display:flex;align-items:center;gap:var(--s-2);font-size:var(--fs-13);color:var(--text-3)}
+select{height:36px;padding:0 var(--s-2);background:var(--surface-input);color:var(--text-1);border:1px solid var(--line);border-radius:var(--r-sm)}
+.seg{display:inline-flex;padding:2px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-input)}
+.seg button{min-height:30px;padding:0 var(--s-3);border:0;border-radius:var(--r-1);background:transparent;color:var(--text-3);font-size:var(--fs-13);font-weight:600;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--grad-brand);color:var(--text-on-brand)}
+.legend-row{display:flex;flex-wrap:wrap;gap:var(--s-2) var(--s-4);margin-top:var(--s-3);font-size:var(--fs-11);color:var(--text-3);align-items:center}
+.legend-row span{display:inline-flex;align-items:center;gap:6px}
+
+.slot{margin-top:var(--s-5)}
+.slot-h{display:flex;align-items:baseline;gap:var(--s-2) var(--s-4);flex-wrap:wrap;margin:0 0 var(--s-2)}
+.slot-h h3{margin:0;font-size:var(--fs-14);font-weight:700}
+.slot-h span{font-size:var(--fs-12);color:var(--text-3);font-family:var(--font-mono)}
+.pon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(224px,100%),1fr));gap:var(--s-3)}
+.flat{margin-top:var(--s-4)}
+.pon{position:relative;display:flex;flex-direction:column;gap:var(--s-2);min-width:0;padding:var(--s-3) var(--s-3) var(--s-2);text-align:left;color:inherit;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-md);cursor:pointer;transition:border-color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
+.pon:hover{border-color:var(--line-strong);transform:translateY(-1px);box-shadow:var(--shadow-2)}
+.pon.is-warn{border-color:var(--warn-line);background:linear-gradient(var(--warn-bg),var(--warn-bg)),var(--surface-1)}
+.pon.is-danger{border-color:var(--danger-500);background:linear-gradient(var(--danger-bg),var(--danger-bg)),var(--surface-1);box-shadow:0 0 0 1px var(--danger-line)}
+.pon-top{display:flex;justify-content:space-between;align-items:center;gap:var(--s-2)}
+.pon-id{font-family:var(--font-mono);font-weight:700;font-size:var(--fs-14)}
+.pon-pct{font-family:var(--font-mono);font-size:var(--fs-11);font-weight:700;line-height:20px;padding:0 var(--s-2);border-radius:var(--r-full);background:var(--surface-3);color:var(--text-3)}
+.is-warn .pon-pct{background:var(--warn-500);color:var(--on-warn)}
+.is-danger .pon-pct{background:var(--danger-500);color:var(--on-solid)}
+.pon-reg{display:block;font-weight:650;font-size:var(--fs-13);line-height:1.25;overflow-wrap:anywhere}
+.pon-meta{display:block;font-size:var(--fs-11);color:var(--text-3);margin-top:2px}
+.pon-idle{display:flex;flex-direction:column;gap:var(--s-1);min-width:0;padding:var(--s-3);border:1px dashed var(--line-strong);border-radius:var(--r-md);color:var(--text-3)}
+.pon-idle .pon-id{color:var(--text-3)}
+.empty{padding:var(--s-8) var(--s-4);text-align:center;color:var(--text-3);border:1px dashed var(--line-strong);border-radius:var(--r-lg);margin-top:var(--s-4)}
+.empty b{display:block;color:var(--text-1);margin-bottom:var(--s-1)}
+
+/* mapa de calor */
+.heat-wrap{overflow-x:auto;margin-top:var(--s-4);padding:var(--s-4);background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-lg)}
+.heat{display:grid;gap:var(--s-1);min-width:760px}
+.heat .hh{font-size:var(--fs-10);font-weight:800;color:var(--text-3);text-align:center;letter-spacing:.06em}
+.heat .rl{display:flex;flex-direction:column;justify-content:center;font-size:var(--fs-12);font-weight:700;color:var(--text-1);padding-right:var(--s-2)}
+.heat .rl small{font-family:var(--font-mono);font-weight:500;color:var(--text-3);font-size:var(--fs-10)}
+.hc{display:grid;place-items:center;height:48px;border:1px solid transparent;border-radius:var(--r-sm);font-family:var(--font-mono);font-size:var(--fs-12);font-weight:700;color:var(--text-3);background:var(--heat-1);cursor:pointer;padding:0;transition:transform var(--dur-1) var(--ease),opacity var(--dur-1)}
+button.hc:hover{transform:scale(1.06);border-color:var(--line-strong)}
+.hc.b2{background:var(--heat-2);color:var(--text-1)} .hc.b3{background:var(--heat-3);color:var(--text-1)} .hc.b4{background:var(--heat-4);color:var(--text-1)}
+.hc.bw{background:var(--warn-500);color:var(--on-warn)}
+.hc.bc{background:var(--danger-500);color:var(--on-solid);box-shadow:0 0 0 2px var(--danger-line)}
+.hc.bi{background:repeating-linear-gradient(45deg,transparent 0 4px,var(--line) 4px 6px);border-color:var(--line);cursor:default;font-weight:500}
+.hc.none{visibility:hidden}
+.hc.dim{opacity:.18}
+.hc .up-mark{font-size:9px;margin-left:1px;vertical-align:1px}
+.lg{width:18px;height:12px;border-radius:3px;display:inline-block}
+
+/* ---------- gaveta de detalhe ---------- */
+.scrim{position:fixed;inset:0;z-index:calc(var(--z-drawer) - 1);background:var(--scrim)}
+.drawer{position:fixed;top:0;right:0;bottom:0;z-index:var(--z-drawer);width:min(600px,100%);overflow-y:auto;display:flex;flex-direction:column;gap:var(--s-5);background:var(--surface-1);border-left:1px solid var(--line);box-shadow:var(--shadow-3);padding:calc(env(safe-area-inset-top,0px) + var(--s-5)) max(var(--s-5),env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + var(--s-8)) var(--s-5)}
+.d-head{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s-3)}
+.d-head h2{margin:var(--s-1) 0 0;font-family:var(--font-mono);font-size:var(--fs-24);letter-spacing:-.02em;overflow-wrap:anywhere}
+.d-head p{margin:var(--s-1) 0 0;font-weight:650}
+.close-btn{width:36px;height:36px;flex:none;display:grid;place-items:center;border-radius:var(--r-sm);border:1px solid var(--line-strong);background:var(--surface-2);color:var(--text-1);cursor:pointer}
+.close-btn svg{width:18px;height:18px}
+.d-tags{display:flex;flex-wrap:wrap;gap:var(--s-2)}
+.d-now{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-3)}
+.d-now .nowbox{padding:var(--s-4);border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2);display:grid;gap:var(--s-2)}
+.nowbox label{display:flex;align-items:center;gap:6px;font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
+.nowbox strong{font-size:var(--fs-24);font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1}
+.nowbox strong .unit{font-size:.55em;color:var(--text-3);font-weight:600;margin-left:.25em;letter-spacing:0}
+.nowbox small{font-family:var(--font-mono);font-size:var(--fs-12);color:var(--text-3)}
+.nowbox.is-danger{border-color:var(--danger-line);background:var(--danger-bg)} .nowbox.is-danger strong{color:var(--danger-text)}
+.nowbox.is-warn{border-color:var(--warn-line)} .nowbox.is-warn strong{color:var(--warn-text)}
+@media (max-width:420px){.d-now{grid-template-columns:1fr}}
+.d-sec-h{display:flex;justify-content:space-between;align-items:center;gap:var(--s-3);flex-wrap:wrap;margin-bottom:var(--s-3)}
+.d-sec-h h3{margin:0;font-size:var(--fs-14);font-weight:700}
+.chart-box{position:relative}
+.tip{position:absolute;top:0;pointer-events:none;min-width:168px;padding:var(--s-2) var(--s-3);background:var(--surface-3);border:1px solid var(--line-strong);border-radius:var(--r-sm);box-shadow:var(--shadow-2);font-size:var(--fs-12);display:grid;gap:2px}
+.tip b{font-weight:700}
+.tip .mono{font-size:var(--fs-11)}
+.scale-note{margin:var(--s-2) 0 0;font-size:var(--fs-12);color:var(--text-3)}
+.d-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.d-stats div{background:var(--surface-1);padding:var(--s-3) var(--s-4);display:grid;gap:2px;min-width:0}
+.d-stats span{font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
+.d-stats strong{font-family:var(--font-mono);font-size:var(--fs-14);font-weight:600}
+.d-stats small{font-size:var(--fs-11);color:var(--text-3)}
+.d-list{list-style:none;margin:0;padding:0;display:grid;gap:var(--s-2);font-size:var(--fs-13)}
+.d-list li{display:flex;flex-wrap:wrap;gap:var(--s-1) var(--s-3);padding:var(--s-2) var(--s-3);border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+.loc{display:flex;flex-wrap:wrap;gap:var(--s-2) var(--s-3);align-items:center;font-size:var(--fs-13)}
+.loc a{color:var(--info-text);font-weight:600}
+
+/* ---------- configurações ---------- */
+.modal{position:fixed;z-index:var(--z-modal);top:50%;left:50%;transform:translate(-50%,-50%);width:min(720px,calc(100% - 32px));max-height:calc(100% - 48px);overflow-y:auto;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-3);padding:var(--s-6)}
+.modal-scrim{position:fixed;inset:0;z-index:calc(var(--z-modal) - 1);background:var(--scrim)}
+.modal h2{margin:0;font-size:var(--fs-20);font-weight:700;letter-spacing:-.02em}
+.modal-h{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s-3);margin-bottom:var(--s-4)}
+fieldset{margin:0 0 var(--s-4);padding:var(--s-4);border:1px solid var(--line);border-radius:var(--r-md);min-width:0}
+legend{padding:0 var(--s-2);font-weight:700;font-size:var(--fs-14)}
+.radio{display:flex;gap:var(--s-3);align-items:flex-start;padding:var(--s-2) 0;cursor:pointer}
+.radio input{margin-top:4px;accent-color:var(--brand-500)}
+.radio small{display:block;color:var(--text-3);font-size:var(--fs-12)}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:var(--s-3) var(--s-4);margin-top:var(--s-3)}
+.field{display:flex;flex-direction:column;gap:var(--s-1);font-size:var(--fs-12);font-weight:600;color:var(--text-3);min-width:0}
+.field.wide{grid-column:1/-1}
+.field input{height:36px;padding:0 var(--s-3);background:var(--surface-input);color:var(--text-1);border:1px solid var(--line);border-radius:var(--r-sm);font-weight:500;font-size:var(--fs-14);min-width:0}
+.field input:focus{border-color:var(--cyan-400);box-shadow:var(--focus-ring);outline:none}
+.field small{font-weight:500}
+.check{display:flex;align-items:center;gap:var(--s-2);padding:var(--s-1) 0;cursor:pointer}
+.check input{accent-color:var(--brand-500);width:16px;height:16px}
+.check small{color:var(--text-3)}
+.row{display:flex;gap:var(--s-3);align-items:center;flex-wrap:wrap;margin-top:var(--s-3)}
+.out{font-size:var(--fs-13);color:var(--text-3)}
+.out.ok{color:var(--ok-text)} .out.err{color:var(--danger-text)}
+.form-err{color:var(--danger-text);font-size:var(--fs-13);margin:0 0 var(--s-3)}
+details.help{margin:0 0 var(--s-4);padding:var(--s-3) var(--s-4);border:1px solid var(--info-line);background:var(--info-bg);border-radius:var(--r-md);font-size:var(--fs-13)}
+details.help summary{cursor:pointer;font-weight:700}
+details.help p{margin:var(--s-2) 0}
+pre.code{margin:var(--s-2) 0;padding:var(--s-3);overflow-x:auto;background:var(--surface-input);border:1px solid var(--line);border-radius:var(--r-sm);font-family:var(--font-mono);font-size:var(--fs-12);line-height:1.6;color:var(--text-1)}
+.modal-f{display:flex;justify-content:space-between;gap:var(--s-3);flex-wrap:wrap}
+
+/* ---------- avisos ---------- */
+.toasts{position:fixed;z-index:var(--z-toast);right:calc(var(--s-4) + env(safe-area-inset-right,0px));bottom:calc(var(--s-4) + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:var(--s-2);width:min(380px,calc(100% - 32px))}
+.toast{display:grid;grid-template-columns:auto 1fr;gap:var(--s-3);align-items:start;padding:var(--s-3) var(--s-4);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:var(--r-md);box-shadow:var(--shadow-2);font-size:var(--fs-13);animation:tin var(--dur-3) var(--ease-out)}
+.toast .dotsev{width:10px;height:10px;border-radius:50%;margin-top:5px;background:var(--info-500)}
+.toast.is-danger{border-color:var(--danger-line)} .toast.is-danger .dotsev{background:var(--danger-500)}
+.toast.is-ok .dotsev{background:var(--ok-500)}
+.toast b{display:block}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+
+<a class="skip-link" href="#main">Pular para o conteúdo</a>
+
+<header class="appbar">
+  <div class="inner gutter bar">
+    <div class="brand">
+      <img src="data:image/png;base64,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" alt="" width="40" height="30">
+      <div><small>UpDown NOC</small><b>Painel das OLTs</b></div>
+    </div>
+    <div class="tabs" role="tablist" aria-label="OLTs" id="tabs"></div>
+    <div class="bar-right">
+      <button class="src-pill" id="srcPill" type="button" data-state="demo" title="Fonte dos dados"><span class="dot"></span><span id="srcText">Demonstração</span><span class="upd" id="updText"></span></button>
+      <button class="icon-btn" id="btnSound" type="button" aria-pressed="false" title="Som dos alertas" aria-label="Som dos alertas"></button>
+      <button class="icon-btn" id="btnTv" type="button" aria-pressed="false" title="Modo TV: tela cheia e rodízio entre as OLTs" aria-label="Modo TV"></button>
+      <button class="icon-btn" id="btnSettings" type="button" title="Configurações" aria-label="Configurações"></button>
+    </div>
+  </div>
+</header>
+
+<div class="demo-band" id="demoBand">
+  <div class="inner gutter">
+    <span><strong>Demonstração.</strong> Portas e descrições são as reais das duas OLTs; tráfego, CPU, memória e temperatura são simulados até ligar o Zabbix.</span>
+    <button class="btn" type="button" id="btnConnect">Conectar ao Zabbix</button>
+  </div>
+</div>
+
+<main id="main" tabindex="-1">
+  <div class="inner gutter">
+    <section class="olt-head" id="oltHead" aria-live="off"></section>
+    <section class="pulse" id="pulse" aria-label="Resumo da OLT"></section>
+    <section id="alertsSec" aria-live="polite"></section>
+    <section class="grid-health" id="healthSec" aria-label="Processamento, memória e temperatura"></section>
+    <section class="grid-mid">
+      <div class="card" id="uplinkCard"></div>
+      <div class="card" id="boardCard"></div>
+    </section>
+    <section aria-labelledby="ponTitle">
+      <div class="pon-head">
+        <div><p class="kicker">Portas PON</p><h2 id="ponTitle">Tráfego por porta</h2></div>
+        <div class="chart-legend" id="ponLegend"></div>
+      </div>
+      <div class="toolbar">
+        <div class="chips" id="chips" role="group" aria-label="Filtrar portas"></div>
+        <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="sr">Buscar</span><input id="q" type="search" placeholder="Porta, região ou VLAN" autocomplete="off"></label>
+        <label class="sel">Ordenar <select id="sort"><option value="slot">Placa e porta</option><option value="util">Maior utilização</option><option value="region">Região</option></select></label>
+        <div class="seg" role="group" aria-label="Visualização" id="viewSeg"><button type="button" data-v="cards" aria-pressed="true">Cartões</button><button type="button" data-v="heat" aria-pressed="false">Mapa de calor</button></div>
+      </div>
+      <div id="ponBody"></div>
+    </section>
+  </div>
+</main>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle" hidden></aside>
+
+<div class="modal-scrim" id="setScrim" hidden></div>
+<section class="modal" id="settings" role="dialog" aria-modal="true" aria-labelledby="setTitle" hidden>
+  <div class="modal-h">
+    <div><p class="kicker">Painel das OLTs</p><h2 id="setTitle">Configurações</h2></div>
+    <button class="close-btn" type="button" id="setClose" aria-label="Fechar"></button>
+  </div>
+  <form id="setForm" novalidate>
+    <p class="form-err" id="formErr" hidden></p>
+    <fieldset>
+      <legend>Fonte dos dados</legend>
+      <label class="radio"><input type="radio" name="source" value="demo" id="srcDemo"><span>Demonstração<small>Portas reais com tráfego simulado. Útil para conhecer o painel.</small></span></label>
+      <label class="radio"><input type="radio" name="source" value="zabbix" id="srcZbx"><span>Zabbix (API JSON-RPC)<small>Lê os itens de interface, CPU, memória e temperatura dos hosts das OLTs.</small></span></label>
+      <div class="fgrid">
+        <label class="field wide">URL da API<input id="fUrl" type="text" inputmode="url" placeholder="https://zbx7.lv.network/api_jsonrpc.php ou /zbx-api" autocomplete="off"></label>
+        <label class="field wide">Token de API<input id="fToken" type="password" autocomplete="off" placeholder="Deixe vazio se o proxy já envia o token"><small>Fica salvo só neste navegador.</small></label>
+        <label class="field">Host da C300<input id="fHostC300" type="text" autocomplete="off"></label>
+        <label class="field">Host da C350<input id="fHostC350" type="text" autocomplete="off"></label>
+      </div>
+      <div class="row"><button class="btn" type="button" id="btnTest">Testar conexão</button><span class="out" id="testOut" role="status"></span></div>
+    </fieldset>
+    <details class="help">
+      <summary>Como ligar ao Zabbix</summary>
+      <p>O navegador só consulta a API se o painel estiver no mesmo endereço dela. Publique este arquivo no nginx do seu servidor e encaminhe <span class="mono">/zbx-api</span> para o Zabbix, com o token guardado no próprio nginx:</p>
+      <pre class="code" id="nginxSnippet">location /painel-olt/ {
+    alias /var/www/painel-olt/;
+    index index.html;
+}
+location = /zbx-api {
+    proxy_pass https://zbx7.lv.network/api_jsonrpc.php;
+    proxy_ssl_server_name on;
+    proxy_set_header Host zbx7.lv.network;
+    proxy_set_header Authorization "Bearer SEU_TOKEN";
+}</pre>
+      <div class="row" style="margin-top:0"><button class="btn" type="button" id="btnCopy">Copiar configuração</button><span class="out" id="copyOut" role="status"></span></div>
+      <p>Depois use <span class="mono">/zbx-api</span> como URL e deixe o token vazio. Confira o caminho da API com a LV Network. Pelo link do Claude o painel não consegue falar com servidores externos, então o modo Zabbix só funciona no arquivo hospedado.</p>
+    </details>
+    <fieldset>
+      <legend>Limites</legend>
+      <div class="fgrid">
+        <label class="field">Alerta de tráfego (%)<input id="fThr" type="number" min="50" max="100" step="1"></label>
+        <label class="field">Atenção de tráfego (%)<input id="fWarn" type="number" min="10" max="99" step="1"></label>
+        <label class="field">Capacidade GPON ↓ (Mbps)<input id="fCapD" type="number" min="100" step="1"></label>
+        <label class="field">Capacidade GPON ↑ (Mbps)<input id="fCapU" type="number" min="100" step="1"></label>
+        <label class="field">CPU atenção / alerta (%)<input id="fCpu" type="text" inputmode="numeric" placeholder="75 / 90"></label>
+        <label class="field">Memória atenção / alerta (%)<input id="fMem" type="text" inputmode="numeric" placeholder="80 / 90"></label>
+        <label class="field">Temperatura atenção / alerta (°C)<input id="fTemp" type="text" inputmode="numeric" placeholder="60 / 70"></label>
+        <label class="field">Atualizar a cada (s)<input id="fInt" type="number" min="10" max="600" step="5"></label>
+      </div>
+      <p class="note">O alerta abre quando a porta passa do limite e só fecha quando cai 5 pontos abaixo dele, para não piscar.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Avisos</legend>
+      <label class="check"><input type="checkbox" id="fSound"> Tocar som quando abrir um alerta <small>(repete a cada minuto até reconhecer)</small></label>
+      <label class="check"><input type="checkbox" id="fNotify"> Notificação do navegador</label>
+      <span class="out" id="notifyOut" role="status"></span>
+    </fieldset>
+    <div class="modal-f">
+      <button class="btn btn-ghost" type="button" id="btnReset">Restaurar padrão</button>
+      <button class="btn-primary" type="submit">Salvar</button>
+    </div>
+  </form>
+</section>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+const DATA = {"olts":[{"id":"c300","nome":"C300 Casqueiro","curto":"C300","local":"Casqueiro","modelo":"ZTE C300","host":"18400 UPT | OLT C300 CASQUEIRO","median":0.012,"pons":[["gpon_1/12/1","",2],["gpon_1/12/2","",2],["gpon_1/12/3","",2],["gpon_1/12/4","",2],["gpon_1/12/5","",2],["gpon_1/12/6","",2],["gpon_1/12/7","",2],["gpon_1/12/8","",2],["gpon_1/13/1","CARAGUATA VLAN 2601 F12 -23.93585167357365,-46.433251886005610",1],["gpon_1/13/2","CARAGUATA VLAN 2602 F11 -23.93498367035922,-46.42969595869228",1],["gpon_1/13/3","CARAGUATA VLAN 2603 F10 -23.93497448739209,-46.429945122597616",1],["gpon_1/13/4","CARAGUATA VLAN 2604 F9 -23.93338747895765,-46.43041104324761",1],["gpon_1/13/5","CARAGUATA VLAN 2605 F8 -23.932739152311058,-46.430582845783135",1],["gpon_1/13/6","CARAGUATA VLAN 2606 F7 -23.9321059016541,-46.43078641404977",1],["gpon_1/13/7","CARAGUATA VLAN 2607 F6 -23.931479863170097,-46.43089633441506",1],["gpon_1/13/8","VLAN 2608 ROTEADOR (SEM ENERGIA NO POP)",1],["gpon_1/13/9","CASQUEIRO VLAN 2609 F1 -23.926180401433275,-46.40740159719864",1],["gpon_1/13/10","CASQUEIRO VLAN 2610 F4 -23.930095193577635,-46.40530314199882",1],["gpon_1/13/11","PONTE NOVA VLAN 2611 F1 -23.933696539126178,-46.39917441350824",1],["gpon_1/13/12","PONTE NOVA VLAN 2612 F2 -23.932037797055198,-46.39885517294634",1],["gpon_1/13/13","PONTE NOVA VLAN 2614 F3 -23.930747634164273,-46.39985742778864",1],["gpon_1/13/14","PONTE NOVA VLAN 2614 F4 -23.92916125139121,-46.39952702728228",1],["gpon_1/13/15","CASQUEIRO VLAN 2615 F5 -23.9308434,-46.4054999",1],["gpon_1/13/16","CASQUEIRO VLAN 2616 F6 -23.9289863,-46.4096459",1],["gpon_1/14/1","BOLSAO 7 VLAN 2713 F7 -23.919913275606234,-46.42246828473011",1],["gpon_1/14/2","BOLSAO 7 VLAN 2712 F8 -23.920543291334685,-46.42193660728539",1],["gpon_1/14/3","BOLSAO 7 VLAN 2711 F9 -23.919254094645424,-46.423091269823445",1],["gpon_1/14/4","BOLSAO 7 VLAN 2710 F10 -23.919377230281363,-46.42200912487706",1],["gpon_1/14/5","BOLSAO 7 VLAN 2709 F11 -23.918434565089306,-46.42106424028599",1],["gpon_1/14/6","BOLSAO 7 VLAN 2708 F12 -23.91861107278898, -46.421180954590696",1],["gpon_1/14/7","BOLSAO 9 VLAN 2716 F7 -23.922376643729734,-46.43354094423924",1],["gpon_1/14/8","BOLSAO 9 VLAN 2707 F12 -23.921314606083286,-46.43083708589202",1],["gpon_1/14/9","BOLSAO 9 VLAN 2721 F10 -23.920491459083713,-46.43255820705769",1],["gpon_1/14/10","BOLSAO 8 VLAN 2706 F6 -23.919351358024603,-46.4278148981489",1],["gpon_1/14/11","BOLSAO 9 VLAN 2714 F5 -23.923032766644045, -46.43078480000098",1],["gpon_1/14/12","BOLSAO 9 VLAN 2715 F8 -23.920491459083713,-46.43255820705769",1],["gpon_1/14/13","MARACA B9 VLAN 2725 F1 -23.92372813466972,-46.42880944200515",1],["gpon_1/14/14","BOLSAO 9 VLAN 2724 F2 -23.921641414662297,-46.43162759778987",1],["gpon_1/14/15","BOLSAO 9 VLAN 2723 F3 -23.92107627834059,-46.43208774404405",1],["gpon_1/14/16","BOLSAO 9 VLAN 2722 F4 -23.92107627834059,-46.43208774404405",1],["gpon_1/15/1","BOLSAO 8 VLAN 2701 F1 -23.918941261177594,-46.426863348064245",1],["gpon_1/15/2","BOLSAO 8 VLAN 2702 F2 -23.919687732441247,-46.426250213582556",1],["gpon_1/15/3","BOLSAO 8 VLAN 2703 F3 -23.92036746692978,-46.425679308648405",1],["gpon_1/15/4","BOLSAO 8 VLAN 2704 F4 -23.92113787900409,-46.42505357392662",1],["gpon_1/15/5","CASQUEIRO VLAN 2705 F3 -23.93105977299494,-46.41132635895426",1],["gpon_1/15/6","CASQUEIRO VLAN 2706 F2 -23.927395293818233,-46.408369210586706",1],["gpon_1/15/7","CASQUEIRO VLAN 2707 F5 -23.928552685384638,-46.403572355712726",1],["gpon_1/15/8","RUBENS LARA VLAN 2708 F4 -23.9268887,-46.4152828",1],["gpon_1/15/9","CASQUEIRO VLAN 2709 F6 -23.926552126411252,-46.411338024582946",1],["gpon_1/15/10","PQ SAO LUIZ VLAN 2709 F5 -23.9254079,-46.4166999",1],["gpon_1/15/11","RUBENS LARA VLAN 2711 F11 -23.926407943116484,-46.41270204989923",1],["gpon_1/15/12","RUBENS LARA VLAN 2712 F3 -23.929816770434066,-46.414568513146286",1],["gpon_1/15/13","RUBENS LARA VLAN 2713 F1 -23.9279306,-46.4128805",1],["gpon_1/15/14","RUBENS LARA VLAN 2714 F2 -23.9284409,-46.4145384",1],["gpon_1/15/15","RUBENS LARA VLAN 2715 F6 -23.926910992345203,-46.414321760281396",1],["gpon_1/15/16","RUBENS LARA VLAN 2716 F4 -23.92661606988033,-46.4134634299394",1],["gpon_1/16/1","VPESCADORES VLAN 2717 F1 -23.9210391,-46.407408",1],["gpon_1/16/2","VPESCADORES VLAN 2718  F2 -23.9223027,-46.4079525",1],["gpon_1/16/3","VPESCADORES VLAN 2719 F3 -23.9230955,-46.4067645",1],["gpon_1/16/4","VPESCADORES VLAN 2720 F4 -23.9237913,-46.4060946",1],["gpon_1/16/5","VPESCADORES VLAN 2721 F5 -23.9250686,-46.4050767",1],["gpon_1/16/6","VPESCADORES VLAN 2722 F6 -23.9250686,-46.4050767",1],["gpon_1/16/7","VPESCADORES VLAN 2723 F7 -23.925604,-46.4041852",1],["gpon_1/16/8","VPESCADORES VLAN 2724 F8 -23.9252559,-46.4022676",1],["gpon_1/16/9","VPESCADORES VLAN 2725 F9 -23.9257814,-46.4027449",1],["gpon_1/16/10","VPESCADORES VLAN 2726 F10 -23.9248399,-46.4010207",1],["gpon_1/16/11","VPESCADORES VLAN 2727 F11 -23.9263724,-46.3993724",1],["gpon_1/16/12","VPESCADORES VLAN 2728 F12 -23.9265945,-46.3986932",1],["gpon_1/16/13","RUBENS LARA VLAN  2729 F8 -23.9279306,-46.4128805",1],["gpon_1/16/14","ALEMOA VLAN 2730 F2 -23.923482423573805,-46.38468967529988",1],["gpon_1/16/15","RUBENS LARA VLAN  2731 F7 -23.9268887 -46.4152828",1],["gpon_1/16/16","CASQUEIRO VLAN 2732 F7 -23.93105977299494,-46.41132635895426",1],["gpon_1/17/1","CASQUEIRO VLAN 2733 F8 -23.9300951,-46.4053031",1],["gpon_1/17/2","VLAN 2734",1],["gpon_1/17/3","VLAN 2735",1],["gpon_1/17/4","VLAN 2736",1],["gpon_1/17/5","",2],["gpon_1/17/6","",2],["gpon_1/17/7","",1],["gpon_1/17/8","",2],["gpon_1/17/9","",2],["gpon_1/17/10","",2],["gpon_1/17/11","",2],["gpon_1/17/12","",2],["gpon_1/17/13","",2],["gpon_1/17/14","",2],["gpon_1/17/15","",2],["gpon_1/17/16","",2]],"uplinks":[["smartgroup1","",2,0],["xgei_1/19/1","",2,10000000000],["xgei_1/19/2","",2,10000000000],["gei_1/19/3","",2,1000000000],["gei_1/19/4","",2,1000000000],["xgei_1/20/1","",1,10000000000],["xgei_1/20/2","",1,10000000000],["gei_1/20/3","",2,1000000000],["gei_1/20/4","",2,1000000000]],"lag":null},{"id":"c350","nome":"C350 Vila Natal","curto":"C350","local":"Vila Natal","modelo":"ZTE C350","host":"18400 UPT | OLT C350 VILA NATAL","median":0.03,"pons":[["gpon_1/2/1","VILA NOEL VLAN 2351   F6 -23.89174370587382, -46.437084049705994",1],["gpon_1/2/2","sabrina.jose.cm",1],["gpon_1/2/3","COSTA MUNIZ  - VLAN 2353  F1 -23.8948373,-46.4338883",1],["gpon_1/2/4","CAMINHO 2 VLAN 2354 F8 -23.898913015468786, -46.430882526329796",1],["gpon_1/2/5","CJ PADRE MANOEL DA NOBREGA VLAN 2355 F3 -23.8948373,-46.4338883",1],["gpon_1/2/6","CORTUME VIA  VLAN 2356 F5 -23.894140926945713, -46.4320311930683",1],["gpon_1/2/7","VALE VERDE B VLAN 2357 F3 -23.91115045467297, -46.46180980709815",1],["gpon_1/2/8","VALE VERDE A VLAN 2358 F1 -23.91115045467297, -46.46180980709815",1],["gpon_1/2/9","VNATAL R1 F1 VLAN2359 -23.897182195325346,-46.43245349524876",1],["gpon_1/2/10","VNATAL R2 VLAN 2360 F2 -23.898529052734375,-46.434329986572266",1],["gpon_1/2/11","VNATAL R3 VLAN 2361 F12 -23.89882469177246,-46.434139251708984",1],["gpon_1/2/12","VNATAL R4 VLAN 2362 F9 -23.898972967967364,-46.43372368965418",1],["gpon_1/2/13","VNATAL R5 VLAN 2363 F5 -23.89952909985177, -46.43385210576432",1],["gpon_1/2/14","VNATAL R6 VLAN 2364 F6 -23.899615609041, -46.43326409515476",1],["gpon_1/2/15","VNATAL R7 VLAN 2365 F7 -23.900276304124954, -46.43366909030002",1],["gpon_1/2/16","VNATAL R8 VLAN 2366 F10 -23.900950512725927, -46.434123211575184",1],["gpon_1/3/1","VSJOSE VLAN 2371 F12 -23.899791969877175,-46.42719856309355",1],["gpon_1/3/2","AGUA FRIA VLAN 2372 F8 -23.8933872,-46.4605233",1],["gpon_1/3/3","VSJOSE VLAN 2373 F11 -23.90605365696968,-46.42478121379174",1],["gpon_1/3/4","VSJOSE VLAN 2374 F9 -23.9016268,-46.4258258",1],["gpon_1/3/5","VSJOSE VLAN 2375 F8 -23.9024748,-46.4258381",1],["gpon_1/3/6","FABRIL VLAN 2376  F10 -23.879937611002347,-46.455077898443186",1],["gpon_1/3/7","VSJOSE VLAN 2377 F10 -23.91060404142218,-46.4232080792325",1],["gpon_1/3/8","VALE VERDE C VLAN 2378 F2 -23.912873,-46.4663425",1],["gpon_1/3/9","VNOVA VLAN 2379 F11 -23.893601017518332 -46.426258163867935",1],["gpon_1/3/10","COSTA SILVA VLAN 2380 F1 -23.875306375633816,-46.415971237738205",1],["gpon_1/3/11","PILOES VLAN 2381 F5 -23.89145958772323,-46.45418805984678",1],["gpon_1/3/12","VE AV PRINCIPAL VLAN 2382 F1 -23.9001545,-46.45204",1],["gpon_1/3/13","FABRIL VLAN 2383 F11 -23.881696293346597,-46.45582595417026",1],["gpon_1/3/14","FABRIL VLAN 2384 F12 -23.881589,-46.457327",1],["gpon_1/3/15","SITIO NOVO VLAN 2385 F6 -23.899998469482348,-46.441385374697624",1],["gpon_1/3/16","SITIO NOVO VLAN 2386 F7 -23.900982459418454,-46.44144091368851",1],["gpon_1/4/1","VALE NOVO VLAN 2391 F5 -23.91594331551796, -46.45771967889821",1],["gpon_1/4/2","SITIO NOVO VLAN 2392 F4 -23.901034493546547,-46.44429399924373",1],["gpon_1/4/3","SITIO NOVO VLAN 2393 F5 -23.901268846067993, -46.44459787443638",1],["gpon_1/4/4","SITIO NOVO VLAN 2394 F1 -23.900021019188294, -46.443435471822",1],["gpon_1/4/5","SITIO NOVO VLAN 2395 F2 -23.89998175378627,-46.44248671087953",1],["gpon_1/4/6","SITIO NOVO VLAN 2396 F3 -23.89998175378627,-46.44248671087953",1],["gpon_1/4/7","ILHA BELA VLAN 2397 F9 -23.901814908465827,-46.44250192346511",1],["gpon_1/4/8","ILHA BELA VLAN 2398 F8 -23.90372478411522,-46.44237420749738",1],["gpon_1/4/9","PILOES VLAN 2399 F7 -23.89018049177804,-46.45204491442578",1],["gpon_1/4/10","FABRIL VLAN 2400 F9 -23.88273571612045,-46.45625490274909",1],["gpon_1/4/11","VESP VLAN 2401 F3 TB2 48FO -23.8978926,-46.4430495",1],["gpon_1/4/12","VESP VLAN 2402 F5 TB2 48FO -23.8981487,-46.4451178",1],["gpon_1/4/13","VESP VLAN 2403 F1 TB2 48FO -23.8984094,-46.4389094",1],["gpon_1/4/14","VESP VLAN 2404 F4 TB2 48FO -23.8979581,-46.4444881",1],["gpon_1/4/15","VESP VLAN 2405 F2 TB2 48FO -23.8982149,-46.4397773",1],["gpon_1/4/16","VNOVA VLAN 2406 F5 -23.893601017518332,-46.426258163867935",1],["gpon_1/5/1","VESP VLAN 2431 F6 TB2 48FO -23.8982896,-46.4467962",1],["gpon_1/5/2","VESP VLAN 2432 F8 -23.9008668,-46.4532313",1],["gpon_1/5/3","VESP VLAN 2433 F11 -23.9025527,-46.4548792",1],["gpon_1/5/4","M.INDIO VLAN 2434 F10 -23.9009364,-46.4482125",1],["gpon_1/5/5","VESP VLAN 2435 F8 -23.8987815,-46.4496643",1],["gpon_1/5/6","M.INDIO VLAN 2436 F9 TB2 48FO -23.9003275,-46.4500287",1],["gpon_1/5/7","VESP VLAN 2437 F12 -23.903740383724298,-46.45958396699837",1],["gpon_1/5/8","COTA 200 VLAN 2438 F2 -23.89242357895762,-46.47597183650075",1],["gpon_1/5/9","COTA 200 VLAN 2439 F5 -23.890577068550108,-46.47194574129486",1],["gpon_1/5/10","VNOVA VLAN 2440 F7 -23.8966116818761,-46.42895163646526",1],["gpon_1/5/11","VNOVA VLAN 2441 F8 -23.89791101340184,-46.42294117972938",1],["gpon_1/5/12","VNOVA VLAN 2442 F4 -23.894055821974366, -46.42414368094046",1],["gpon_1/5/13","VNOVA VLAN 2443 F3/F1 -23.89452705050874,-46.421990587372605",1],["gpon_1/5/14","VNOVA VLAN 2444 F10 -23.89752565992175,-46.424746263049634",1],["gpon_1/5/15","VNOVA VLAN 2445 F6 -23.893463700755817,-46.42695728589613",1],["gpon_1/5/16","VNOVA VLAN 2446 F9 -23.897012197540505,-46.42712909384755",1],["gpon_1/8/1","31 DE MARCO VLAN 2447 F1 -23.891827632046976,-46.42912864428441",1],["gpon_1/8/2","31 DE MARCO VLAN 2448 F2 -23.89045501244187,-46.42892575598534",1],["gpon_1/8/3","CAMINHO 2 VLAN 2449 F11 -23.898658010340455,-46.43096001266233",1],["gpon_1/8/4","POSTO ALDO ZI VLAN 2450 F1 -23.847987021573484,-46.3911250353789",1],["gpon_1/8/5","VSANTA ROSA VLAN 2451 F1 -23.890938935260042,-46.42505652543848",1],["gpon_1/8/6","VPAULISTA VLAN 2452 F3 -23.8864411,-46.4271756",1],["gpon_1/8/7","COSTA.SILVA VLAN 2453 F2 -23.876586229563028,-46.41596313550236",1],["gpon_1/8/8","S.FRANCISCO VLAN 2454 F3 -23.882115935040055,-46.41883570819974",1],["gpon_1/8/9","V.ELIZABETH VLAN 2455 F3 -23.877257019046123,-46.424671826818575",1],["gpon_1/8/10","FERN JORGE VLAN 2456 F7 -23.878758806250477,-46.41460248525944",1],["gpon_1/8/11","S.FRANCISCO VLAN 2457 F1 -23.88493661982192,-46.41637909513273",1],["gpon_1/8/12","FERN JORGE VLAN 2458 F4 -23.8807245,-46.4187838",1],["gpon_1/8/13","FERN JORGE VLAN 2459 F8 -23.878758806250477,-46.41460248525944",1],["gpon_1/8/14","COSTA.SILVA VLAN 2460 F6 -23.8757880005894,-46.41411147891598",1],["gpon_1/8/15","S.FRANCISCO VLAN 2461 F6 -23.881694771440582,-46.41521823541418",1],["gpon_1/8/16","COSTA.SILVA VLAN 2462 F5 -23.878696,-46.417958",1],["gpon_1/9/1","FERN JORGE VLAN 2463 F2 -23.884642844885892,-46.418893691746945",1],["gpon_1/9/2","VPAULISTA VLAN 2464 F4 -23.885591508889004,-46.4211905204605",1],["gpon_1/9/3","VSANTA ROSA VLAN 2465 F2 -23.8884318,-46.4225358",1],["gpon_1/9/4","VNATAL CDHU VLAN 2466 F1 -23.901880387655563,-46.43471785770538",1],["gpon_1/9/5","CAIQUE VLAN 2467 F11 -23.89882469177246,-46.434139251708984",1],["gpon_1/9/6","VNATAL CDHU VLAN 2468 F2 -23.901486790216712,-46.43405716212146",1],["gpon_1/9/7","AGUA FRIA VLAN 2469 F2 -23.88998794555664,-46.456787109375",1],["gpon_1/9/8","ANA COSTA CDHU 2470 F8 -23.879687260997766,-46.42003133344457",1],["gpon_1/9/9","FABRIL VLAN 2471 F8 -23.88039957760252,-46.455037345994945",1],["gpon_1/9/10","FABRIL VLAN 2472 F7 -23.882737878630063,-46.455720814106115",1],["gpon_1/9/11","VNATAL CDHU VLAN 2473 F3 -23.90109059356758,-46.43307961684951",1],["gpon_1/9/12","VNATAL CDHU VLAN 2474 F4 -23.900728169998693,-46.43196282819447",1],["gpon_1/9/13","VNATAL CDHU VLAN 2475 F5 -23.900489151751007,-46.43131207861322",1],["gpon_1/9/14","VNATAL CDHU VLAN 2476 F6 -23.90111527470164,-46.431121684630924",1],["gpon_1/9/15","POSTO ALDO ZI VLAN 2477 F1 -23.8484073931, -46.375601322",1],["gpon_1/9/16","VNOVA VLAN 2478 F12 -23.89752565992175 -46.424746263049634",1],["gpon_1/10/1","COTA 200 VLAN 2479 F1 -23.89242357895762,-46.47597183650075",1],["gpon_1/10/2","COTA 200 VLAN 2480 F3 -23.89242357895762,-46.47597183650075",1],["gpon_1/10/3","VALE VERDE VLAN 2481 F6 -23.9115382671, -46.4613272328",1],["gpon_1/10/4","CAIQUE VLAN 2482 F7 -23.9018485906, -46.4360097264",1],["gpon_1/10/5","CAIQUE VLAN 2483 F8 -23.9018485906, -46.4360097264",1],["gpon_1/10/6","CAIQUE VLAN 2484 F9 -23.9018485906, -46.4360097264",1],["gpon_1/10/7","CAIQUE VLAN 2485 F10 -23.9018485906, -46.4360097264",1],["gpon_1/10/8","CAIQUE VLAN 2486 F11 -23.9018485906, -46.4360097264",1],["gpon_1/10/9","CAIQUE VLAN 2487 F12 -23.9018485906, -46.4360097264",1],["gpon_1/10/10","M.INDIO VLAN 2488 F12 -23.9009364,-46.4482125",1],["gpon_1/10/11","V.PAULISTA VLAN 2489",1],["gpon_1/10/12","ILHA BELA VLAN2490 F10 -23.903617742565938, -46.442351073205685",1],["gpon_1/10/13","VLAN 2491 AUTENTICACOES",1]],"uplinks":[["smartgroup1","",1,30000000000],["xgei_1/0/1","DIR-SW",1,10000000000],["xgei_1/1/1","LACP-SW_6730-CORE-XGE0/0/11",1,10000000000],["xgei_1/1/2","LACP-SW_6730-CORE-XGE0/0/12",1,10000000000]],"lag":{"name":"smartgroup1","members":["xgei_1/0/1","xgei_1/1/1","xgei_1/1/2"]}}]};
+const MIN = 60000, HOUR = 3600000, TAU = Math.PI * 2, WINDOW = 120 * MIN;
+const STORE = 'updown.painel-olt.v1', STORE_UI = 'updown.painel-olt.ui';
+const DEFAULTS = {
+  source:'demo', url:'', token:'',
+  hosts:{ c300:'18400 UPT | OLT C300 CASQUEIRO', c350:'18400 UPT | OLT C350 VILA NATAL' },
+  thr:90, warn:75, capDown:2488, capUp:1244,
+  cpuWarn:75, cpuCrit:90, memWarn:80, memCrit:90, tempWarn:60, tempCrit:70,
+  interval:30, sound:false, notify:false
+};
+const TH = { cpu:{w:'cpuWarn',c:'cpuCrit',hy:3}, mem:{w:'memWarn',c:'memCrit',hy:2}, temp:{w:'tempWarn',c:'tempCrit',hy:2} };
+const RANK = { idle:-1, ok:0, warn:1, crit:2 };
+
+/* ---------- utilidades ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const nf = (v, d) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits:d, maximumFractionDigits:d });
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function bpsParts(v){
+  if (v == null || !isFinite(v)) return ['—',''];
+  const a = Math.abs(v);
+  if (a >= 1e9) return [nf(v/1e9, a >= 1e10 ? 1 : 2), 'Gbps'];
+  if (a >= 1e6) return [nf(v/1e6, a >= 1e8 ? 0 : 1), 'Mbps'];
+  if (a >= 1e3) return [nf(v/1e3, 0), 'kbps'];
+  return [nf(v, 0), 'bps'];
+}
+const fmtBps = v => { const [n,u] = bpsParts(v); return u ? n + ' ' + u : n; };
+const bpsHTML = v => { const [n,u] = bpsParts(v); return esc(n) + (u ? `<span class="unit">${u}</span>` : ''); };
+function fmtPct(p){ if (p == null || !isFinite(p)) return '—'; const x = p * 100; return nf(x, x < 10 ? 1 : 0) + '%'; }
+const fmtTime = ms => new Date(ms).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+const fmtTimeS = ms => new Date(ms).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+const fmtDay = ms => new Date(ms).toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit' });
+function fmtDur(ms){
+  const m = Math.max(0, Math.round(ms / MIN));
+  if (m < 1) return 'menos de 1 min';
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60), r = m % 60;
+  return h + ' h' + (r ? ' ' + String(r).padStart(2,'0') + ' min' : '');
+}
+function hash(str){ let h = 2166136261; for (let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function rnd(seed){ let t = (seed + 0x6D2B79F5) | 0; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
+function gauss(seed){ const u1 = Math.max(1e-9, rnd(seed)), u2 = rnd(seed ^ 0x9e3779b9); return Math.sqrt(-2 * Math.log(u1)) * Math.cos(TAU * u2); }
+const jit = (seed, ms, period = 20000) => rnd((seed ^ Math.imul(Math.floor(ms / period) | 0, 0x9E3779B1)) >>> 0) - .5;
+function load(key){ try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch(e){ return null; } }
+function store(key, v){ try { localStorage.setItem(key, JSON.stringify(v)); return true; } catch(e){ return false; } }
+function loadCfg(){
+  const base = JSON.parse(JSON.stringify(DEFAULTS));
+  const o = load(STORE);
+  if (!o || typeof o !== 'object') return base;
+  return Object.assign(base, o, { hosts: Object.assign(base.hosts, o.hosts || {}) });
+}
+
+const ICON = {
+  bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
+  soundOn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>',
+  soundOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>',
+  tv:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+};
+
+/* ---------- estado ---------- */
+let cfg = loadCfg();
+const uiSaved = load(STORE_UI) || {};
+const ui = {
+  active: DATA.olts[0].id,
+  filter: ['active','crit','warn','idle'].includes(uiSaved.filter) ? uiSaved.filter : 'active',
+  sort: ['slot','util','region'].includes(uiSaved.sort) ? uiSaved.sort : 'slot',
+  view: uiSaved.view === 'heat' ? 'heat' : 'cards',
+  q:'', detail:null, dWin:24, dSeries:null, dLoading:false, tv:false, lastFocus:null
+};
+const OLTS = DATA.olts.map(d => ({ id:d.id, nome:d.nome, curto:d.curto, local:d.local, modelo:d.modelo, src:d,
+  ports:[], portMap:new Map(), uplinks:[], health:{}, boards:[], updatedAt:null, error:null, loading:false, zhostid:null, zraw:{} }));
+const byId = Object.fromEntries(OLTS.map(o => [o.id, o]));
+const targets = new Map();
+const alerts = { active:new Map(), history:[] };
+let timer = null, soundTimer = null, tvTimer = null, wakeLock = null, audio = null, polling = false;
+const pons = { sig:'', refs:new Map(), slotRefs:new Map() };
+
+/* ---------- descrição das portas ---------- */
+function parseAlias(raw){
+  let s = String(raw || '').replace(/\s+/g, ' ').trim();
+  let coords = null;
+  const cm = s.match(/(-\d{1,2}\.\d+)\s*,?\s*(-\d{1,3}\.\d+)/);
+  if (cm){ coords = [+cm[1], +cm[2]]; s = (s.slice(0, cm.index) + s.slice(cm.index + cm[0].length)).trim(); }
+  const label = s;
+  let vlan = null, m = s.match(/VLAN\s*(\d{2,4})/i);
+  if (m){ vlan = m[1]; s = s.replace(m[0], ' '); }
+  else if ((m = s.match(/\b(\d{4})\b/))){ vlan = m[1]; s = s.replace(m[0], ' '); }
+  let fiber = null; m = s.match(/\bF\d{1,2}(?:\/F\d{1,2})?\b/i);
+  if (m){ fiber = m[0].toUpperCase(); s = s.replace(m[0], ' '); }
+  let cable = null; m = s.match(/\bTB\d+\s*\d+\s*FO\b/i);
+  if (m){ cable = m[0].toUpperCase(); s = s.replace(m[0], ' '); }
+  const region = s.replace(/\s+/g, ' ').replace(/\s-\s/g, ' ').replace(/^[\s\-–]+|[\s\-–]+$/g, '').trim();
+  return { label, region, vlan, fiber, cable, coords };
+}
+function slotOf(name){ const m = String(name).match(/_(\d+)\/(\d+)\/(\d+)$/); return m ? { slot:+m[2], idx:+m[3] } : { slot:0, idx:0 }; }
+function setCaps(p, speed){
+  if (p.kind === 'gpon'){ p.capD = cfg.capDown * 1e6; p.capU = cfg.capUp * 1e6; }
+  else { p.capD = p.capU = speed || 1e10; }
+}
+function makePort(oltId, name, alias, active){
+  const a = parseAlias(alias), s = slotOf(name);
+  const p = { type:'pon', key:oltId + '|' + name, olt:oltId, name, short:name.replace(/^[a-z-]+_/i, ''), slot:s.slot, idx:s.idx,
+    alias:alias || '', ...a, active, kind:/^xg/i.test(name) ? 'xgs' : 'gpon', capD:0, capU:0, down:null, up:null, pd:null, pu:null,
+    hd:[], hu:[], sevD:'ok', sevU:'ok', sev:active ? 'ok' : 'idle' };
+  p.search = norm([name, p.short, a.label, a.region, a.vlan ? 'vlan ' + a.vlan : '', a.fiber].join(' '));
+  setCaps(p);
+  return p;
+}
+function guessSpeed(name){ if (/^smartgroup/i.test(name)) return 0; if (/^xgei/i.test(name)) return 1e10; if (/^gei/i.test(name)) return 1e9; return 1e10; }
+function makeUplink(oltId, name, alias, active, speed){
+  return { type:'uplink', key:oltId + '|' + name, olt:oltId, name, short:name, alias:alias || '', label:alias || '', region:alias || '',
+    active, isLag:/^smartgroup/i.test(name), members:[], memberOf:null, capD:speed || guessSpeed(name), capU:speed || guessSpeed(name),
+    down:null, up:null, pd:null, pu:null, hd:[], hu:[], sevD:'ok', sevU:'ok', sev:active ? 'ok' : 'idle' };
+}
+function mkMetric(oltId, id, label, unit){ return { type:'health', key:oltId + '|h|' + id, olt:oltId, id, label, unit, value:null, hist:[], sev:'ok', where:'', missing:false }; }
+function rebuildIndex(){
+  targets.clear();
+  for (const o of OLTS){
+    for (const p of o.ports) targets.set(p.key, p);
+    for (const u of o.uplinks) targets.set(u.key, u);
+    for (const m of Object.values(o.health)) if (m) targets.set(m.key, m);
+  }
+}
+function pushPoint(arr, t, v){
+  if (v == null || !isFinite(v)) return;
+  const last = arr[arr.length - 1];
+  if (last && last[0] === t) last[1] = v;
+  else if (!last || t > last[0]) arr.push([t, v]);
+  const cut = t - WINDOW - MIN;
+  while (arr.length && arr[0][0] < cut) arr.shift();
+}
+function valueAt(arr, t){
+  let lo = 0, hi = arr.length - 1, ans = -1;
+  while (lo <= hi){ const mid = (lo + hi) >> 1; if (arr[mid][0] <= t){ ans = mid; lo = mid + 1; } else hi = mid - 1; }
+  return ans < 0 ? null : arr[ans][1];
+}
+
+/* ---------- simulação (modo demonstração) ---------- */
+function curve(ms){
+  const d = new Date(ms), h = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+  const g = (c, w) => { let x = Math.abs(h - c); x = Math.min(x, 24 - x); return Math.exp(-x * x / (2 * w * w)); };
+  return Math.min(1, (0.17 + 0.30 * g(12.5, 3.4) + 0.72 * g(21.2, 2.4)) / 0.93);
+}
+const DEMO_SPECIAL = {
+  'c300|gpon_1/15/4':'osc', 'c300|gpon_1/16/7':'upHot', 'c300|gpon_1/13/2':'warn',
+  'c350|gpon_1/4/11':'steady', 'c350|gpon_1/9/4':'osc', 'c350|gpon_1/5/13':'warn', 'c350|gpon_1/10/4':'warn2'
+};
+function demoProfile(p, median){
+  const seed = hash(p.key);
+  return { seed, kind:DEMO_SPECIAL[p.key] || 'normal',
+    w:clamp(Math.exp(Math.log(median) + 0.75 * gauss(seed)), 0.004, 0.36),
+    r:0.10 + rnd(seed ^ 0x51ed) * 0.12,
+    ph1:rnd(seed ^ 0xa1) * TAU, ph2:rnd(seed ^ 0xb2) * TAU, ph3:rnd(seed ^ 0xc3) * TAU };
+}
+function demoUtil(p, ms){
+  const P = p.demo, c = curve(ms);
+  const s1 = Math.sin(TAU * ms / (37 * MIN) + P.ph1), s2 = Math.sin(TAU * ms / (138 * MIN) + P.ph2), s3 = Math.sin(TAU * ms / (9 * MIN) + P.ph3);
+  let d, u;
+  switch (P.kind){
+    case 'steady': d = 0.918 + 0.022 * c + 0.010 * s1 + 0.006 * s3; break;
+    case 'osc':    d = 0.872 + 0.052 * Math.sin(TAU * ms / (19 * MIN) + P.ph1) + 0.010 * s3; break;
+    case 'warn':   d = 0.790 + 0.035 * s1 + 0.020 * c; break;
+    case 'warn2':  d = 0.600 + 0.190 * c + 0.030 * s1; break;
+    case 'upHot':  d = 0.160 + 0.100 * c + 0.020 * s1; break;
+    default:       d = P.w * c * (1 + 0.12 * s1 + 0.07 * s2 + 0.05 * s3);
+  }
+  d += jit(P.seed, ms) * (P.kind === 'normal' ? P.w * 0.05 : 0.012);
+  if (P.kind === 'upHot') u = 0.918 + 0.016 * Math.sin(TAU * ms / (27 * MIN) + P.ph2) + jit(P.seed ^ 7, ms) * 0.008;
+  else u = (clamp(d, 0, 1) * p.capD * P.r * (1 + 0.18 * s2)) / p.capU;
+  return [clamp(d, 0, 0.985), clamp(u, 0, 0.985)];
+}
+function demoUplinks(o, t, D, U){
+  const res = new Map();
+  const lag = o.uplinks.find(u => u.isLag && u.active && u.members.length);
+  if (lag){
+    const ws = lag.members.map((m, i) => 1 + 0.05 * Math.sin(TAU * t / (41 * MIN) + i * 2.1));
+    const sum = ws.reduce((a, b) => a + b, 0);
+    const Dt = D * 1.012 + 35e6, Ut = U * 1.02 + 12e6;
+    lag.members.forEach((m, i) => res.set(m, [Dt * ws[i] / sum, Ut * ws[i] / sum]));
+    res.set(lag.name, [Dt, Ut]);
+  } else {
+    const act = o.uplinks.filter(u => u.active && !u.isLag);
+    act.forEach((u, i) => {
+      const w = i === 0 ? 0.965 : 0.035 / Math.max(1, act.length - 1);
+      const base = i === 0 ? 40e6 : 22e6;
+      res.set(u.name, [D * w + base, U * w + base * 0.4]);
+    });
+  }
+  return res;
+}
+function demoHealth(o, ms){
+  const c = curve(ms), s = hash(o.id);
+  const b = o.id === 'c300' ? { cpu:19, cpuA:11, mem:57.6, temp:46.5 } : { cpu:13, cpuA:9, mem:43.2, temp:40.2 };
+  return {
+    cpu: clamp(b.cpu + b.cpuA * c + 3.2 * Math.sin(TAU * ms / (7 * MIN) + (s % 7)) + jit(s, ms, 15000) * 4, 1, 99),
+    mem: b.mem + 0.5 * Math.sin(TAU * ms / (180 * MIN)) + jit(s ^ 3, ms, 60000) * 0.2,
+    temp: b.temp + 2.4 * c + 0.35 * Math.sin(TAU * ms / (23 * MIN))
+  };
+}
+function demoBoards(o, ms, h){
+  const c = curve(ms);
+  const slots = [...new Set(o.ports.map(p => p.slot))].sort((a, b) => a - b);
+  const rows = [{ label:'Controladora', cpu:h.cpu, mem:h.mem, temp:h.temp, ports:null }];
+  for (const sl of slots){
+    const seed = hash(o.id + 's' + sl), ps = o.ports.filter(p => p.slot === sl);
+    const act = ps.filter(p => p.active).length;
+    let temp = 43 + rnd(seed) * 8 + 2 * c + 0.3 * Math.sin(TAU * ms / (17 * MIN) + seed % 5);
+    if (o.id === 'c300' && sl === 17) temp = 61.3 + 0.5 * Math.sin(TAU * ms / (29 * MIN));
+    rows.push({ label:'Placa ' + sl, slot:sl, cpu: act ? 9 + rnd(seed ^ 9) * 18 + 9 * c + jit(seed, ms, 15000) * 3 : 3 + rnd(seed) * 2, mem:null, temp, ports:act + '/' + ps.length });
+  }
+  return rows;
+}
+function buildDemo(o){
+  const d = o.src;
+  o.ports = d.pons.map(([name, alias, oper]) => { const p = makePort(o.id, name, alias, oper === 1); p.demo = demoProfile(p, d.median); return p; });
+  o.portMap = new Map(o.ports.map(p => [p.name, p]));
+  o.uplinks = d.uplinks.map(([name, alias, oper, speed]) => makeUplink(o.id, name, alias, oper === 1, speed));
+  if (d.lag){
+    const lag = o.uplinks.find(u => u.name === d.lag.name);
+    if (lag){ lag.members = d.lag.members.slice(); for (const u of o.uplinks) if (lag.members.includes(u.name)) u.memberOf = lag.name; }
+  }
+  o.health = { cpu:mkMetric(o.id, 'cpu', 'Processamento', '%'), mem:mkMetric(o.id, 'mem', 'Memória', '%'), temp:mkMetric(o.id, 'temp', 'Temperatura', '°C') };
+}
+function demoAt(o, t, bucket){
+  let D = 0, U = 0;
+  for (const p of o.ports){
+    if (!p.active){ p.down = p.up = null; continue; }
+    const [d, u] = demoUtil(p, t);
+    p.down = d * p.capD; p.up = u * p.capU; D += p.down; U += p.up;
+    pushPoint(p.hd, bucket, p.down); pushPoint(p.hu, bucket, p.up);
+  }
+  const uv = demoUplinks(o, t, D, U);
+  for (const u of o.uplinks){
+    const v = uv.get(u.name);
+    if (!u.active || !v){ u.down = u.up = null; continue; }
+    u.down = v[0]; u.up = v[1]; pushPoint(u.hd, bucket, u.down); pushPoint(u.hu, bucket, u.up);
+  }
+  const h = demoHealth(o, t);
+  for (const id of ['cpu','mem','temp']){ const m = o.health[id]; m.value = h[id]; m.where = 'Controladora'; pushPoint(m.hist, bucket, h[id]); }
+  return h;
+}
+function demoStep(now){
+  const bucket = Math.floor(now / MIN) * MIN;
+  for (const o of OLTS){
+    const h = demoAt(o, now, bucket);
+    o.boards = demoBoards(o, now, h);
+    o.updatedAt = now; o.error = null; o.loading = false;
+  }
+}
+function startDemo(){
+  for (const o of OLTS) buildDemo(o);
+  rebuildIndex();
+  const now = Date.now(), cur = Math.floor(now / MIN) * MIN;
+  for (let k = 120; k >= 1; k--){ const t = cur - k * MIN; for (const o of OLTS) demoAt(o, t, t); }
+  replay(now);
+  demoStep(now);
+  evaluate(now, true);
+  timer = setInterval(() => { const t = Date.now(); demoStep(t); evaluate(t, false); update(); }, 5000);
+}
+
+/* ---------- Zabbix ---------- */
+function insideClaude(){ return /claude|anthropic/i.test(location.hostname); }
+async function zcall(conn, method, params, auth = true){
+  const headers = { 'Content-Type':'application/json-rpc' };
+  if (auth && conn.token) headers.Authorization = 'Bearer ' + conn.token.trim();
+  let res;
+  try {
+    res = await fetch(conn.url.trim(), { method:'POST', headers, body:JSON.stringify({ jsonrpc:'2.0', method, params, id:Date.now() }) });
+  } catch(e){
+    throw new Error(insideClaude()
+      ? 'Pelo link do Claude o painel não alcança servidores externos. Hospede o arquivo na sua rede para ler o Zabbix.'
+      : 'Sem resposta da API do Zabbix. Confira a URL e se este endereço pode consultá-la (mesmo domínio ou proxy).');
+  }
+  const text = await res.text();
+  let body; try { body = JSON.parse(text); } catch(e){ throw new Error(`A API respondeu algo que não é JSON (HTTP ${res.status}). Confira a URL.`); }
+  if (body && body.error) throw new Error(`Zabbix ${method}: ${body.error.message}${body.error.data ? ' — ' + body.error.data : ''}`);
+  return body ? body.result : null;
+}
+const zbx = (method, params, auth) => zcall(cfg, method, params, auth);
+const IOUT = ['itemid','name','key_','lastvalue','lastclock','units','value_type'];
+function isBpsUnit(u){ return /^b(ps|\/s)$/.test(String(u || '').trim()); }
+function rateFrom(o, it){
+  const v = +it.lastvalue, c = +it.lastclock;
+  if (!isFinite(v)) return null;
+  const u = String(it.units || '').trim();
+  if (isBpsUnit(u)) return v;
+  if (/^B(ps|\/s)$/.test(u)) return v * 8;
+  const prev = o.zraw[it.itemid]; o.zraw[it.itemid] = { v, c };
+  if (prev && c > prev.c && v >= prev.v) return (v - prev.v) * 8 / (c - prev.c);
+  return null;
+}
+async function zResolve(o){
+  if (o.zhostid) return;
+  const name = (cfg.hosts[o.id] || '').trim();
+  if (!name) throw new Error('Informe o nome do host desta OLT nas configurações.');
+  let r = await zbx('host.get', { output:['hostid','name'], filter:{ name:[name] } });
+  if (!r || !r.length) r = await zbx('host.get', { output:['hostid','name'], search:{ name }, limit:5 });
+  if (!r || !r.length) throw new Error(`O host "${name}" não foi encontrado no Zabbix.`);
+  o.zhostid = r[0].hostid; o.zhostname = r[0].name;
+}
+function mergeInterfaces(o, items){
+  const ifs = new Map();
+  for (const it of items || []){
+    const km = String(it.key_).match(/\[(ifHCInOctets|ifHCOutOctets|ifOperStatus|ifHighSpeed|ifSpeed)\.(\d+)\]/);
+    if (!km) continue;
+    const nm = String(it.name).match(/^Interface\s+(.+?):\s/);
+    if (!nm) continue;
+    const lab = nm[1], am = lab.match(/^(.*?)\((.*)\)$/);
+    const ifName = (am ? am[1] : lab).trim(), alias = (am ? am[2] : '').trim();
+    let r = ifs.get(km[2]);
+    if (!r){ r = { name:ifName, alias, it:{} }; ifs.set(km[2], r); }
+    if (!r.alias && alias) r.alias = alias;
+    const metric = km[1];
+    if (metric === 'ifHCInOctets' || metric === 'ifHCOutOctets'){
+      const cur = r.it[metric];
+      if (!cur || (isBpsUnit(it.units) && !isBpsUnit(cur.units))) r.it[metric] = it;
+    } else r.it[metric] = it;
+  }
+  for (const r of ifs.values()){
+    const isPon = /^(gpon|xgs|xg-?pon|epon|combo)/i.test(r.name);
+    const isUp = !isPon && /^(xxgei|xgei|gei|cgei|\d+gei|smartgroup)/i.test(r.name);
+    if (!isPon && !isUp) continue;
+    const oper = r.it.ifOperStatus ? +r.it.ifOperStatus.lastvalue : null;
+    let speed = r.it.ifHighSpeed ? +r.it.ifHighSpeed.lastvalue : (r.it.ifSpeed ? +r.it.ifSpeed.lastvalue : null);
+    if (speed && speed < 1e6) speed *= 1e6;
+    const inR = r.it.ifHCInOctets ? rateFrom(o, r.it.ifHCInOctets) : null;
+    const outR = r.it.ifHCOutOctets ? rateFrom(o, r.it.ifHCOutOctets) : null;
+    const active = oper != null ? oper === 1 : ((inR || 0) + (outR || 0)) > 0;
+    const clockOf = it => it ? +it.lastclock * 1000 : Date.now();
+    let t = o.portMap.get(r.name);
+    if (!t){
+      t = isPon ? makePort(o.id, r.name, r.alias, active) : makeUplink(o.id, r.name, r.alias, active, speed);
+      o.portMap.set(r.name, t);
+      (isPon ? o.ports : o.uplinks).push(t);
+    }
+    t.active = active;
+    if (isPon){
+      setCaps(t, speed);
+      t.down = outR; t.up = inR; t.zD = r.it.ifHCOutOctets; t.zU = r.it.ifHCInOctets;
+    } else {
+      t.capD = t.capU = speed || guessSpeed(r.name) || t.capD;
+      t.down = inR; t.up = outR; t.zD = r.it.ifHCInOctets; t.zU = r.it.ifHCOutOctets;
+    }
+    if (t.down != null) pushPoint(t.hd, clockOf(t.zD), t.down);
+    if (t.up != null) pushPoint(t.hu, clockOf(t.zU), t.up);
+  }
+  o.ports.sort((a, b) => a.slot - b.slot || a.idx - b.idx);
+  o.uplinks.sort((a, b) => (b.isLag - a.isLag) || a.name.localeCompare(b.name, 'pt-BR', { numeric:true }));
+}
+function boardLabel(name){
+  return String(name)
+    .replace(/\b(cpu|processador|processor|processamento|utiliza[cç][aã]o|utilization|usage|uso|load|carga|mem[oó]ria|memory|temperatura|temperature|temp|util|ratio|percent)\b/gi, '')
+    .replace(/[:()\[\]%]+/g, ' ').replace(/\s{2,}/g, ' ').replace(/^[\s\-–_]+|[\s\-–_]+$/g, '').trim() || 'Geral';
+}
+function mergeHealth(o, items){
+  const groups = { cpu:[], mem:[], temp:[] };
+  for (const it of items || []){
+    if (/^net\.if/.test(it.key_) || /^Interface\s/i.test(it.name)) continue;
+    if (!['0','3'].includes(String(it.value_type))) continue;
+    const n = it.name; let id = null;
+    if (/temp/i.test(n)) id = 'temp'; else if (/cpu|process/i.test(n)) id = 'cpu'; else if (/mem/i.test(n)) id = 'mem';
+    if (!id) continue;
+    const u = String(it.units || '').trim(), v = +it.lastvalue;
+    if (!isFinite(v)) continue;
+    if ((id === 'cpu' || id === 'mem') && ((u && u !== '%') || v < 0 || v > 100)) continue;
+    if (id === 'temp' && (v < -20 || v > 150)) continue;
+    groups[id].push({ it, v, label:boardLabel(n), clock:+it.lastclock * 1000 });
+  }
+  const labels = { cpu:['Processamento','%'], mem:['Memória','%'], temp:['Temperatura','°C'] };
+  const boards = new Map();
+  for (const id of ['cpu','mem','temp']){
+    let m = o.health[id];
+    if (!m){ m = mkMetric(o.id, id, labels[id][0], labels[id][1]); o.health[id] = m; }
+    const g = groups[id];
+    if (!g.length){ m.missing = true; m.value = null; continue; }
+    g.sort((a, b) => b.v - a.v);
+    if (m.zItem && m.zItem.itemid !== g[0].it.itemid) m.hist = [];
+    m.missing = false; m.value = g[0].v; m.where = g[0].label; m.zItem = g[0].it;
+    pushPoint(m.hist, g[0].clock, g[0].v);
+    for (const x of g){ const b = boards.get(x.label) || { label:x.label, cpu:null, mem:null, temp:null, ports:null }; b[id] = x.v; boards.set(x.label, b); }
+  }
+  o.boards = [...boards.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR', { numeric:true }));
+}
+async function zHistory(o){
+  const from = Math.floor((Date.now() - WINDOW) / 1000);
+  const map = new Map(), byType = { 0:[], 3:[] };
+  const add = (it, arr) => { if (!it) return; const vt = String(it.value_type); if (!(vt in byType)) return; map.set(String(it.itemid), arr); byType[vt].push(String(it.itemid)); };
+  for (const t of [...o.ports, ...o.uplinks]){
+    if (!t.active) continue;
+    if (t.zD && isBpsUnit(t.zD.units)){ t.hd.length = 0; add(t.zD, t.hd); }
+    if (t.zU && isBpsUnit(t.zU.units)){ t.hu.length = 0; add(t.zU, t.hu); }
+  }
+  for (const m of Object.values(o.health)) if (m && m.zItem){ m.hist.length = 0; add(m.zItem, m.hist); }
+  for (const vt of ['0','3']){
+    const ids = byType[vt];
+    for (let i = 0; i < ids.length; i += 150){
+      const rows = await zbx('history.get', { history:+vt, itemids:ids.slice(i, i + 150), time_from:from, output:'extend', sortfield:'clock', sortorder:'ASC', limit:200000 });
+      for (const r of rows || []){ const arr = map.get(String(r.itemid)); if (arr) arr.push([+r.clock * 1000, +r.value]); }
+    }
+  }
+  for (const arr of map.values()) arr.sort((a, b) => a[0] - b[0]);
+}
+async function zPoll(o, first){
+  await zResolve(o);
+  const items = await zbx('item.get', { hostids:[o.zhostid], output:IOUT, search:{ key_:'net.if' }, limit:50000 });
+  mergeInterfaces(o, items);
+  let hitems = [];
+  try { hitems = await zbx('item.get', { hostids:[o.zhostid], output:IOUT, search:{ name:['*CPU*','*Mem*','*Temp*','*Process*'] }, searchByAny:true, searchWildcardsEnabled:true, limit:2000 }); }
+  catch(e){ hitems = []; }
+  mergeHealth(o, hitems);
+  rebuildIndex();
+  if (first) await zHistory(o);
+  o.updatedAt = Date.now(); o.error = null; o.loading = false;
+}
+async function zTick(first){
+  if (polling) return;
+  polling = true;
+  await Promise.all(OLTS.map(o => zPoll(o, first).catch(e => { o.error = e.message; o.loading = false; })));
+  polling = false;
+  const now = Date.now();
+  if (first){ replay(now); }
+  evaluate(now, first);
+  if (first) announceInitial();
+  update();
+}
+function startZabbix(){
+  for (const o of OLTS){ o.health = {}; }
+  if (!cfg.url.trim()){
+    for (const o of OLTS){ o.error = 'Informe a URL da API do Zabbix nas configurações.'; }
+    return;
+  }
+  for (const o of OLTS) o.loading = true;
+  zTick(true);
+  timer = setInterval(() => zTick(false), clamp(+cfg.interval || 30, 10, 600) * 1000);
+}
+
+/* ---------- regras de alerta ---------- */
+function sevPct(p, prev){
+  const T = cfg.thr / 100, W = cfg.warn / 100;
+  if (p == null || !isFinite(p)) return 'ok';
+  if (p >= T || (prev === 'crit' && p >= T - 0.05)) return 'crit';
+  if (p >= W) return 'warn';
+  return 'ok';
+}
+function sevVal(v, w, c, prev, hy){
+  if (v == null || !isFinite(v)) return 'ok';
+  if (v >= c || (prev === 'crit' && v >= c - hy)) return 'crit';
+  if (v >= w) return 'warn';
+  return 'ok';
+}
+const worst = (a, b) => RANK[a] >= RANK[b] ? a : b;
+function track(o, t, dir, isCrit, value, pct, now, fresh){
+  const key = t.key + '|' + dir, a = alerts.active.get(key);
+  if (isCrit){
+    if (!a){ const n = { key, olt:o.id, target:t.key, type:t.type, dir, since:now, last:now, value, pct, peak:pct != null ? pct : value, ack:false }; alerts.active.set(key, n); fresh.push(n); }
+    else { a.last = now; a.value = value; a.pct = pct; const cmp = pct != null ? pct : value; if (cmp > a.peak) a.peak = cmp; }
+  } else if (a){
+    alerts.active.delete(key); a.ended = now; alerts.history.unshift(a);
+    if (alerts.history.length > 40) alerts.history.pop();
+  }
+}
+function evaluate(now, silent){
+  const fresh = [];
+  for (const o of OLTS){
+    for (const t of [...o.ports, ...o.uplinks]){
+      if (!t.active || t.down == null){
+        t.sev = t.active ? 'ok' : 'idle'; t.pd = t.pu = null;
+        track(o, t, 'down', false, null, null, now, fresh); track(o, t, 'up', false, null, null, now, fresh);
+        continue;
+      }
+      t.pd = t.capD ? t.down / t.capD : null;
+      t.pu = (t.capU && t.up != null) ? t.up / t.capU : null;
+      t.sevD = sevPct(t.pd, t.sevD); t.sevU = sevPct(t.pu, t.sevU); t.sev = worst(t.sevD, t.sevU);
+      track(o, t, 'down', t.sevD === 'crit', t.down, t.pd, now, fresh);
+      track(o, t, 'up', t.sevU === 'crit', t.up, t.pu, now, fresh);
+    }
+    for (const m of Object.values(o.health)){
+      if (!m) continue;
+      const th = TH[m.id];
+      m.sev = sevVal(m.value, cfg[th.w], cfg[th.c], m.sev, th.hy);
+      track(o, m, 'v', m.sev === 'crit', m.value, null, now, fresh);
+    }
+  }
+  if (!silent && fresh.length) announce(fresh);
+}
+function replay(now){
+  const saved = [];
+  for (const o of OLTS){
+    for (const t of [...o.ports, ...o.uplinks]) saved.push([t, t.down, t.up]);
+    for (const m of Object.values(o.health)) if (m) saved.push([m, m.value]);
+  }
+  const start = Math.floor((now - WINDOW) / MIN) * MIN + MIN;
+  for (let t = start; t < now - MIN / 2; t += MIN){
+    for (const o of OLTS){
+      for (const x of [...o.ports, ...o.uplinks]){ if (!x.active) continue; x.down = valueAt(x.hd, t); x.up = valueAt(x.hu, t); }
+      for (const m of Object.values(o.health)) if (m) m.value = valueAt(m.hist, t);
+    }
+    evaluate(t, true);
+  }
+  for (const s of saved){ if (s[0].type === 'health') s[0].value = s[1]; else { s[0].down = s[1]; s[0].up = s[2]; } }
+}
+
+/* ---------- avisos: som, notificação, toast ---------- */
+function ensureAudio(){
+  if (audio) return audio;
+  try { const C = window.AudioContext || window.webkitAudioContext; if (C) audio = new C(); } catch(e){ audio = null; }
+  return audio;
+}
+function beep(){
+  const ctx = ensureAudio(); if (!ctx) return;
+  try {
+    if (ctx.state === 'suspended') ctx.resume();
+    const t0 = ctx.currentTime;
+    [[880, 0], [660, 0.18]].forEach(([f, dt]) => {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = 'sine'; osc.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + dt); g.gain.exponentialRampToValueAtTime(0.18, t0 + dt + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.16);
+      osc.connect(g).connect(ctx.destination); osc.start(t0 + dt); osc.stop(t0 + dt + 0.18);
+    });
+  } catch(e){}
+}
+function toast(title, body, kind = 'info', ms = 7000){
+  const box = $('#toasts'), el = document.createElement('div');
+  el.className = 'toast is-' + kind;
+  el.innerHTML = `<span class="dotsev"></span><div><b>${esc(title)}</b>${body ? `<span>${esc(body)}</span>` : ''}</div>`;
+  box.appendChild(el);
+  while (box.children.length > 4) box.firstChild.remove();
+  setTimeout(() => el.remove(), ms);
+}
+function notifyBrowser(title, body){
+  if (!cfg.notify || !('Notification' in window) || Notification.permission !== 'granted') return;
+  try { new Notification(title, { body, tag:'updown-olt' }); } catch(e){}
+}
+function announce(fresh){
+  const list = fresh.slice(0, 3);
+  for (const a of list){ const d = describe(a); toast(d.title, d.sub, 'danger', 9000); notifyBrowser(d.title, d.sub); }
+  if (fresh.length > 3) toast(`Mais ${fresh.length - 3} alertas abertos`, '', 'danger');
+  if (cfg.sound) beep();
+}
+function announceInitial(){
+  const n = alerts.active.size;
+  if (!n) return;
+  toast(n === 1 ? '1 alerta ativo' : `${n} alertas ativos`, 'Veja a lista no topo de cada OLT.', 'danger');
+  if (cfg.sound) beep();
+}
+function startSoundLoop(){
+  clearInterval(soundTimer);
+  soundTimer = setInterval(() => { if (cfg.sound && [...alerts.active.values()].some(a => !a.ack)) beep(); }, 60000);
+}
+function describe(a){
+  const t = targets.get(a.target), o = byId[a.olt];
+  if (!t) return { title:'Alerta', sub:'' };
+  if (a.type === 'health'){
+    const th = TH[t.id];
+    return { title:`${t.label} da ${o.curto}`, sub:`${fmtMetric(t, a.value)}${t.where ? ' · ' + t.where : ''} (alerta em ${cfg[th.c]}${t.unit === '%' ? '%' : ' °C'})` };
+  }
+  const cap = a.dir === 'down' ? t.capD : t.capU;
+  const what = t.type === 'pon' ? 'PON ' + t.short : 'Uplink ' + t.name;
+  return { title:`${what} · ${o.curto}${t.type === 'pon' && t.region ? ' · ' + t.region : ''}`,
+    sub:`${a.dir === 'down' ? '↓ Download' : '↑ Upload'} ${fmtBps(a.value)} de ${fmtBps(cap)} (${fmtPct(a.pct)})` };
+}
+function fmtMetric(m, v){ if (v == null) return '—'; return m.unit === '%' ? nf(v, v < 10 ? 1 : 0) + '%' : nf(v, 1) + ' °C'; }
+
+/* ---------- desenho: sparkline, medidor, gráfico ---------- */
+function linePath(pts){ let s = ''; for (let i = 0; i < pts.length; i++) s += (i ? 'L' : 'M') + pts[i][0].toFixed(1) + ' ' + pts[i][1].toFixed(1); return s; }
+function sparkSVG(hd, hu, capD, t1, cls = 'spark'){
+  const W = 200, H = 34, t0 = t1 - WINDOW;
+  let peak = 0;
+  for (const a of hd) if (a[0] >= t0 && a[1] > peak) peak = a[1];
+  for (const a of hu) if (a[0] >= t0 && a[1] > peak) peak = a[1];
+  const ymax = Math.max(peak * 1.15, capD * 0.1, 1);
+  const X = t => clamp((t - t0) / (t1 - t0), 0, 1) * W, Y = v => H - 2 - (Math.min(v, ymax) / ymax) * (H - 4);
+  const pd = hd.filter(a => a[0] >= t0).map(a => [X(a[0]), Y(a[1])]);
+  const pu = hu.filter(a => a[0] >= t0).map(a => [X(a[0]), Y(a[1])]);
+  const thrV = capD * cfg.thr / 100;
+  const thr = thrV <= ymax ? `<line class="spark-thr" x1="0" x2="${W}" y1="${Y(thrV).toFixed(1)}" y2="${Y(thrV).toFixed(1)}"/>` : '';
+  const area = pd.length > 1 ? `<path class="spark-fill" d="${linePath(pd)}L${pd[pd.length - 1][0].toFixed(1)} ${H}L${pd[0][0].toFixed(1)} ${H}Z"/>` : '';
+  return `<svg class="${cls}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${thr}${area}${pu.length > 1 ? `<path class="spark-out" d="${linePath(pu)}"/>` : ''}${pd.length > 1 ? `<path class="spark-in" d="${linePath(pd)}"/>` : ''}</svg>`;
+}
+function gaugeSVG(m){
+  const th = TH[m.id], isTemp = m.id === 'temp';
+  const lo = isTemp ? 20 : 0, hi = isTemp ? 90 : 100;
+  const f = v => clamp((v - lo) / (hi - lo), 0, 1);
+  const r = 54, c = 2 * Math.PI * r, arc = 0.75 * c, cx = 66, cy = 66;
+  const val = m.value == null ? 0 : f(m.value);
+  const cls = m.sev === 'crit' ? 'is-danger' : m.sev === 'warn' ? 'is-warn' : '';
+  const tick = (v, k) => { const ang = (135 + 270 * f(v)) * Math.PI / 180; const x1 = cx + Math.cos(ang) * (r - 11), y1 = cy + Math.sin(ang) * (r - 11), x2 = cx + Math.cos(ang) * (r + 11), y2 = cy + Math.sin(ang) * (r + 11); return `<line class="gauge-tick ${k}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`; };
+  const label = m.value == null ? '—' : (isTemp ? nf(m.value, 1) : nf(m.value, 0));
+  return `<svg class="gauge" viewBox="0 0 132 120" role="img" aria-label="${esc(m.label)}: ${m.value == null ? 'sem dado' : esc(fmtMetric(m, m.value))}">
+    <g transform="rotate(135 ${cx} ${cy})">
+      <circle class="gauge-track" cx="${cx}" cy="${cy}" r="${r}" stroke-width="12" stroke-dasharray="${arc.toFixed(1)} ${c.toFixed(1)}"/>
+      <circle class="gauge-value ${cls}" cx="${cx}" cy="${cy}" r="${r}" stroke-width="12" stroke-dasharray="${(val * arc).toFixed(1)} ${c.toFixed(1)}"/>
+    </g>
+    ${tick(cfg[th.w], 'w')}${tick(cfg[th.c], 'c')}
+    <text class="gauge-label" x="${cx}" y="${cy + 6}">${esc(label)}</text>
+    <text class="gauge-sub" x="${cx}" y="${cy + 22}">${isTemp ? '°C' : 'por cento'}</text>
+  </svg>`;
+}
+function healthSpark(m, t1){
+  const W = 200, H = 34, t0 = t1 - WINDOW, isTemp = m.id === 'temp';
+  const pts = m.hist.filter(a => a[0] >= t0);
+  if (pts.length < 2) return '';
+  const lo = isTemp ? Math.min(20, ...pts.map(p => p[1])) : 0, hi = isTemp ? Math.max(90, ...pts.map(p => p[1])) : 100;
+  const X = t => clamp((t - t0) / (t1 - t0), 0, 1) * W, Y = v => H - 2 - ((v - lo) / (hi - lo)) * (H - 4);
+  const p = pts.map(a => [X(a[0]), Y(a[1])]);
+  const cy = Y(cfg[TH[m.id].c]);
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><line class="spark-thr" x1="0" x2="${W}" y1="${cy.toFixed(1)}" y2="${cy.toFixed(1)}"/><path class="spark-fill" d="${linePath(p)}L${p[p.length - 1][0].toFixed(1)} ${H}L${p[0][0].toFixed(1)} ${H}Z"/><path class="spark-in" d="${linePath(p)}"/></svg>`;
+}
+const NICE = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 1];
+let chartUid = 0;
+function chartSVG(W, d, u, capD, capU, t0, t1, winH){
+  const H = 248, PL = 46, PR = 14, PT = 16, PB = 28, iw = W - PL - PR, ih = H - PT - PB;
+  const thr = cfg.thr / 100;
+  let peak = 0;
+  for (const a of d) peak = Math.max(peak, a[1] / capD);
+  for (const a of u) peak = Math.max(peak, a[1] / capU);
+  let ymax = NICE.find(n => n >= peak * 1.12) || 1;
+  if (ymax >= 0.75) ymax = 1;
+  const X = t => PL + (t - t0) / (t1 - t0) * iw, Y = p => PT + ih - (Math.min(p, ymax) / ymax) * ih;
+  const pd = d.map(a => [X(a[0]), Y(a[1] / capD)]), pu = u.map(a => [X(a[0]), Y(a[1] / capU)]);
+  const id = 'g' + (++chartUid);
+  let grid = '';
+  for (let k = 0; k <= 4; k++){
+    const v = ymax * k / 4, y = Y(v);
+    grid += `<line class="chart-grid" x1="${PL}" x2="${PL + iw}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}"/><text class="chart-axis" x="${PL - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${nf(v * 100, v * 100 < 10 && v > 0 ? 1 : 0)}%</text>`;
+  }
+  const stepH = winH <= 6 ? 1 : winH <= 24 ? 3 : 6;
+  const tk = new Date(t0); tk.setMinutes(0, 0, 0); tk.setHours(tk.getHours() + 1);
+  while (tk.getHours() % stepH) tk.setHours(tk.getHours() + 1);
+  let xl = '';
+  for (let t = tk.getTime(); t <= t1; t += stepH * HOUR){
+    const x = X(t), dd = new Date(t);
+    if (x < PL + 14 || x > PL + iw - 14) continue;
+    const lab = dd.getHours() === 0 ? dd.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }) : String(dd.getHours()).padStart(2, '0') + 'h';
+    xl += `<line class="chart-grid" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${PT + ih}" y2="${PT + ih + 4}"/><text class="chart-axis" x="${x.toFixed(1)}" y="${H - 8}" text-anchor="middle">${lab}</text>`;
+  }
+  const thrLine = thr <= ymax ? `<line class="chart-thr" x1="${PL}" x2="${PL + iw}" y1="${Y(thr).toFixed(1)}" y2="${Y(thr).toFixed(1)}"/><text class="chart-thr-label" x="${PL + iw}" y="${(Y(thr) - 6).toFixed(1)}" text-anchor="end">limite ${cfg.thr}%</text>` : '';
+  const area = (pts) => pts.length > 1 ? `${linePath(pts)}L${pts[pts.length - 1][0].toFixed(1)} ${PT + ih}L${pts[0][0].toFixed(1)} ${PT + ih}Z` : '';
+  const lastD = pd[pd.length - 1], lastU = pu[pu.length - 1];
+  const svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Utilização de download e upload nas últimas ${winH} horas, escala até ${Math.round(ymax * 100)}%">
+    <defs>
+      <linearGradient id="${id}i" x1="0" y1="0" x2="0" y2="1"><stop class="stop-in" offset="0%" stop-opacity=".34"/><stop class="stop-in" offset="100%" stop-opacity="0"/></linearGradient>
+      <linearGradient id="${id}o" x1="0" y1="0" x2="0" y2="1"><stop class="stop-out" offset="0%" stop-opacity=".30"/><stop class="stop-out" offset="100%" stop-opacity="0"/></linearGradient>
+    </defs>
+    ${grid}${xl}${thrLine}
+    <path d="${area(pu)}" fill="url(#${id}o)"/><path d="${area(pd)}" fill="url(#${id}i)"/>
+    <path class="chart-out" d="${pu.length > 1 ? linePath(pu) : ''}"/><path class="chart-in" d="${pd.length > 1 ? linePath(pd) : ''}"/>
+    ${lastU ? `<circle class="chart-dot out" cx="${lastU[0].toFixed(1)}" cy="${lastU[1].toFixed(1)}" r="4"/>` : ''}
+    ${lastD ? `<circle class="chart-dot in" cx="${lastD[0].toFixed(1)}" cy="${lastD[1].toFixed(1)}" r="4"/>` : ''}
+    <g class="hover" visibility="hidden"><line class="chart-cursor" y1="${PT}" y2="${PT + ih}"/><circle class="chart-dot in hd" r="4"/><circle class="chart-dot out hu" r="4"/></g>
+    <rect class="hit" x="${PL}" y="${PT}" width="${iw}" height="${ih}" fill="transparent"/>
+  </svg>`;
+  return { svg, ymax, peak, geo:{ W, PL, iw, t0, t1, X, Y, capD, capU } };
+}
+
+/* ---------- interface ---------- */
+function buildStatic(){
+  $('#tabs').innerHTML = OLTS.map(o => `<button class="tab" role="tab" type="button" id="tab-${o.id}" data-olt="${o.id}" aria-selected="false">${esc(o.curto)} <span class="tab-sub">${esc(o.local)}</span><span class="tab-count" hidden></span></button>`).join('');
+  $('#btnTv').innerHTML = ICON.tv; $('#btnSettings').innerHTML = ICON.gear; $('#setClose').innerHTML = ICON.x;
+  $('#sort').value = ui.sort;
+  document.documentElement.style.setProperty('--thr-pos', cfg.thr + '%');
+}
+function setSoundBtn(){
+  const b = $('#btnSound');
+  b.innerHTML = cfg.sound ? ICON.soundOn : ICON.soundOff;
+  b.setAttribute('aria-pressed', String(!!cfg.sound));
+  b.title = cfg.sound ? 'Som dos alertas ligado' : 'Som dos alertas desligado';
+}
+function oltAlertCount(id){ let n = 0; for (const a of alerts.active.values()) if (a.olt === id) n++; return n; }
+function updateChrome(){
+  for (const o of OLTS){
+    const tab = $('#tab-' + o.id);
+    tab.setAttribute('aria-selected', String(o.id === ui.active));
+    tab.tabIndex = o.id === ui.active ? 0 : -1;
+    const cnt = tab.querySelector('.tab-count'), n = oltAlertCount(o.id);
+    cnt.hidden = !n; cnt.textContent = n; cnt.setAttribute('aria-label', n + (n === 1 ? ' alerta' : ' alertas'));
+  }
+  const total = alerts.active.size;
+  document.title = (total ? `(${total}) ` : '') + 'Painel OLT UpDown';
+  const pill = $('#srcPill'), anyErr = OLTS.some(o => o.error), o = byId[ui.active];
+  pill.dataset.state = cfg.source === 'demo' ? 'demo' : anyErr ? 'error' : 'live';
+  $('#srcText').textContent = cfg.source === 'demo' ? 'Demonstração' : anyErr ? 'Falha no Zabbix' : 'Zabbix ao vivo';
+  $('#updText').textContent = o.updatedAt ? fmtTimeS(o.updatedAt) : '';
+  $('#demoBand').hidden = cfg.source !== 'demo';
+}
+function keepFocus(container, fn){
+  const ae = document.activeElement;
+  const k = ae && container.contains(ae) ? ae.getAttribute('data-fk') : null;
+  fn();
+  if (k){ const el = container.querySelector(`[data-fk="${CSS.escape(k)}"]`); if (el) el.focus({ preventScroll:true }); }
+}
+function renderHead(o){
+  const meta = cfg.source === 'zabbix' ? (o.zhostname || cfg.hosts[o.id]) : o.src.host;
+  $('#oltHead').innerHTML = `<div><p class="kicker">${esc(o.modelo)} · OLT</p><h1>${esc(o.nome)}</h1><p class="meta">Host no Zabbix: <span class="mono">${esc(meta)}</span></p></div>`;
+  const act = o.ports.filter(p => p.active), D = act.reduce((s, p) => s + (p.down || 0), 0), U = act.reduce((s, p) => s + (p.up || 0), 0);
+  const nCrit = o.ports.filter(p => p.sev === 'crit').length, nWarn = o.ports.filter(p => p.sev === 'warn').length;
+  const mx = act.reduce((m, p) => Math.max(m, p.pd || 0, p.pu || 0), 0);
+  if (o.error && !o.updatedAt){
+    $('#pulse').innerHTML = `<div class="pulse-item is-danger"><span>Sem dados</span><strong>Falha na leitura</strong><small>${esc(o.error)}</small></div>`;
+    return;
+  }
+  if (o.loading && !o.updatedAt){
+    $('#pulse').innerHTML = `<div class="pulse-item"><span>Zabbix</span><strong>Carregando…</strong><small>Buscando interfaces, CPU, memória e temperatura.</small></div>`;
+    return;
+  }
+  $('#pulse').innerHTML = `
+    <div class="pulse-item"><span>PONs ativas</span><strong>${act.length}<span class="unit">de ${o.ports.length}</span></strong><small>${o.ports.length - act.length} sem link ou livres</small></div>
+    <div class="pulse-item"><span><i class="sw in"></i>Download nas PONs</span><strong>${bpsHTML(D)}</strong><small>soma das portas agora</small></div>
+    <div class="pulse-item"><span><i class="sw out"></i>Upload nas PONs</span><strong>${bpsHTML(U)}</strong><small>soma das portas agora</small></div>
+    <div class="pulse-item ${nCrit ? 'is-danger' : 'is-ok'}"><span>Portas ≥ ${cfg.thr}%</span><strong>${nCrit}</strong><small>${nWarn} em atenção (${cfg.warn}–${cfg.thr}%)</small></div>
+    <div class="pulse-item ${mx >= cfg.thr / 100 ? 'is-danger' : mx >= cfg.warn / 100 ? 'is-warn' : ''}"><span>Maior utilização</span><strong>${fmtPct(mx)}</strong><small>${o.error ? 'última leitura com falha' : 'atualizado ' + (o.updatedAt ? fmtTimeS(o.updatedAt) : '—')}</small></div>`;
+}
+function renderAlerts(o){
+  const sec = $('#alertsSec');
+  const list = [...alerts.active.values()].filter(a => a.olt === o.id).sort((a, b) => (a.ack - b.ack) || (a.since - b.since));
+  const hist = alerts.history.filter(a => a.olt === o.id).slice(0, 8);
+  const histHTML = hist.length ? `<details class="hist" data-fk="hist"${ui.histOpen ? ' open' : ''}><summary>Encerrados nas últimas horas (${hist.length})</summary><ul>${hist.map(a => { const d = describe(a); return `<li><b>${esc(d.title)}</b><span>pico ${a.pct != null || a.type !== 'health' ? fmtPct(a.peak) : esc(fmtMetric(targets.get(a.target) || {}, a.peak))}</span><span>${fmtTime(a.since)}–${fmtTime(a.ended)} (${fmtDur(a.ended - a.since)})</span></li>`; }).join('')}</ul></details>` : '';
+  keepFocus(sec, () => {
+    if (!list.length){
+      sec.innerHTML = `<div class="all-ok"><span class="dotsev"></span><span>Nenhuma porta acima de ${cfg.thr}% e saúde da OLT dentro dos limites.${o.updatedAt ? ' Última verificação ' + fmtTimeS(o.updatedAt) + '.' : ''}</span></div>${histHTML}`;
+      return;
+    }
+    const unacked = list.filter(a => !a.ack).length;
+    sec.innerHTML = `<div class="alerts">
+      <div class="alerts-h"><h2>${ICON.bell}${list.length === 1 ? '1 alerta ativo' : list.length + ' alertas ativos'} na ${esc(o.curto)}</h2>
+        ${unacked > 1 ? `<button class="btn" type="button" data-act="ackall" data-fk="ackall">Reconhecer todos</button>` : ''}</div>
+      <ul class="alert-list">${list.map(a => { const d = describe(a); return `<li class="alert${a.ack ? ' ack' : ''}"><span class="dotsev" aria-hidden="true"></span>
+        <div><div class="alert-t">${esc(d.title)}</div><div class="alert-s"><b>${esc(d.sub)}</b> · desde ${fmtTime(a.since)} (${fmtDur(Date.now() - a.since)})${a.ack ? ' · reconhecido' : ''}</div></div>
+        <div class="alert-act">${a.type !== 'health' ? `<button class="btn" type="button" data-open="${esc(a.target)}" data-fk="o-${esc(a.key)}">Ver gráfico</button>` : ''}${a.ack ? '' : `<button class="btn" type="button" data-ack="${esc(a.key)}" data-fk="a-${esc(a.key)}">Reconhecer</button>`}</div></li>`; }).join('')}</ul>
+      ${histHTML}</div>`;
+  });
+}
+function renderHealth(o){
+  const sec = $('#healthSec'), t1 = Date.now();
+  sec.innerHTML = ['cpu','mem','temp'].map(id => {
+    const m = o.health[id];
+    const label = { cpu:'Processamento', mem:'Memória', temp:'Temperatura' }[id];
+    if (!m || m.missing || (m.value == null && cfg.source === 'zabbix')){
+      return `<article class="card hcard"><div class="hcard-h"><label>${label}</label><span class="badge badge--idle">sem item</span></div><p class="muted" style="margin:0">${o.loading ? 'Carregando…' : 'Nenhum item de ' + label.toLowerCase() + ' encontrado neste host do Zabbix.'}</p></article>`;
+    }
+    const th = TH[id], pts = m.hist.filter(a => a[0] >= t1 - WINDOW).map(a => a[1]);
+    const pk = pts.length ? Math.max(...pts) : m.value, mn = pts.length ? Math.min(...pts) : m.value;
+    const st = m.sev === 'crit' ? ['is-danger','badge--danger','Alerta'] : m.sev === 'warn' ? ['is-warn','badge--warn','Atenção'] : ['','badge--ok','Normal'];
+    const u = m.unit === '%' ? '%' : ' °C';
+    return `<article class="card hcard ${st[0]}"><div class="hcard-h"><label>${label}</label><span class="badge ${st[1]}">${st[2]}</span></div>
+      <div class="hbody">${gaugeSVG(m)}<div class="hside">
+        <dl><dt>Pico 2 h</dt><dd>${esc(fmtMetric(m, pk))}</dd><dt>Mínimo 2 h</dt><dd>${esc(fmtMetric(m, mn))}</dd><dt>Atenção / alerta</dt><dd>${cfg[th.w]} / ${cfg[th.c]}${u}</dd></dl>
+        ${healthSpark(m, t1)}<span class="where">${esc(m.where || '')}${m.where ? ' · ' : ''}últimas 2 h</span>
+      </div></div></article>`;
+  }).join('');
+}
+function dmHTML(dir, v, p, sev){
+  const cls = (dir === 'down' ? 'in' : 'out') + (sev === 'crit' ? ' is-danger' : sev === 'warn' ? ' is-warn' : '');
+  return `<span class="dm ${cls}"><span class="ar" aria-hidden="true">${dir === 'down' ? '↓' : '↑'}</span><span class="track"><i style="width:${(clamp(p || 0, 0, 1) * 100).toFixed(1)}%"></i></span><span class="v">${esc(fmtBps(v))} · ${fmtPct(p)}</span></span>`;
+}
+function renderUplinks(o){
+  const card = $('#uplinkCard'), t1 = Date.now();
+  const act = o.uplinks.filter(u => u.active), off = o.uplinks.filter(u => !u.active);
+  const capTotal = act.filter(u => !u.memberOf).reduce((s, u) => s + (u.capD || 0), 0);
+  const order = [];
+  for (const u of act){ if (u.memberOf) continue; order.push(u); if (u.isLag) for (const m of u.members){ const x = act.find(v => v.name === m); if (x) order.push(x); } }
+  for (const u of act) if (!order.includes(u)) order.push(u);
+  keepFocus(card, () => {
+    card.innerHTML = `<div class="card-h"><h2>Uplinks</h2><small>${act.length} com link · capacidade ${esc(fmtBps(capTotal))}</small></div>
+      ${order.length ? `<ul class="uplinks">${order.map(u => `<li><button type="button" class="up-row${u.memberOf ? ' member' : ''}${u.sev === 'crit' ? ' is-danger' : u.sev === 'warn' ? ' is-warn' : ''}" data-open="${esc(u.key)}" data-fk="u-${esc(u.key)}" aria-label="${esc(u.name)}: download ${esc(fmtBps(u.down))}, upload ${esc(fmtBps(u.up))}. Abrir gráfico">
+        <span class="up-id"><span class="mono">${esc(u.name)}</span>${u.isLag ? `<span class="tag">LACP · ${u.members.length}×${esc(fmtBps(u.capD / Math.max(1, u.members.length)))}</span>` : `<span class="tag">${esc(fmtBps(u.capD))}</span>`}<span class="alias">${esc(u.alias || (u.isLag ? 'Agregado' : 'Sem descrição'))}</span></span>
+        <span class="up-meters">${dmHTML('down', u.down, u.pd, u.sevD)}${dmHTML('up', u.up, u.pu, u.sevU)}</span>
+        ${sparkSVG(u.hd, u.hu, u.capD, t1)}</button></li>`).join('')}</ul>` : `<p class="muted">Nenhum uplink com link.</p>`}
+      ${off.length ? `<p class="note">Sem link: <span class="mono">${off.map(u => esc(u.name)).join(', ')}</span></p>` : ''}
+      <p class="note">No uplink, download é o tráfego que chega do core para a OLT.</p>`;
+  });
+}
+function renderBoards(o){
+  const card = $('#boardCard');
+  const tc = (v, w, c) => v == null ? '' : v >= c ? 'is-danger' : v >= w ? 'is-warn' : '';
+  const rows = o.boards || [];
+  card.innerHTML = `<div class="card-h"><h2>Placas</h2><small>${rows.length ? 'CPU e temperatura por placa' : ''}</small></div>
+    ${rows.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Placa</th><th class="r">PONs</th><th class="r">CPU</th><th class="r">Temp.</th></tr></thead><tbody>
+      ${rows.map(b => `<tr><td>${esc(b.label)}</td><td class="r">${b.ports == null ? '—' : esc(b.ports)}</td>
+        <td class="r ${tc(b.cpu, cfg.cpuWarn, cfg.cpuCrit)}">${b.cpu == null ? '—' : nf(b.cpu, 0) + '%'}</td>
+        <td class="r ${tc(b.temp, cfg.tempWarn, cfg.tempCrit)}">${b.temp == null ? '—' : nf(b.temp, 1) + ' °C'}</td></tr>`).join('')}
+    </tbody></table></div>` : `<p class="muted">${o.loading ? 'Carregando…' : 'Sem itens por placa no Zabbix.'}</p>`}`;
+}
+
+/* portas PON */
+function counts(o){
+  const c = { active:0, crit:0, warn:0, idle:0 };
+  for (const p of o.ports){ if (p.active) c.active++; else c.idle++; if (p.sev === 'crit') c.crit++; else if (p.sev === 'warn') c.warn++; }
+  return c;
+}
+function renderChips(o){
+  const c = counts(o);
+  const defs = [['active','Ativas',''],['crit',`≥ ${cfg.thr}%`,'c'],['warn',`${cfg.warn}–${cfg.thr}%`,'w'],['idle','Sem link','']];
+  const box = $('#chips');
+  keepFocus(box, () => {
+    box.innerHTML = defs.map(([f, l, k]) => `<button type="button" class="chip ${k}" data-f="${f}" data-fk="f-${f}" aria-pressed="${ui.filter === f}">${l} <b>${c[f]}</b></button>`).join('');
+  });
+  $('#ponTitle').textContent = `${o.ports.length} portas · ${c.active} ativas`;
+  $('#ponLegend').innerHTML = `<span><i class="sw in"></i>Download</span><span><i class="sw out"></i>Upload</span><span><i class="thr-sw"></i>Limite ${cfg.thr}%</span><span class="dim">curvas das últimas 2 h</span>`;
+  for (const b of $('#viewSeg').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === ui.view));
+}
+function visiblePorts(o){
+  const q = norm(ui.q.trim());
+  const list = o.ports.filter(p => {
+    if (ui.filter === 'active' && !p.active) return false;
+    if (ui.filter === 'crit' && p.sev !== 'crit') return false;
+    if (ui.filter === 'warn' && p.sev !== 'warn') return false;
+    if (ui.filter === 'idle' && p.active) return false;
+    return !q || p.search.includes(q);
+  });
+  const util = p => Math.max(p.pd || 0, p.pu || 0);
+  if (ui.sort === 'util') list.sort((a, b) => util(b) - util(a) || a.slot - b.slot || a.idx - b.idx);
+  else if (ui.sort === 'region') list.sort((a, b) => (a.region || '~').localeCompare(b.region || '~', 'pt-BR') || a.slot - b.slot || a.idx - b.idx);
+  else list.sort((a, b) => a.slot - b.slot || a.idx - b.idx);
+  return list;
+}
+function cardHTML(p){
+  const meta = [p.vlan ? 'VLAN ' + p.vlan : '', p.fiber, p.cable].filter(Boolean).join(' · ');
+  if (!p.active) return `<div class="pon-idle" data-key="${esc(p.key)}"><span class="pon-top"><span class="pon-id">${esc(p.short)}</span><span class="badge badge--idle">sem link</span></span><span class="pon-reg">${esc(p.region || 'Sem descrição')}</span>${meta ? `<span class="pon-meta">${esc(meta)}</span>` : ''}</div>`;
+  return `<button type="button" class="pon" data-key="${esc(p.key)}" data-open="${esc(p.key)}" data-fk="p-${esc(p.key)}">
+    <span class="pon-top"><span class="pon-id">${esc(p.short)}</span><span class="pon-pct"></span></span>
+    <span><span class="pon-reg">${esc(p.region || 'Sem descrição')}</span>${meta ? `<span class="pon-meta">${esc(meta)}</span>` : ''}</span>
+    <span class="dmw"></span><span class="spk"></span></button>`;
+}
+function fillCard(el, p, t1){
+  if (!p.active) return;
+  el.className = 'pon' + (p.sev === 'crit' ? ' is-danger' : p.sev === 'warn' ? ' is-warn' : '');
+  el.querySelector('.pon-pct').textContent = fmtPct(Math.max(p.pd || 0, p.pu || 0));
+  el.querySelector('.dmw').innerHTML = dmHTML('down', p.down, p.pd, p.sevD) + dmHTML('up', p.up, p.pu, p.sevU);
+  el.querySelector('.spk').innerHTML = sparkSVG(p.hd, p.hu, p.capD, t1);
+  el.setAttribute('aria-label', `Porta ${p.name}, ${p.region || 'sem descrição'}. Download ${fmtBps(p.down)} (${fmtPct(p.pd)}), upload ${fmtBps(p.up)} (${fmtPct(p.pu)}). Abrir gráfico`);
+}
+function slotSummary(o, sl){
+  const ps = o.ports.filter(p => p.slot === sl), act = ps.filter(p => p.active);
+  const D = act.reduce((s, p) => s + (p.down || 0), 0), U = act.reduce((s, p) => s + (p.up || 0), 0);
+  return `${act.length}/${ps.length} ativas · ↓ ${fmtBps(D)} · ↑ ${fmtBps(U)}`;
+}
+function renderPons(o, force){
+  const body = $('#ponBody'), t1 = Date.now();
+  if (ui.view === 'heat') return renderHeat(o, force);
+  const list = visiblePorts(o);
+  const grouped = ui.sort === 'slot';
+  const sig = [o.id, ui.view, ui.sort, ui.filter, ui.q, cfg.thr, list.map(p => p.key + (p.active ? '' : '-')).join(',')].join('|');
+  if (force || sig !== pons.sig){
+    pons.sig = sig;
+    keepFocus(body, () => {
+      if (!list.length){
+        body.innerHTML = `<div class="empty"><b>${o.loading ? 'Carregando portas…' : 'Nenhuma porta neste filtro.'}</b>${o.loading ? '' : 'Troque o filtro ou limpe a busca.'}</div>`;
+      } else if (grouped){
+        const slots = [...new Set(list.map(p => p.slot))];
+        body.innerHTML = slots.map(sl => `<div class="slot"><div class="slot-h"><h3>Placa ${sl}</h3><span data-slot="${sl}"></span></div><div class="pon-grid">${list.filter(p => p.slot === sl).map(cardHTML).join('')}</div></div>`).join('');
+      } else {
+        body.innerHTML = `<div class="pon-grid flat">${list.map(cardHTML).join('')}</div>`;
+      }
+    });
+    pons.refs = new Map([...body.querySelectorAll('[data-key]')].map(el => [el.dataset.key, el]));
+  }
+  for (const p of list){ const el = pons.refs.get(p.key); if (el) fillCard(el, p, t1); }
+  for (const el of body.querySelectorAll('[data-slot]')) el.textContent = slotSummary(o, +el.dataset.slot);
+}
+function heatClass(p){
+  if (!p.active) return 'bi';
+  if (p.sev === 'crit') return 'bc';
+  if (p.sev === 'warn') return 'bw';
+  const u = Math.max(p.pd || 0, p.pu || 0);
+  return u < 0.1 ? 'b1' : u < 0.25 ? 'b2' : u < 0.5 ? 'b3' : 'b4';
+}
+function renderHeat(o, force){
+  const body = $('#ponBody');
+  const slots = [...new Set(o.ports.map(p => p.slot))].sort((a, b) => a - b);
+  const cols = Math.max(...o.ports.map(p => p.idx), 1);
+  const sig = ['heat', o.id, o.ports.length, cols].join('|');
+  const vis = new Set(visiblePorts(o).map(p => p.key));
+  if (force || sig !== pons.sig){
+    pons.sig = sig;
+    let h = `<div class="heat" style="grid-template-columns:96px repeat(${cols},minmax(40px,1fr))"><span></span>`;
+    for (let i = 1; i <= cols; i++) h += `<span class="hh">${i}</span>`;
+    for (const sl of slots){
+      const ps = o.ports.filter(p => p.slot === sl);
+      h += `<div class="rl">Placa ${sl}<small data-hs="${sl}"></small></div>`;
+      for (let i = 1; i <= cols; i++){
+        const p = ps.find(x => x.idx === i);
+        if (!p) h += `<span class="hc none"></span>`;
+        else if (!p.active) h += `<span class="hc bi" data-key="${esc(p.key)}" title="${esc(p.name)} · ${esc(p.region || 'sem descrição')} · sem link">–</span>`;
+        else h += `<button type="button" class="hc" data-key="${esc(p.key)}" data-open="${esc(p.key)}" data-fk="h-${esc(p.key)}"></button>`;
+      }
+    }
+    h += `</div>`;
+    keepFocus(body, () => {
+      body.innerHTML = `<div class="heat-wrap">${h}</div><div class="legend-row"><span>Utilização da direção mais carregada:</span>
+        <span><i class="lg" style="background:var(--heat-1)"></i>&lt; 10%</span><span><i class="lg" style="background:var(--heat-2)"></i>10–25%</span>
+        <span><i class="lg" style="background:var(--heat-3)"></i>25–50%</span><span><i class="lg" style="background:var(--heat-4)"></i>50–${cfg.warn}%</span>
+        <span><i class="lg" style="background:var(--warn-500)"></i>${cfg.warn}–${cfg.thr}%</span><span><i class="lg" style="background:var(--danger-500)"></i>≥ ${cfg.thr}%</span>
+        <span><i class="lg" style="background:repeating-linear-gradient(45deg,transparent 0 3px,var(--line-strong) 3px 5px)"></i>sem link</span><span>↑ marca quando o upload é a direção mais carregada</span></div>`;
+    });
+    pons.refs = new Map([...body.querySelectorAll('[data-key]')].map(el => [el.dataset.key, el]));
+  }
+  for (const p of o.ports){
+    const el = pons.refs.get(p.key); if (!el) continue;
+    const dim = !vis.has(p.key) && (ui.q.trim() || ui.filter !== 'active');
+    if (!p.active){ el.className = 'hc bi' + (dim ? ' dim' : ''); continue; }
+    el.className = 'hc ' + heatClass(p) + (dim ? ' dim' : '');
+    const u = Math.max(p.pd || 0, p.pu || 0), upMax = (p.pu || 0) > (p.pd || 0);
+    el.innerHTML = `${nf(u * 100, 0)}${upMax ? '<span class="up-mark" aria-hidden="true">↑</span>' : ''}`;
+    el.title = `${p.name} · ${p.region || 'sem descrição'} · ↓ ${fmtBps(p.down)} (${fmtPct(p.pd)}) · ↑ ${fmtBps(p.up)} (${fmtPct(p.pu)})`;
+    el.setAttribute('aria-label', `Porta ${p.short}, ${p.region || 'sem descrição'}: ${fmtPct(u)}${upMax ? ' no upload' : ' no download'}. Abrir gráfico`);
+  }
+  for (const el of body.querySelectorAll('[data-hs]')){
+    const sl = +el.dataset.hs, act = o.ports.filter(p => p.slot === sl && p.active);
+    el.textContent = '↓ ' + fmtBps(act.reduce((s, p) => s + (p.down || 0), 0));
+  }
+}
+
+/* tela inteira */
+function renderScreen(){
+  const o = byId[ui.active];
+  pons.sig = '';
+  renderHead(o); renderAlerts(o); renderHealth(o); renderUplinks(o); renderBoards(o); renderChips(o); renderPons(o, true);
+  updateChrome();
+}
+function update(){
+  const o = byId[ui.active];
+  renderHead(o); renderAlerts(o); renderHealth(o); renderUplinks(o); renderBoards(o); renderChips(o); renderPons(o, false);
+  updateChrome();
+  if (ui.detail) updateDetail(false);
+}
+function setTab(id, fromHash){
+  if (!byId[id]) return;
+  const changed = id !== ui.active;
+  ui.active = id;
+  if (!fromHash && location.hash.slice(1) !== id){ try { history.replaceState(null, '', '#' + id); } catch(e){ location.hash = id; } }
+  if (changed) renderScreen();
+}
+
+/* ---------- gaveta de detalhe ---------- */
+function demoSeries(t, winH){
+  const now = Date.now(), step = winH <= 6 ? MIN : winH <= 24 ? 3 * MIN : 5 * MIN;
+  const t0 = Math.floor((now - winH * HOUR) / step) * step;
+  const d = [], u = [], o = byId[t.olt];
+  for (let x = t0; x <= now; x += step){
+    if (t.type === 'pon'){ const [a, b] = demoUtil(t, x); d.push([x, a * t.capD]); u.push([x, b * t.capU]); }
+    else {
+      let D = 0, U = 0;
+      for (const p of o.ports){ if (!p.active) continue; const [a, b] = demoUtil(p, x); D += a * p.capD; U += b * p.capU; }
+      const v = demoUplinks(o, x, D, U).get(t.name) || [0, 0];
+      d.push([x, v[0]]); u.push([x, v[1]]);
+    }
+  }
+  d.push([now, t.down]); u.push([now, t.up]);
+  return { d, u };
+}
+async function zSeries(t, winH){
+  const from = Math.floor((Date.now() - winH * HOUR) / 1000);
+  const get = async it => {
+    if (!it || !isBpsUnit(it.units)) return [];
+    const rows = await zbx('history.get', { history:+it.value_type, itemids:[it.itemid], time_from:from, output:'extend', sortfield:'clock', sortorder:'ASC', limit:20000 });
+    return (rows || []).map(r => [+r.clock * 1000, +r.value]);
+  };
+  const [d, u] = await Promise.all([get(t.zD), get(t.zU)]);
+  return { d, u };
+}
+async function loadSeries(){
+  const t = targets.get(ui.detail); if (!t) return;
+  const key = ui.detail, win = ui.dWin;
+  ui.dLoading = true; renderChartArea();
+  try {
+    const s = cfg.source === 'demo' ? demoSeries(t, win) : await zSeries(t, win);
+    if (ui.detail !== key || ui.dWin !== win) return;
+    ui.dSeries = { key, win, d:s.d, u:s.u, at:Date.now(), err:null };
+  } catch(e){
+    if (ui.detail !== key) return;
+    ui.dSeries = { key, win, d:[], u:[], at:Date.now(), err:e.message };
+  }
+  ui.dLoading = false;
+  renderChartArea();
+}
+function openDetail(key){
+  const t = targets.get(key); if (!t) return;
+  ui.lastFocus = document.activeElement;
+  ui.detail = key; ui.dSeries = null;
+  $('#scrim').hidden = false; const dr = $('#drawer'); dr.hidden = false;
+  updateDetail(true);
+  loadSeries();
+  const b = dr.querySelector('.close-btn'); if (b) b.focus();
+}
+function closeDetail(){
+  ui.detail = null; ui.dSeries = null;
+  $('#drawer').hidden = true; $('#scrim').hidden = true;
+  const lf = ui.lastFocus;
+  if (lf && document.contains(lf)) lf.focus();
+  else if (lf && lf.dataset && lf.dataset.fk){ const el = document.querySelector(`[data-fk="${CSS.escape(lf.dataset.fk)}"]`); if (el) el.focus(); }
+}
+function updateDetail(full){
+  const t = targets.get(ui.detail), dr = $('#drawer');
+  if (!t){ closeDetail(); return; }
+  const o = byId[t.olt];
+  const nowBox = (dir) => {
+    const v = dir === 'down' ? t.down : t.up, p = dir === 'down' ? t.pd : t.pu, cap = dir === 'down' ? t.capD : t.capU, sev = dir === 'down' ? t.sevD : t.sevU;
+    return `<div class="nowbox ${sev === 'crit' ? 'is-danger' : sev === 'warn' ? 'is-warn' : ''}"><label><i class="sw ${dir === 'down' ? 'in' : 'out'}"></i>${dir === 'down' ? 'Download agora' : 'Upload agora'}</label><strong>${bpsHTML(v)}</strong>
+      ${dmHTML(dir, v, p, sev)}<small>${fmtPct(p)} de ${esc(fmtBps(cap))}</small></div>`;
+  };
+  if (full || !dr.querySelector('.d-head')){
+    const kicker = t.type === 'pon' ? `PON · Placa ${t.slot} · ${o.nome}` : `Uplink · ${o.nome}`;
+    const tags = [];
+    if (t.type === 'pon'){
+      if (t.vlan) tags.push(`<span class="badge badge--info">VLAN ${esc(t.vlan)}</span>`);
+      if (t.fiber) tags.push(`<span class="badge badge--info">Fibra ${esc(t.fiber)}</span>`);
+      if (t.cable) tags.push(`<span class="badge badge--info">${esc(t.cable)}</span>`);
+      tags.push(`<span class="badge badge--idle">${t.kind === 'gpon' ? 'GPON' : 'XGS-PON'} · ↓ ${esc(fmtBps(t.capD))} · ↑ ${esc(fmtBps(t.capU))}</span>`);
+    } else {
+      tags.push(`<span class="badge badge--idle">${t.isLag ? 'Agregado LACP' : 'Porta de uplink'} · ${esc(fmtBps(t.capD))}</span>`);
+      if (t.memberOf) tags.push(`<span class="badge badge--info">membro de ${esc(t.memberOf)}</span>`);
+    }
+    const loc = t.coords ? `<div class="loc"><span class="muted">Coordenadas</span><span class="mono">${t.coords[0].toFixed(5)}, ${t.coords[1].toFixed(5)}</span><a href="https://www.google.com/maps?q=${t.coords[0]},${t.coords[1]}" target="_blank" rel="noopener">Abrir no mapa</a></div>` : '';
+    dr.innerHTML = `<div class="d-head"><div><p class="kicker">${esc(kicker)}</p><h2 id="dTitle">${esc(t.name)}</h2><p>${esc(t.type === 'pon' ? (t.region || 'Sem descrição') : (t.alias || (t.isLag ? 'Agregado' : 'Sem descrição')))}</p>${t.label && t.type === 'pon' && t.label !== t.region ? `<p class="muted" style="font-weight:500;font-size:var(--fs-12)">Descrição no equipamento: <span class="mono">${esc(t.alias)}</span></p>` : ''}</div>
+        <button class="close-btn" type="button" data-act="close" aria-label="Fechar">${ICON.x}</button></div>
+      <div class="d-tags">${tags.join('')}</div>
+      <div class="d-now" id="dNow"></div>
+      <section><div class="d-sec-h"><h3>Utilização no período</h3><div class="seg" role="group" aria-label="Período">${[6, 24, 48].map(w => `<button type="button" data-win="${w}" aria-pressed="${ui.dWin === w}">${w} h</button>`).join('')}</div></div>
+        <div class="chart-box" id="dChart"></div><div id="dLegend"></div></section>
+      <div class="d-stats" id="dStats"></div>
+      ${loc}
+      <section id="dAlerts"></section>`;
+  }
+  $('#dNow').innerHTML = nowBox('down') + nowBox('up');
+  const rel = [...alerts.active.values()].filter(a => a.target === t.key).concat(alerts.history.filter(a => a.target === t.key)).slice(0, 6);
+  $('#dAlerts').innerHTML = rel.length ? `<div class="d-sec-h"><h3>Alertas desta porta</h3></div><ul class="d-list">${rel.map(a => `<li><b>${a.dir === 'down' ? '↓ Download' : '↑ Upload'}</b><span class="mono">pico ${fmtPct(a.peak)}</span><span class="muted">${fmtTime(a.since)}${a.ended ? '–' + fmtTime(a.ended) + ' (' + fmtDur(a.ended - a.since) + ')' : ' · ainda ativo'}</span></li>`).join('')}</ul>` : '';
+  if (ui.dSeries && Date.now() - ui.dSeries.at > (cfg.source === 'demo' ? 60000 : 120000) && !ui.dLoading) loadSeries();
+}
+function renderChartArea(){
+  const box = $('#dChart'), leg = $('#dLegend'), st = $('#dStats');
+  const t = targets.get(ui.detail);
+  if (!box || !t) return;
+  const s = ui.dSeries;
+  if (!s || s.key !== ui.detail || s.win !== ui.dWin){
+    box.innerHTML = `<div class="empty" style="margin:0">${ui.dLoading ? 'Carregando histórico…' : 'Sem histórico.'}</div>`; leg.innerHTML = ''; st.innerHTML = ''; return;
+  }
+  if (s.err || s.d.length < 2){
+    box.innerHTML = `<div class="empty" style="margin:0"><b>Histórico indisponível</b>${esc(s.err || 'O Zabbix não devolveu pontos para este período.')}</div>`; leg.innerHTML = ''; st.innerHTML = ''; return;
+  }
+  const W = Math.max(300, Math.round(box.clientWidth || 520));
+  const now = Date.now(), t0 = now - s.win * HOUR;
+  const c = chartSVG(W, s.d, s.u, t.capD, t.capU, t0, now, s.win);
+  box.innerHTML = c.svg + `<div class="tip" hidden></div>`;
+  const lastD = s.d[s.d.length - 1][1], lastU = s.u.length ? s.u[s.u.length - 1][1] : null;
+  leg.innerHTML = `<div class="chart-legend" style="margin-top:var(--s-3)"><span><i class="sw in"></i>Download — agora ${esc(fmtBps(lastD))}</span><span><i class="sw out"></i>Upload — agora ${esc(fmtBps(lastU))}</span><span><i class="thr-sw"></i>Limite ${cfg.thr}%</span><span class="dim">${s.d.length} amostras</span></div>
+    ${c.ymax < cfg.thr / 100 ? `<p class="scale-note">Escala até ${nf(c.ymax * 100, 0)}% para mostrar a curva; o limite de ${cfg.thr}% fica acima do pico do período (${fmtPct(c.peak)}).</p>` : ''}`;
+  const stat = (arr, cap) => { let pk = arr[0], sum = 0; for (const a of arr){ if (a[1] > pk[1]) pk = a; sum += a[1]; } return { pk, avg:sum / arr.length, cap }; };
+  const sd = stat(s.d, t.capD), su = s.u.length ? stat(s.u, t.capU) : null;
+  let above = 0;
+  const T = cfg.thr / 100;
+  for (let i = 1; i < s.d.length; i++){ const dt = s.d[i][0] - s.d[i - 1][0]; const pu = valueAt(s.u, s.d[i][0]); if (s.d[i][1] / t.capD >= T || (pu != null && pu / t.capU >= T)) above += dt; }
+  st.innerHTML = `<div><span>Pico de download</span><strong>${esc(fmtBps(sd.pk[1]))} · ${fmtPct(sd.pk[1] / t.capD)}</strong><small>${fmtDay(sd.pk[0])} às ${fmtTime(sd.pk[0])}</small></div>
+    <div><span>Média de download</span><strong>${esc(fmtBps(sd.avg))} · ${fmtPct(sd.avg / t.capD)}</strong><small>últimas ${s.win} h</small></div>
+    <div><span>Pico de upload</span><strong>${su ? esc(fmtBps(su.pk[1])) + ' · ' + fmtPct(su.pk[1] / t.capU) : '—'}</strong><small>${su ? fmtDay(su.pk[0]) + ' às ' + fmtTime(su.pk[0]) : ''}</small></div>
+    <div><span>Tempo acima de ${cfg.thr}%</span><strong>${above ? esc(fmtDur(above)) : 'nenhum'}</strong><small>em qualquer direção</small></div>`;
+  const svg = box.querySelector('svg'), tip = box.querySelector('.tip'), g = svg.querySelector('.hover'), hit = svg.querySelector('.hit');
+  const geo = c.geo;
+  const move = ev => {
+    const r = svg.getBoundingClientRect(); const x = (ev.clientX - r.left) * (geo.W / r.width);
+    const tt = geo.t0 + clamp((x - geo.PL) / geo.iw, 0, 1) * (geo.t1 - geo.t0);
+    let lo = 0, hi = s.d.length - 1;
+    while (hi - lo > 1){ const m = (lo + hi) >> 1; if (s.d[m][0] < tt) lo = m; else hi = m; }
+    const i = Math.abs(s.d[lo][0] - tt) < Math.abs(s.d[hi][0] - tt) ? lo : hi;
+    const pt = s.d[i], vu = valueAt(s.u, pt[0]);
+    const cx = geo.X(pt[0]);
+    g.setAttribute('visibility', 'visible');
+    g.querySelector('line').setAttribute('x1', cx); g.querySelector('line').setAttribute('x2', cx);
+    const hd = g.querySelector('.hd'), hu = g.querySelector('.hu');
+    hd.setAttribute('cx', cx); hd.setAttribute('cy', geo.Y(pt[1] / geo.capD));
+    if (vu != null){ hu.setAttribute('cx', cx); hu.setAttribute('cy', geo.Y(vu / geo.capU)); hu.setAttribute('visibility', 'visible'); } else hu.setAttribute('visibility', 'hidden');
+    tip.hidden = false;
+    tip.innerHTML = `<b>${esc(fmtDay(pt[0]))} · ${esc(fmtTime(pt[0]))}</b><span class="mono"><i class="sw in"></i> ↓ ${esc(fmtBps(pt[1]))} · ${fmtPct(pt[1] / geo.capD)}</span><span class="mono"><i class="sw out"></i> ↑ ${esc(fmtBps(vu))} · ${fmtPct(vu != null ? vu / geo.capU : null)}</span>`;
+    const px = cx * (r.width / geo.W), w = tip.offsetWidth;
+    tip.style.left = clamp(px + 12, 0, r.width - w) + 'px';
+    if (px + 12 + w > r.width) tip.style.left = clamp(px - w - 12, 0, r.width - w) + 'px';
+  };
+  const leave = () => { g.setAttribute('visibility', 'hidden'); tip.hidden = true; };
+  hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move); hit.addEventListener('pointerleave', leave);
+}
+
+/* ---------- configurações ---------- */
+function fillForm(c){
+  $('#srcDemo').checked = c.source === 'demo'; $('#srcZbx').checked = c.source === 'zabbix';
+  $('#fUrl').value = c.url; $('#fToken').value = c.token;
+  $('#fHostC300').value = c.hosts.c300; $('#fHostC350').value = c.hosts.c350;
+  $('#fThr').value = c.thr; $('#fWarn').value = c.warn; $('#fCapD').value = c.capDown; $('#fCapU').value = c.capUp;
+  $('#fCpu').value = `${c.cpuWarn} / ${c.cpuCrit}`; $('#fMem').value = `${c.memWarn} / ${c.memCrit}`; $('#fTemp').value = `${c.tempWarn} / ${c.tempCrit}`;
+  $('#fInt').value = c.interval; $('#fSound').checked = !!c.sound; $('#fNotify').checked = !!c.notify;
+}
+function openSettings(){
+  ui.lastFocus = document.activeElement;
+  fillForm(cfg);
+  $('#formErr').hidden = true; $('#testOut').textContent = ''; $('#notifyOut').textContent = '';
+  $('#setScrim').hidden = false; $('#settings').hidden = false;
+  $('#settings').querySelector(cfg.source === 'demo' ? '#srcDemo' : '#srcZbx').focus();
+}
+function closeSettings(){
+  $('#setScrim').hidden = true; $('#settings').hidden = true;
+  if (ui.lastFocus && document.contains(ui.lastFocus)) ui.lastFocus.focus();
+}
+function pair(str, name){
+  const m = String(str).match(/^\s*(\d+(?:[.,]\d+)?)\s*[\/;\-–]\s*(\d+(?:[.,]\d+)?)\s*$/);
+  if (!m) throw new Error(`${name}: use o formato "atenção / alerta", por exemplo 75 / 90.`);
+  const a = +m[1].replace(',', '.'), b = +m[2].replace(',', '.');
+  if (!(a < b)) throw new Error(`${name}: o valor de atenção precisa ser menor que o de alerta.`);
+  return [a, b];
+}
+function readForm(){
+  const n = (id, name, lo, hi) => { const v = +$(id).value; if (!isFinite(v) || v < lo || v > hi) throw new Error(`${name}: informe um número entre ${lo} e ${hi}.`); return v; };
+  const next = JSON.parse(JSON.stringify(cfg));
+  next.source = $('#srcZbx').checked ? 'zabbix' : 'demo';
+  next.url = $('#fUrl').value.trim(); next.token = $('#fToken').value.trim();
+  next.hosts = { c300:$('#fHostC300').value.trim() || DEFAULTS.hosts.c300, c350:$('#fHostC350').value.trim() || DEFAULTS.hosts.c350 };
+  next.thr = n('#fThr', 'Alerta de tráfego', 50, 100);
+  next.warn = n('#fWarn', 'Atenção de tráfego', 10, 99);
+  if (next.warn >= next.thr) throw new Error('A atenção de tráfego precisa ser menor que o alerta.');
+  next.capDown = n('#fCapD', 'Capacidade GPON de download', 100, 100000);
+  next.capUp = n('#fCapU', 'Capacidade GPON de upload', 100, 100000);
+  [next.cpuWarn, next.cpuCrit] = pair($('#fCpu').value, 'CPU');
+  [next.memWarn, next.memCrit] = pair($('#fMem').value, 'Memória');
+  [next.tempWarn, next.tempCrit] = pair($('#fTemp').value, 'Temperatura');
+  next.interval = n('#fInt', 'Atualização', 10, 600);
+  next.sound = $('#fSound').checked; next.notify = $('#fNotify').checked;
+  if (next.source === 'zabbix' && !next.url) throw new Error('Para usar o Zabbix, informe a URL da API.');
+  return next;
+}
+function applyCfg(next){
+  const restart = next.source !== cfg.source || next.url !== cfg.url || next.token !== cfg.token || next.hosts.c300 !== cfg.hosts.c300 || next.hosts.c350 !== cfg.hosts.c350 || next.interval !== cfg.interval;
+  cfg = next;
+  const saved = store(STORE, cfg);
+  document.documentElement.style.setProperty('--thr-pos', cfg.thr + '%');
+  setSoundBtn();
+  if (restart) start();
+  else {
+    for (const o of OLTS) for (const p of o.ports) setCaps(p);
+    evaluate(Date.now(), true);
+    renderScreen();
+  }
+  toast('Configurações salvas', saved ? '' : 'Este navegador não permitiu guardar; valem até fechar a página.', 'ok', 4000);
+}
+
+/* ---------- modo TV ---------- */
+async function setTv(on){
+  ui.tv = on;
+  $('#btnTv').setAttribute('aria-pressed', String(on));
+  clearInterval(tvTimer);
+  if (on){
+    try { if (document.documentElement.requestFullscreen && !document.fullscreenElement) await document.documentElement.requestFullscreen(); } catch(e){}
+    try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){ wakeLock = null; }
+    tvTimer = setInterval(() => {
+      if (ui.detail || !$('#settings').hidden) return;
+      const i = OLTS.findIndex(o => o.id === ui.active);
+      setTab(OLTS[(i + 1) % OLTS.length].id);
+    }, 30000);
+    toast('Modo TV ligado', 'As telas das OLTs alternam a cada 30 s.', 'info', 4000);
+  } else {
+    try { if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); } catch(e){}
+    try { if (wakeLock) await wakeLock.release(); } catch(e){}
+    wakeLock = null;
+  }
+}
+
+/* ---------- eventos ---------- */
+function bind(){
+  $('#tabs').addEventListener('click', e => { const b = e.target.closest('[data-olt]'); if (b) setTab(b.dataset.olt); });
+  $('#tabs').addEventListener('keydown', e => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const i = OLTS.findIndex(o => o.id === ui.active), n = OLTS.length;
+    const next = OLTS[(i + (e.key === 'ArrowRight' ? 1 : n - 1)) % n].id;
+    setTab(next); $('#tab-' + next).focus(); e.preventDefault();
+  });
+  window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (byId[h]) setTab(h, true); });
+  document.addEventListener('click', e => {
+    const op = e.target.closest('[data-open]'); if (op){ openDetail(op.dataset.open); return; }
+    const ack = e.target.closest('[data-ack]'); if (ack){ const a = alerts.active.get(ack.dataset.ack); if (a) a.ack = true; renderAlerts(byId[ui.active]); return; }
+    const act = e.target.closest('[data-act]');
+    if (act){
+      if (act.dataset.act === 'ackall'){ for (const a of alerts.active.values()) if (a.olt === ui.active) a.ack = true; renderAlerts(byId[ui.active]); }
+      if (act.dataset.act === 'close') closeDetail();
+      return;
+    }
+    const win = e.target.closest('[data-win]');
+    if (win){ ui.dWin = +win.dataset.win; for (const b of win.parentElement.children) b.setAttribute('aria-pressed', String(b === win)); loadSeries(); }
+  });
+  document.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('hist')) ui.histOpen = e.target.open; }, true);
+  $('#chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; ui.filter = b.dataset.f; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
+  $('#q').addEventListener('input', e => { ui.q = e.target.value; renderPons(byId[ui.active], false); });
+  $('#sort').addEventListener('change', e => { ui.sort = e.target.value; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view }); renderPons(byId[ui.active], true); });
+  $('#viewSeg').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; ui.view = b.dataset.v; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
+  $('#scrim').addEventListener('click', closeDetail);
+  $('#setScrim').addEventListener('click', closeSettings);
+  $('#setClose').addEventListener('click', closeSettings);
+  $('#btnSettings').addEventListener('click', openSettings);
+  $('#srcPill').addEventListener('click', openSettings);
+  $('#btnConnect').addEventListener('click', () => { openSettings(); $('#srcZbx').checked = true; $('#fUrl').focus(); });
+  $('#btnSound').addEventListener('click', () => { cfg.sound = !cfg.sound; store(STORE, cfg); setSoundBtn(); if (cfg.sound){ ensureAudio(); beep(); toast('Som dos alertas ligado', 'Toca ao abrir um alerta e repete a cada minuto até reconhecer.', 'info', 4000); } });
+  $('#btnTv').addEventListener('click', () => setTv(!ui.tv));
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && ui.tv) setTv(false); });
+  document.addEventListener('visibilitychange', async () => { if (ui.tv && document.visibilityState === 'visible' && navigator.wakeLock){ try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!$('#settings').hidden) closeSettings();
+    else if (ui.detail) closeDetail();
+  });
+  document.addEventListener('pointerdown', () => { if (cfg.sound) ensureAudio(); }, { once:true });
+  $('#setForm').addEventListener('submit', e => {
+    e.preventDefault();
+    try { const next = readForm(); $('#formErr').hidden = true; closeSettings(); applyCfg(next); }
+    catch(err){ const fe = $('#formErr'); fe.textContent = err.message; fe.hidden = false; if (fe.scrollIntoView) fe.scrollIntoView({ block:'nearest' }); }
+  });
+  $('#btnReset').addEventListener('click', () => {
+    const d = JSON.parse(JSON.stringify(DEFAULTS));
+    d.source = $('#srcZbx').checked ? 'zabbix' : 'demo';
+    d.url = $('#fUrl').value; d.token = $('#fToken').value;
+    d.hosts = { c300:$('#fHostC300').value, c350:$('#fHostC350').value };
+    fillForm(d);
+    $('#testOut').className = 'out'; $('#testOut').textContent = 'Limites e avisos voltaram ao padrão. Salve para aplicar.';
+  });
+  $('#btnTest').addEventListener('click', async () => {
+    const out = $('#testOut'), conn = { url:$('#fUrl').value.trim(), token:$('#fToken').value.trim() };
+    if (!conn.url){ out.className = 'out err'; out.textContent = 'Informe a URL da API.'; return; }
+    out.className = 'out'; out.textContent = 'Testando…';
+    try {
+      const ver = await zcall(conn, 'apiinfo.version', {}, false);
+      const found = [];
+      for (const [id, inp] of [['C300', '#fHostC300'], ['C350', '#fHostC350']]){
+        const r = await zcall(conn, 'host.get', { output:['hostid','name'], search:{ name:$(inp).value.trim() }, limit:3 });
+        found.push(`${id}: ${r && r.length ? 'encontrada' : 'não encontrada'}`);
+      }
+      out.className = 'out ok'; out.textContent = `Zabbix ${ver} respondeu. ${found.join(' · ')}.`;
+    } catch(err){ out.className = 'out err'; out.textContent = err.message; }
+  });
+  $('#btnCopy').addEventListener('click', () => {
+    const txt = $('#nginxSnippet').textContent, out = $('#copyOut');
+    const fallback = () => { const r = document.createRange(); r.selectNodeContents($('#nginxSnippet')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); out.textContent = 'Texto selecionado: use Ctrl+C.'; };
+    try { navigator.clipboard.writeText(txt).then(() => { out.textContent = 'Copiado.'; }, fallback); } catch(e){ fallback(); }
+  });
+  $('#fNotify').addEventListener('change', e => {
+    const out = $('#notifyOut');
+    if (!e.target.checked){ out.textContent = ''; return; }
+    if (!('Notification' in window)){ e.target.checked = false; out.textContent = 'Este navegador não oferece notificações.'; return; }
+    try {
+      Notification.requestPermission().then(p => {
+        if (p !== 'granted'){ e.target.checked = false; out.textContent = 'O navegador não liberou notificações nesta página.'; }
+        else out.textContent = 'Notificações liberadas.';
+      }, () => { e.target.checked = false; out.textContent = 'O navegador não liberou notificações nesta página.'; });
+    } catch(err){ e.target.checked = false; out.textContent = 'O navegador não liberou notificações nesta página.'; }
+  });
+  let rz;
+  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (ui.detail) renderChartArea(); }, 150); });
+}
+
+/* ---------- partida ---------- */
+function start(){
+  clearInterval(timer); timer = null;
+  alerts.active.clear(); alerts.history.length = 0;
+  for (const o of OLTS){ o.ports = []; o.portMap = new Map(); o.uplinks = []; o.health = {}; o.boards = []; o.updatedAt = null; o.error = null; o.loading = false; o.zhostid = null; o.zraw = {}; }
+  if (ui.detail) closeDetail();
+  if (cfg.source === 'zabbix') startZabbix(); else startDemo();
+  rebuildIndex();
+  renderScreen();
+  if (cfg.source === 'demo') announceInitial();
+}
+buildStatic();
+setSoundBtn();
+bind();
+const h0 = location.hash.slice(1);
+if (byId[h0]) ui.active = h0;
+start();
+startSoundLoop();
+})();
+</script>
+
+</body>
+</html>
