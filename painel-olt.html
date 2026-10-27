@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjU5MCAyOTAgODMwIDgzMCI+CiAgPHRpdGxlPlVwRG93biBJbnRlcm5ldDwvdGl0bGU+CiAgPGcgZmlsbD0iIzBEQkJFRiI+CiAgICA8cGF0aCBkPSJNNjEyIDY4Mkw2ODAgNzI3TDc0OCA2ODJWODAwQzc0OCA4OTIgODE0IDk2NyA4OTggOTY3Qzk3OCA5NjcgMTA0NCA5MDYgMTA0NCA4MzBWNzI3TDExMTMgNjc1TDExODMgNzI3VjgyMEMxMTgzIDk3MiAxMDU1IDEwOTcgODk4IDEwOTdDNzQwIDEwOTcgNjEyIDk2OCA2MTIgODEwWiIvPgogICAgPHBhdGggZD0iTTEzOTggNzMwTDEzMjkgNjg1TDEyNjEgNzMwVjYwMEMxMjYxIDUxNSAxMTk4IDQ0NSAxMTEzIDQ0NUMxMDMyIDQ0NSA5NjYgNTA4IDk2NiA1ODVWNjg1TDg5NyA3MzdMODI3IDY4NVY1ODVDODI3IDQzNiA5NTYgMzE1IDExMTMgMzE1QzEyNzAgMzE1IDEzOTggNDQzIDEzOTggNjAwWiIvPgogIDwvZz4KICA8ZyBmaWxsPSIjOUIwMEZGIj4KICAgIDxwYXRoIGQ9Ik02MTAgNTAwTDY4MCA1NTBMNzUwIDUwMFY2MjBMNjgwIDY3M0w2MTAgNjIwWiIvPgogICAgPHBhdGggZD0iTTgyNyA3MzhMODk3IDc4OEw5NjcgNzM4Vjg1OEw4OTcgOTEwTDgyNyA4NThaIi8+CiAgICA8cGF0aCBkPSJNMTA0MiA1NTNMMTExMiA1MDBMMTE4MiA1NTNWNjcyTDExMTIgNjIzTDEwNDIgNjcyWiIvPgogICAgPHBhdGggZD0iTTEyNTkgNzkwTDEzMjkgNzM4TDEzOTkgNzkwVjkxMEwxMzI5IDg2MEwxMjU5IDkxMFoiLz4KICA8L2c+Cjwvc3ZnPgo=">
 <title>Painel OLT UpDown</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -130,7 +131,7 @@ button,input,select{font:inherit}
 .appbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:var(--appbar-bg);color:var(--appbar-fg);border-bottom:1px solid var(--appbar-line)}
 .bar{display:flex;align-items:center;gap:var(--s-3) var(--s-5);flex-wrap:wrap;padding-block:var(--s-3)}
 .brand{display:flex;align-items:center;gap:var(--s-3);min-width:0;margin-right:var(--s-2)}
-.brand img{height:30px;width:auto;display:block}
+.brand-mark{width:32px;height:32px;display:block;flex:none}
 .brand b{display:block;font-size:var(--fs-16);font-weight:700;letter-spacing:-.01em;line-height:1.1}
 .brand small{display:block;font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--appbar-dim)}
 .tabs{display:flex;gap:var(--s-1);padding:var(--s-1);border:1px solid var(--appbar-line);border-radius:var(--r-lg);background:var(--appbar-soft);overflow-x:auto;scrollbar-width:none;max-width:100%}
@@ -147,6 +148,11 @@ button,input,select{font:inherit}
 .src-pill[data-state="live"] .dot{background:var(--ok-500);animation:pulse 2.2s var(--ease) infinite}
 .src-pill[data-state="error"] .dot{background:var(--danger-500)}
 .src-pill .upd{color:var(--appbar-dim);font-family:var(--font-mono);font-weight:500}
+.who{display:inline-flex;align-items:center;gap:var(--s-2);min-height:36px;padding:0 var(--s-1) 0 var(--s-1);border:1px solid var(--appbar-line);border-radius:var(--r-full);background:var(--appbar-soft);font-size:var(--fs-12);font-weight:650;color:var(--appbar-fg)}
+.who-av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--grad-brand);color:var(--text-on-brand);font-size:var(--fs-11);font-weight:800;text-transform:uppercase}
+.who-name{max-width:14ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who-out{color:var(--appbar-fg);text-decoration:none;padding:var(--s-1) var(--s-3);border-radius:var(--r-full);border-left:1px solid var(--appbar-line)}
+.who-out:hover{background:var(--appbar-soft)}
 .icon-btn{width:36px;height:36px;display:inline-grid;place-items:center;border-radius:var(--r-sm);border:1px solid var(--appbar-line);background:transparent;color:var(--appbar-fg);cursor:pointer;transition:background var(--dur-1) var(--ease)}
 .icon-btn:hover{background:var(--appbar-soft)}
 .icon-btn[aria-pressed="true"]{background:var(--appbar-on);border-color:rgba(29,201,255,.6)}
@@ -456,11 +462,21 @@ pre.code{margin:var(--s-2) 0;padding:var(--s-3);overflow-x:auto;background:var(-
 <header class="appbar">
   <div class="inner gutter bar">
     <div class="brand">
-      <img src="data:image/png;base64,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" alt="" width="40" height="30">
+      <svg class="brand-mark" viewBox="590 290 830 830" aria-hidden="true" focusable="false"><g fill="#0DBBEF">
+    <path d="M612 682L680 727L748 682V800C748 892 814 967 898 967C978 967 1044 906 1044 830V727L1113 675L1183 727V820C1183 972 1055 1097 898 1097C740 1097 612 968 612 810Z"/>
+    <path d="M1398 730L1329 685L1261 730V600C1261 515 1198 445 1113 445C1032 445 966 508 966 585V685L897 737L827 685V585C827 436 956 315 1113 315C1270 315 1398 443 1398 600Z"/>
+  </g>
+  <g fill="#9B00FF">
+    <path d="M610 500L680 550L750 500V620L680 673L610 620Z"/>
+    <path d="M827 738L897 788L967 738V858L897 910L827 858Z"/>
+    <path d="M1042 553L1112 500L1182 553V672L1112 623L1042 672Z"/>
+    <path d="M1259 790L1329 738L1399 790V910L1329 860L1259 910Z"/>
+  </g></svg>
       <div><small>UpDown NOC</small><b>Painel das OLTs</b></div>
     </div>
     <div class="tabs" role="tablist" aria-label="OLTs" id="tabs"></div>
     <div class="bar-right">
+      <span class="who" id="who" hidden><span class="who-av" aria-hidden="true"></span><span class="who-name" id="whoName"></span><a class="who-out" href="/logout">Sair</a></span>
       <button class="src-pill" id="srcPill" type="button" data-state="demo" title="Fonte dos dados"><span class="dot"></span><span id="srcText">Demonstração</span><span class="upd" id="updText"></span></button>
       <button class="icon-btn" id="btnSound" type="button" aria-pressed="false" title="Som dos alertas" aria-label="Som dos alertas"></button>
       <button class="icon-btn" id="btnTv" type="button" aria-pressed="false" title="Modo TV: tela cheia e rodízio entre as OLTs" aria-label="Modo TV"></button>
@@ -539,7 +555,7 @@ location = /zbx-api {
     proxy_set_header Authorization "Bearer SEU_TOKEN";
 }</pre>
       <div class="row" style="margin-top:0"><button class="btn" type="button" id="btnCopy">Copiar configuração</button><span class="out" id="copyOut" role="status"></span></div>
-      <p>Depois use <span class="mono">/zbx-api</span> como URL e deixe o token vazio. Confira o caminho da API com a LV Network. Pelo link do Claude o painel não consegue falar com servidores externos, então o modo Zabbix só funciona no arquivo hospedado.</p>
+      <p>Se o painel foi instalado com o instalador do login, isso já está pronto: use <span class="mono">/zbx-api</span> como URL e deixe o token vazio. Confira o caminho da API com a LV Network. Pelo link do Claude o painel não consegue falar com servidores externos, então o modo Zabbix só funciona no arquivo hospedado.</p>
     </details>
     <fieldset>
       <legend>Limites</legend>
@@ -690,6 +706,28 @@ function makeUplink(oltId, name, alias, active, speed){
     active, isLag:/^smartgroup/i.test(name), members:[], memberOf:null, capD:speed || guessSpeed(name), capU:speed || guessSpeed(name),
     down:null, up:null, pd:null, pu:null, hd:[], hu:[], sevD:'ok', sevU:'ok', sev:active ? 'ok' : 'idle' };
 }
+/* Agregado LACP (smartgroup): os membros vêm do cadastro da OLT; sem cadastro,
+   as portas físicas com link entram no agregado quando a soma das velocidades
+   bate com a dele. O agregado não conta como mais um enlace. */
+function applyLag(o){
+  for (const u of o.uplinks){ if (u.isLag) u.members = []; u.memberOf = null; }
+  const known = o.src && o.src.lag;
+  for (const lag of o.uplinks.filter(u => u.isLag)){
+    let members = [];
+    if (known && known.name === lag.name) members = known.members.filter(n => o.uplinks.some(u => u.name === n && !u.isLag));
+    if (!members.length && lag.active){
+      const phys = o.uplinks.filter(u => !u.isLag && u.active);
+      const sum = phys.reduce((s, u) => s + (u.capD || 0), 0);
+      if (phys.length > 1 && lag.capD && Math.abs(sum - lag.capD) < 1e6) members = phys.map(u => u.name);
+    }
+    lag.members = members;
+    for (const u of o.uplinks) if (!u.isLag && members.includes(u.name)) u.memberOf = lag.name;
+    if (members.length && !lag.capD){
+      const cap = members.reduce((s, n) => s + ((o.uplinks.find(u => u.name === n) || {}).capD || 0), 0);
+      lag.capD = lag.capU = cap;
+    }
+  }
+}
 function mkMetric(oltId, id, label, unit){ return { type:'health', key:oltId + '|h|' + id, olt:oltId, id, label, unit, value:null, hist:[], sev:'ok', where:'', missing:false }; }
 function rebuildIndex(){
   targets.clear();
@@ -793,10 +831,7 @@ function buildDemo(o){
   o.ports = d.pons.map(([name, alias, oper]) => { const p = makePort(o.id, name, alias, oper === 1); p.demo = demoProfile(p, d.median); return p; });
   o.portMap = new Map(o.ports.map(p => [p.name, p]));
   o.uplinks = d.uplinks.map(([name, alias, oper, speed]) => makeUplink(o.id, name, alias, oper === 1, speed));
-  if (d.lag){
-    const lag = o.uplinks.find(u => u.name === d.lag.name);
-    if (lag){ lag.members = d.lag.members.slice(); for (const u of o.uplinks) if (lag.members.includes(u.name)) u.memberOf = lag.name; }
-  }
+  applyLag(o);
   o.health = { cpu:mkMetric(o.id, 'cpu', 'Processamento', '%'), mem:mkMetric(o.id, 'mem', 'Memória', '%'), temp:mkMetric(o.id, 'temp', 'Temperatura', '°C') };
 }
 function demoAt(o, t, bucket){
@@ -848,6 +883,10 @@ async function zcall(conn, method, params, auth = true){
     throw new Error(insideClaude()
       ? 'Pelo link do Claude o painel não alcança servidores externos. Hospede o arquivo na sua rede para ler o Zabbix.'
       : 'Sem resposta da API do Zabbix. Confira a URL e se este endereço pode consultá-la (mesmo domínio ou proxy).');
+  }
+  if (res.status === 401 && !/^https?:/i.test(conn.url.trim())){
+    location.href = '/login?next=' + encodeURIComponent(location.pathname || '/');
+    throw new Error('Sua sessão expirou. Entre novamente.');
   }
   const text = await res.text();
   let body; try { body = JSON.parse(text); } catch(e){ throw new Error(`A API respondeu algo que não é JSON (HTTP ${res.status}). Confira a URL.`); }
@@ -924,6 +963,7 @@ function mergeInterfaces(o, items){
   }
   o.ports.sort((a, b) => a.slot - b.slot || a.idx - b.idx);
   o.uplinks.sort((a, b) => (b.isLag - a.isLag) || a.name.localeCompare(b.name, 'pt-BR', { numeric:true }));
+  applyLag(o);
 }
 function boardLabel(name){
   return String(name)
@@ -1334,12 +1374,14 @@ function dmHTML(dir, v, p, sev){
 function renderUplinks(o){
   const card = $('#uplinkCard'), t1 = Date.now();
   const act = o.uplinks.filter(u => u.active), off = o.uplinks.filter(u => !u.active);
-  const capTotal = act.filter(u => !u.memberOf).reduce((s, u) => s + (u.capD || 0), 0);
+  const phys = act.filter(u => !u.isLag);
+  const capTotal = phys.length ? phys.reduce((s, u) => s + (u.capD || 0), 0) : act.reduce((s, u) => s + (u.capD || 0), 0);
+  const lagNote = act.filter(u => u.isLag && u.members.length).map(u => `${u.members.length} em ${u.name}`).join(', ');
   const order = [];
   for (const u of act){ if (u.memberOf) continue; order.push(u); if (u.isLag) for (const m of u.members){ const x = act.find(v => v.name === m); if (x) order.push(x); } }
   for (const u of act) if (!order.includes(u)) order.push(u);
   keepFocus(card, () => {
-    card.innerHTML = `<div class="card-h"><h2>Uplinks</h2><small>${act.length} com link · capacidade ${esc(fmtBps(capTotal))}</small></div>
+    card.innerHTML = `<div class="card-h"><h2>Uplinks</h2><small>${phys.length || act.length} com link · capacidade ${esc(fmtBps(capTotal))}${lagNote ? ' · ' + esc(lagNote) : ''}</small></div>
       ${order.length ? `<ul class="uplinks">${order.map(u => `<li><button type="button" class="up-row${u.memberOf ? ' member' : ''}${u.sev === 'crit' ? ' is-danger' : u.sev === 'warn' ? ' is-warn' : ''}" data-open="${esc(u.key)}" data-fk="u-${esc(u.key)}" aria-label="${esc(u.name)}: download ${esc(fmtBps(u.down))}, upload ${esc(fmtBps(u.up))}. Abrir gráfico">
         <span class="up-id"><span class="mono">${esc(u.name)}</span>${u.isLag ? `<span class="tag">LACP · ${u.members.length}×${esc(fmtBps(u.capD / Math.max(1, u.members.length)))}</span>` : `<span class="tag">${esc(fmtBps(u.capD))}</span>`}<span class="alias">${esc(u.alias || (u.isLag ? 'Agregado' : 'Sem descrição'))}</span></span>
         <span class="up-meters">${dmHTML('down', u.down, u.pd, u.sevD)}${dmHTML('up', u.up, u.pu, u.sevU)}</span>
@@ -1840,6 +1882,19 @@ function start(){
   renderScreen();
   if (cfg.source === 'demo') announceInitial();
 }
+function checkSession(){
+  if (!/^https?:$/.test(location.protocol) || typeof fetch !== 'function') return;
+  fetch('/sessao', { credentials:'same-origin', cache:'no-store' })
+    .then(r => r.ok && /json/.test(r.headers.get('content-type') || '') ? r.json() : null)
+    .then(d => {
+      if (!d || !d.authenticated || !d.user) return;
+      $('#whoName').textContent = d.user;
+      $('#who').querySelector('.who-av').textContent = d.user.slice(0, 1);
+      $('#who').title = 'Conectado como ' + d.user;
+      $('#who').hidden = false;
+    })
+    .catch(() => {});
+}
 buildStatic();
 setSoundBtn();
 bind();
@@ -1847,6 +1902,7 @@ const h0 = location.hash.slice(1);
 if (byId[h0]) ui.active = h0;
 start();
 startSoundLoop();
+try { checkSession(); } catch(e){}
 })();
 </script>
 
