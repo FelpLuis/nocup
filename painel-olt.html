@@ -608,7 +608,7 @@ body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;rig
     <p class="form-err" id="formErr" hidden></p>
     <fieldset>
       <legend>Conexão</legend>
-      <p class="note" style="margin-top:0">Os dados vêm do Zabbix da LV Network, consultado pelo servidor do painel. O token fica guardado no servidor e nunca passa pelo navegador.</p>
+      <p class="note" style="margin-top:0">Os dados vêm do Zabbix configurado no servidor do painel. O token fica guardado no servidor e nunca passa pelo navegador.</p>
       <div class="row"><button class="btn" type="button" id="btnTest">Testar conexão</button><span class="out" id="testOut" role="status"></span></div>
     </fieldset>
     <fieldset>
@@ -663,9 +663,10 @@ body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;rig
 const DATA = {"olts":[{"id":"c300","nome":"C300 Casqueiro","curto":"C300","local":"Casqueiro","modelo":"ZTE C300","lag":null},{"id":"c350","nome":"C350 Vila Natal","curto":"C350","local":"Vila Natal","modelo":"ZTE C350","lag":{"name":"smartgroup1","members":["xgei_1/0/1","xgei_1/1/1","xgei_1/1/2"]}}]};
 const MIN = 60000, HOUR = 3600000, TAU = Math.PI * 2, WINDOW = 120 * MIN;
 const STORE = 'updown.painel-olt.v1', STORE_UI = 'updown.painel-olt.ui';
-/* Fonte fixa: o nginx do servidor encaminha /zbx-api para https://zbx7.lv.network/api_jsonrpc.php com o token. */
+/* Fonte fixa: o nginx do servidor encaminha /zbx-api para a API do Zabbix com o token de leitura. */
 const ZBX = { url:'/zbx-api', token:'' };
-const HOSTS = { c300:'18400 UPT | OLT C300 CASQUEIRO', c350:'18400 UPT | OLT C350 VILA NATAL' };
+/* Nomes no Zabbix da UpDown; a busca por trecho também acha os da LV ("18400 UPT | OLT …"). */
+const HOSTS = { c300:'OLT C300 CASQUEIRO', c350:'OLT C350 VILA NATAL' };
 const DEFAULTS = {
   thr:90, warn:75, capDown:1250, capUp:1250,
   cpuWarn:75, cpuCrit:90, memWarn:80, memCrit:90, tempWarn:60, tempCrit:70,
