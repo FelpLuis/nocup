@@ -447,6 +447,60 @@ pre.code{margin:var(--s-2) 0;padding:var(--s-3);overflow-x:auto;background:var(-
 .toast b{display:block}
 @keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
+/* ---------- modo TV: as duas OLTs numa tela, C350 em cima e C300 embaixo ---------- */
+body.tv-on{overflow:hidden}
+body.tv-on .appbar,body.tv-on main{display:none}
+body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;right:auto;left:50%;transform:translateX(-50%)}
+.tv{position:fixed;inset:0;z-index:50;display:grid;grid-template-rows:auto minmax(0,1fr) minmax(0,1fr);gap:var(--s-3);
+  padding:calc(env(safe-area-inset-top,0px) + var(--s-3)) max(var(--s-4),env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + var(--s-3)) max(var(--s-4),env(safe-area-inset-left,0px));
+  background:radial-gradient(900px 520px at 8% -6%,var(--bg-glow-1),transparent 60%),radial-gradient(760px 480px at 100% 0%,var(--bg-glow-2),transparent 58%),var(--bg);color:var(--text-1)}
+.tv-top{display:flex;align-items:center;gap:var(--s-3) var(--s-5);flex-wrap:wrap;padding:var(--s-2) var(--s-4);border-radius:var(--r-lg);background:var(--appbar-bg);color:var(--appbar-fg)}
+.tv-top .brand-logo{height:30px}
+.tv-top b{font-size:var(--fs-16);white-space:nowrap}
+.tv-legend{display:flex;flex-wrap:wrap;gap:var(--s-1) var(--s-3);font-size:var(--fs-11);color:var(--appbar-dim);align-items:center}
+.tv-legend span{display:inline-flex;align-items:center;gap:6px}
+.tv-legend .lg{width:14px;height:10px}
+.tv-right{margin-left:auto;display:flex;align-items:center;gap:var(--s-3);flex-wrap:wrap}
+.tv-clock{font-family:var(--font-mono);font-size:var(--fs-24);font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.tv-exit{min-height:36px;padding:0 var(--s-3);border-radius:var(--r-sm);border:1px solid var(--appbar-line);background:var(--appbar-soft);color:var(--appbar-fg);font-size:var(--fs-12);font-weight:650;cursor:pointer}
+.tv-exit:hover{background:var(--appbar-on)}
+.tv-olt{display:grid;grid-template-columns:minmax(0,1fr) clamp(250px,21vw,340px);gap:var(--s-3);min-height:0}
+.tv-heat-card{display:flex;flex-direction:column;gap:var(--s-2);min-width:0;min-height:0;padding:var(--s-3) var(--s-4);background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-lg)}
+.tv-heat-card.is-danger{border-color:var(--danger-line);box-shadow:0 0 0 1px var(--danger-line)}
+.tv-olt-h{display:flex;align-items:baseline;gap:var(--s-2) var(--s-5);flex-wrap:wrap}
+.tv-olt-h h2{margin:0;font-size:var(--fs-20);font-weight:700;letter-spacing:-.02em}
+.tv-stat{font-size:var(--fs-13);color:var(--text-3);white-space:nowrap}
+.tv-stat b{font-family:var(--font-mono);color:var(--text-1);font-weight:700}
+.tv-stat.is-danger b{color:var(--danger-text)}
+.tv-stat.is-warn b{color:var(--warn-text)}
+.tv-upd{margin-left:auto;font-family:var(--font-mono);font-size:var(--fs-11);color:var(--text-3)}
+.tv-heat{flex:1;min-height:0;display:grid;gap:4px}
+.tv-heat .hh{font-size:var(--fs-10);font-weight:800;color:var(--text-3);text-align:center;align-self:end}
+.tv-heat .rl{display:flex;align-items:center;font-size:clamp(11px,.85vw,15px);font-weight:700;white-space:nowrap}
+.tv-heat .hc{height:auto;min-height:0;font-size:clamp(11px,1.05vw,20px);border-radius:6px}
+.tv-heat .hc.bc{animation:tv-crit 1.6s var(--ease) infinite}
+@keyframes tv-crit{0%,100%{box-shadow:0 0 0 2px var(--danger-line)}50%{box-shadow:0 0 0 5px var(--danger-bg)}}
+.tv-msg{flex:1;display:grid;place-items:center;text-align:center;color:var(--text-3);border:1px dashed var(--line-strong);border-radius:var(--r-md);padding:var(--s-4)}
+.tv-msg.err{color:var(--danger-text);border-color:var(--danger-line)}
+.tv-health{display:grid;grid-template-rows:repeat(3,minmax(0,1fr));gap:var(--s-3);min-height:0}
+.tv-g{position:relative;overflow:hidden;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:var(--s-3);min-height:0;padding:var(--s-2) var(--s-3);background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-lg)}
+.tv-g::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--grad-brand);opacity:.8}
+.tv-g.is-warn::before{background:var(--grad-warn)} .tv-g.is-danger::before{background:var(--grad-danger)}
+.tv-g.is-danger{border-color:var(--danger-line)}
+.tv-g .gauge{width:auto;height:100%;max-height:118px;min-height:0;aspect-ratio:132/120}
+.tv-g-side{display:grid;gap:2px;min-width:0}
+.tv-g-side label{font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
+.tv-g-side small{font-size:var(--fs-11);color:var(--text-3);font-family:var(--font-mono)}
+.tv-g-side .spark{height:26px}
+.tv-g.none{grid-template-columns:1fr;color:var(--text-3);font-size:var(--fs-12)}
+@media (max-width:900px){
+  .tv{overflow-y:auto;grid-template-rows:auto auto auto}
+  .tv-olt{grid-template-columns:minmax(0,1fr)}
+  .tv-heat{overflow-x:auto;min-height:320px}
+  .tv-health{grid-template-rows:none;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))}
+  .tv-g .gauge{height:96px}
+}
+
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
 }
@@ -469,7 +523,7 @@ pre.code{margin:var(--s-2) 0;padding:var(--s-3);overflow-x:auto;background:var(-
       <span class="who" id="who" hidden><span class="who-av" aria-hidden="true"></span><span class="who-name" id="whoName"></span><a class="who-out" href="/logout">Sair</a></span>
       <button class="src-pill" id="srcPill" type="button" data-state="loading" title="Conexão com o Zabbix"><span class="dot"></span><span id="srcText">Conectando…</span><span class="upd" id="updText"></span></button>
       <button class="icon-btn" id="btnSound" type="button" aria-pressed="false" title="Som dos alertas" aria-label="Som dos alertas"></button>
-      <button class="icon-btn" id="btnTv" type="button" aria-pressed="false" title="Modo TV: tela cheia e rodízio entre as OLTs" aria-label="Modo TV"></button>
+      <button class="icon-btn" id="btnTv" type="button" aria-pressed="false" title="Modo TV: mapa de calor e saúde das duas OLTs em tela cheia" aria-label="Modo TV"></button>
       <button class="icon-btn" id="btnSettings" type="button" title="Configurações" aria-label="Configurações"></button>
     </div>
   </div>
@@ -542,6 +596,22 @@ pre.code{margin:var(--s-2) 0;padding:var(--s-3);overflow-x:auto;background:var(-
       <button class="btn-primary" type="submit">Salvar</button>
     </div>
   </form>
+</section>
+
+<section class="tv" id="tv" aria-label="Modo TV" hidden>
+  <header class="tv-top">
+    <img class="brand-logo" src="data:image/png;base64,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" alt="UpDown Internet" width="101" height="30">
+    <span class="brand-sep" aria-hidden="true"></span>
+    <b>Painel das OLTs</b>
+    <div class="tv-legend" id="tvLegend"></div>
+    <div class="tv-right">
+      <span class="src-pill" id="tvPill" data-state="loading"><span class="dot"></span><span id="tvSrc">Conectando…</span></span>
+      <span class="tv-clock" id="tvClock">--:--</span>
+      <button class="tv-exit" type="button" id="tvExit">Sair do modo TV</button>
+    </div>
+  </header>
+  <div class="tv-olt" id="tv-c350"></div>
+  <div class="tv-olt" id="tv-c300"></div>
 </section>
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
@@ -995,7 +1065,7 @@ function announce(fresh){
 function announceInitial(){
   const n = alerts.active.size;
   if (!n) return;
-  toast(n === 1 ? '1 alerta ativo' : `${n} alertas ativos`, 'Veja a lista no topo de cada OLT.', 'danger');
+  toast(n === 1 ? '1 alerta ativo' : `${n} alertas ativos`, ui.tv ? 'As portas em vermelho estão acima do limite.' : 'Veja a lista no topo de cada OLT.', 'danger');
   if (cfg.sound) beep();
 }
 function startSoundLoop(){
@@ -1368,6 +1438,64 @@ function renderHeat(o, force){
   }
 }
 
+/* modo TV */
+const TV_ORDER = ['c350', 'c300'];
+function tvHeatHTML(o){
+  if (!o.ports.length){
+    return o.error ? `<div class="tv-msg err">${esc(o.error)}</div>` : `<div class="tv-msg">${o.loading ? 'Carregando portas…' : 'Sem portas PON neste host.'}</div>`;
+  }
+  const slots = [...new Set(o.ports.map(p => p.slot))].sort((a, b) => a - b);
+  const cols = Math.max(...o.ports.map(p => p.idx), 1);
+  let h = `<div class="tv-heat" style="grid-template-columns:auto repeat(${cols},minmax(0,1fr));grid-template-rows:auto repeat(${slots.length},minmax(0,1fr))"><span></span>`;
+  for (let i = 1; i <= cols; i++) h += `<span class="hh">${i}</span>`;
+  for (const sl of slots){
+    h += `<span class="rl">Placa ${sl}</span>`;
+    for (let i = 1; i <= cols; i++){
+      const p = o.ports.find(x => x.slot === sl && x.idx === i);
+      if (!p){ h += `<span class="hc none"></span>`; continue; }
+      if (!p.active){ h += `<span class="hc bi" title="${esc(p.name)} · ${esc(p.region || 'sem descrição')} · sem link">–</span>`; continue; }
+      const u = Math.max(p.pd || 0, p.pu || 0), upMax = (p.pu || 0) > (p.pd || 0);
+      h += `<button type="button" class="hc ${heatClass(p)}" data-open="${esc(p.key)}" title="${esc(p.name)} · ${esc(p.region || 'sem descrição')} · ↓ ${esc(fmtBps(p.down))} (${fmtPct(p.pd)}) · ↑ ${esc(fmtBps(p.up))} (${fmtPct(p.pu)})" aria-label="Porta ${esc(p.short)}, ${esc(p.region || 'sem descrição')}: ${fmtPct(u)}">${nf(u * 100, 0)}${upMax ? '<span class="up-mark" aria-hidden="true">↑</span>' : ''}</button>`;
+    }
+  }
+  return h + `</div>`;
+}
+function tvHealthHTML(o){
+  const t1 = Date.now();
+  return ['cpu','mem','temp'].map(id => {
+    const m = o.health[id], label = { cpu:'Processamento', mem:'Memória', temp:'Temperatura' }[id];
+    if (!m || m.missing || m.value == null) return `<div class="tv-g none"><span>${label}: ${o.loading ? 'carregando…' : 'sem item no Zabbix'}</span></div>`;
+    const pts = m.hist.filter(a => a[0] >= t1 - WINDOW).map(a => a[1]);
+    const pk = pts.length ? Math.max(...pts) : m.value;
+    const st = m.sev === 'crit' ? ['is-danger','badge--danger','Alerta'] : m.sev === 'warn' ? ['is-warn','badge--warn','Atenção'] : ['','badge--ok','Normal'];
+    return `<div class="tv-g ${st[0]}">${gaugeSVG(m)}<div class="tv-g-side"><label>${label}</label><span><span class="badge ${st[1]}">${st[2]}</span></span><small>pico 2 h ${esc(fmtMetric(m, pk))}</small>${healthSpark(m, t1)}</div></div>`;
+  }).join('');
+}
+function renderTv(){
+  for (const id of TV_ORDER){
+    const o = byId[id], box = $('#tv-' + id); if (!o || !box) continue;
+    const act = o.ports.filter(p => p.active);
+    const D = act.reduce((s, p) => s + (p.down || 0), 0), U = act.reduce((s, p) => s + (p.up || 0), 0);
+    const nCrit = o.ports.filter(p => p.sev === 'crit').length, nWarn = o.ports.filter(p => p.sev === 'warn').length;
+    box.innerHTML = `<section class="tv-heat-card${nCrit ? ' is-danger' : ''}" aria-label="${esc(o.nome)}">
+        <div class="tv-olt-h"><h2>${esc(o.nome)}</h2>
+          <span class="tv-stat">PONs <b>${act.length}/${o.ports.length}</b></span>
+          <span class="tv-stat"><i class="sw in"></i> <b>${esc(fmtBps(D))}</b></span>
+          <span class="tv-stat"><i class="sw out"></i> <b>${esc(fmtBps(U))}</b></span>
+          <span class="tv-stat ${nCrit ? 'is-danger' : ''}">≥ ${cfg.thr}% <b>${nCrit}</b></span>
+          <span class="tv-stat ${nWarn ? 'is-warn' : ''}">atenção <b>${nWarn}</b></span>
+          <span class="tv-upd">${o.updatedAt ? 'atualizado ' + fmtTimeS(o.updatedAt) : ''}</span></div>
+        ${tvHeatHTML(o)}
+      </section>
+      <div class="tv-health" aria-label="Saúde da ${esc(o.curto)}">${tvHealthHTML(o)}</div>`;
+  }
+  const anyErr = OLTS.some(x => x.error), loading = OLTS.some(x => x.loading && !x.updatedAt);
+  $('#tvPill').dataset.state = anyErr ? 'error' : loading ? 'loading' : 'live';
+  $('#tvSrc').textContent = anyErr ? 'Falha no Zabbix' : loading ? 'Conectando…' : 'Zabbix ao vivo';
+  $('#tvLegend').innerHTML = `<span><i class="lg" style="background:var(--heat-1)"></i>&lt;10%</span><span><i class="lg" style="background:var(--heat-2)"></i>10–25</span><span><i class="lg" style="background:var(--heat-3)"></i>25–50</span><span><i class="lg" style="background:var(--heat-4)"></i>50–${cfg.warn}</span><span><i class="lg" style="background:var(--warn-500)"></i>${cfg.warn}–${cfg.thr}</span><span><i class="lg" style="background:var(--danger-500)"></i>≥ ${cfg.thr}%</span><span>↑ upload</span>`;
+}
+function tickClock(){ const el = $('#tvClock'); if (el) el.textContent = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }); }
+
 /* tela inteira */
 function renderScreen(){
   const o = byId[ui.active];
@@ -1376,6 +1504,7 @@ function renderScreen(){
   updateChrome();
 }
 function update(){
+  if (ui.tv){ renderTv(); updateChrome(); if (ui.detail) updateDetail(false); return; }
   const o = byId[ui.active];
   renderHead(o); renderAlerts(o); renderHealth(o); renderUplinks(o); renderBoards(o); renderChips(o); renderPons(o, false);
   updateChrome();
@@ -1576,22 +1705,24 @@ function applyCfg(next){
 
 /* ---------- modo TV ---------- */
 async function setTv(on){
+  if (on === ui.tv) return;
   ui.tv = on;
   $('#btnTv').setAttribute('aria-pressed', String(on));
-  clearInterval(tvTimer);
+  clearInterval(tvTimer); tvTimer = null;
+  document.body.classList.toggle('tv-on', on);
+  $('#tv').hidden = !on;
   if (on){
+    renderTv(); tickClock();
+    tvTimer = setInterval(tickClock, 10000);
     try { if (document.documentElement.requestFullscreen && !document.fullscreenElement) await document.documentElement.requestFullscreen(); } catch(e){}
     try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){ wakeLock = null; }
-    tvTimer = setInterval(() => {
-      if (ui.detail || !$('#settings').hidden) return;
-      const i = OLTS.findIndex(o => o.id === ui.active);
-      setTab(OLTS[(i + 1) % OLTS.length].id);
-    }, 30000);
-    toast('Modo TV ligado', 'As telas das OLTs alternam a cada 30 s.', 'info', 4000);
+    $('#tvExit').focus({ preventScroll:true });
   } else {
     try { if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); } catch(e){}
     try { if (wakeLock) await wakeLock.release(); } catch(e){}
     wakeLock = null;
+    renderScreen();
+    $('#btnTv').focus({ preventScroll:true });
   }
 }
 
@@ -1629,12 +1760,14 @@ function bind(){
   $('#srcPill').addEventListener('click', openSettings);
   $('#btnSound').addEventListener('click', () => { cfg.sound = !cfg.sound; store(STORE, cfg); setSoundBtn(); if (cfg.sound){ ensureAudio(); beep(); toast('Som dos alertas ligado', 'Toca ao abrir um alerta e repete a cada minuto até reconhecer.', 'info', 4000); } });
   $('#btnTv').addEventListener('click', () => setTv(!ui.tv));
+  $('#tvExit').addEventListener('click', () => setTv(false));
   document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && ui.tv) setTv(false); });
   document.addEventListener('visibilitychange', async () => { if (ui.tv && document.visibilityState === 'visible' && navigator.wakeLock){ try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } });
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (!$('#settings').hidden) closeSettings();
     else if (ui.detail) closeDetail();
+    else if (ui.tv) setTv(false);
   });
   document.addEventListener('pointerdown', () => { if (cfg.sound) ensureAudio(); }, { once:true });
   $('#setForm').addEventListener('submit', e => {
