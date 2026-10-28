@@ -436,6 +436,10 @@ button.hc:hover{transform:scale(1.06);border-color:var(--line-strong)}
 .scale-note{margin:var(--s-2) 0 0;font-size:var(--fs-12);color:var(--text-3)}
 .d-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
 .d-stats > div:last-child:nth-child(odd){grid-column:1/-1}
+.d-stats div.is-warn strong{color:var(--warn-text)} .d-stats div.is-danger strong{color:var(--danger-text)}
+.d-stats div.is-danger{background:linear-gradient(var(--danger-bg),var(--danger-bg)),var(--surface-1)}
+.opt-none{display:grid;gap:var(--s-1);padding:var(--s-3) var(--s-4);border:1px dashed var(--line-strong);border-radius:var(--r-md);font-size:var(--fs-13);color:var(--text-3)}
+.opt-none b{color:var(--text-1);font-weight:650}
 .d-stats div{background:var(--surface-1);padding:var(--s-3) var(--s-4);display:grid;gap:2px;min-width:0}
 .d-stats span{font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
 .d-stats strong{font-family:var(--font-mono);font-size:var(--fs-14);font-weight:600}
@@ -617,6 +621,7 @@ body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;rig
         <label class="field">CPU atenção / alerta (%)<input id="fCpu" type="text" inputmode="numeric" placeholder="75 / 90"></label>
         <label class="field">Memória atenção / alerta (%)<input id="fMem" type="text" inputmode="numeric" placeholder="80 / 90"></label>
         <label class="field">Temperatura atenção / alerta (°C)<input id="fTemp" type="text" inputmode="numeric" placeholder="60 / 70"></label>
+        <label class="field">Sinal RX atenção / alerta (dBm)<input id="fRx" type="text" inputmode="numeric" placeholder="-25 / -28"></label>
         <label class="field">Atualizar a cada (s)<input id="fInt" type="number" min="10" max="600" step="5"></label>
       </div>
       <p class="note">O alerta abre quando a porta passa do limite e só fecha quando cai 5 pontos abaixo dele, para não piscar.</p>
@@ -664,6 +669,7 @@ const HOSTS = { c300:'18400 UPT | OLT C300 CASQUEIRO', c350:'18400 UPT | OLT C35
 const DEFAULTS = {
   thr:90, warn:75, capDown:1250, capUp:1250,
   cpuWarn:75, cpuCrit:90, memWarn:80, memCrit:90, tempWarn:60, tempCrit:70,
+  rxWarn:-25, rxCrit:-28,
   interval:30, sound:false, notify:false
 };
 const TH = { cpu:{w:'cpuWarn',c:'cpuCrit',hy:3}, mem:{w:'memWarn',c:'memCrit',hy:2}, temp:{w:'tempWarn',c:'tempCrit',hy:2} };
@@ -817,6 +823,40 @@ function applyLag(o){
     }
   }
 }
+/* Sinal óptico (dBm). O painel reconhece itens com RX/TX (ou sinal, óptico,
+   power, laser) no nome e a porta no formato 1/2/1; com ":N" depois da porta o
+   item é de uma ONU. Enquanto o Zabbix não coletar, a porta mostra "não coletado". */
+function mergeOptical(o, items){
+  for (const p of o.ports) p.opt = null;
+  o.optCount = 0;
+  const byShort = new Map(o.ports.map(p => [p.short, p]));
+  for (const it of items || []){
+    if (/^net\.if/.test(it.key_) || /^Interface\s.+:\s(Bits|Operational|Speed|Inbound|Outbound)/i.test(it.name)) continue;
+    const n = String(it.name), u = String(it.units || '').trim(), v = +it.lastvalue;
+    if (it.lastvalue === '' || !isFinite(v)) continue;
+    if (u && !/dbm/i.test(u)) continue;
+    if (v < -60 || v > 15) continue;
+    const dir = /\brx\b|receb|recep|input|entrada/i.test(n) ? 'rx' : /\btx\b|transm|output|envi|sa[ií]da|laser/i.test(n) ? 'tx' : null;
+    if (!dir) continue;
+    const pm = n.match(/(\d+)[\/.](\d+)[\/.](\d+)(?:\s*[:]\s*(\d+))?/) || String(it.key_).match(/(\d+)[\/.](\d+)[\/.](\d+)(?:\s*[:]\s*(\d+))?/);
+    if (!pm) continue;
+    const p = byShort.get(`${pm[1]}/${pm[2]}/${pm[3]}`); if (!p) continue;
+    p.opt = p.opt || { tx:null, rx:null, onus:[] };
+    if (pm[4] != null) p.opt.onus.push({ onu:+pm[4], dir, v });
+    else p.opt[dir] = { v, clock:+it.lastclock * 1000 };
+    o.optCount++;
+  }
+  for (const p of o.ports){
+    if (!p.opt) continue;
+    const rx = p.opt.onus.filter(x => x.dir === 'rx');
+    if (rx.length){
+      let worst = rx[0]; for (const x of rx) if (x.v < worst.v) worst = x;
+      p.opt.onuRx = { n:rx.length, worst, avg:rx.reduce((a, x) => a + x.v, 0) / rx.length, low:rx.filter(x => x.v <= cfg.rxCrit).length };
+    }
+  }
+}
+const fmtDbm = v => v == null || !isFinite(v) ? '—' : nf(v, 1).replace('-', '−') + ' dBm';
+function rxSev(v){ if (v == null) return ''; if (v <= cfg.rxCrit || v > -8) return 'is-danger'; if (v <= cfg.rxWarn) return 'is-warn'; return ''; }
 function mkMetric(oltId, id, label, unit){ return { type:'health', key:oltId + '|h|' + id, olt:oltId, id, label, unit, value:null, hist:[], sev:'ok', where:'', missing:false }; }
 function rebuildIndex(){
   targets.clear();
@@ -1034,6 +1074,10 @@ async function zPoll(o, first){
   try { hitems = await zbx('item.get', { hostids:[o.zhostid], output:IOUT, search:{ name:['*CPU*','*Mem*','*Temp*','*Process*'] }, searchByAny:true, searchWildcardsEnabled:true, limit:2000 }); }
   catch(e){ hitems = []; }
   mergeHealth(o, hitems);
+  let oitems = [];
+  try { oitems = await zbx('item.get', { hostids:[o.zhostid], output:IOUT, search:{ name:['*rx*','*tx*','*sinal*','*optic*','*óptic*','*power*','*potência*','*dbm*','*laser*'] }, searchByAny:true, searchWildcardsEnabled:true, limit:10000 }); }
+  catch(e){ oitems = []; }
+  mergeOptical(o, oitems);
   rebuildIndex();
   if (first) await zHistory(o);
   o.updatedAt = Date.now(); o.error = null; o.loading = false;
@@ -1503,7 +1547,8 @@ function heatText(p){
 }
 function heatTitle(p){
   const bad = [p.badD != null ? `↓ leitura inválida (${fmtBps(p.badD)})` : '', p.badU != null ? `↑ leitura inválida (${fmtBps(p.badU)})` : ''].filter(Boolean).join(' · ');
-  return `${p.name} · ${p.region || 'sem descrição'} · ↓ ${fmtBps(p.down)} (${fmtPct(p.pd)} de ${fmtBps(p.capD)}) · ↑ ${fmtBps(p.up)} (${fmtPct(p.pu)} de ${fmtBps(p.capU)})${bad ? ' · ' + bad + ', acima do máximo do GPON: confira o item no Zabbix' : ''}`;
+  const opt = p.opt ? ` · TX ${fmtDbm(p.opt.tx && p.opt.tx.v)}${p.opt.rx ? ' · RX ' + fmtDbm(p.opt.rx.v) : ''}${p.opt.onuRx ? ' · RX pior ONU ' + fmtDbm(p.opt.onuRx.worst.v) : ''}` : '';
+  return `${p.name} · ${p.region || 'sem descrição'} · ↓ ${fmtBps(p.down)} (${fmtPct(p.pd)} de ${fmtBps(p.capD)}) · ↑ ${fmtBps(p.up)} (${fmtPct(p.pu)} de ${fmtBps(p.capU)})${opt}${bad ? ' · ' + bad + ', acima do máximo do GPON: confira o item no Zabbix' : ''}`;
 }
 function renderHeat(o, force){
   const body = $('#ponBody');
@@ -1798,6 +1843,25 @@ function renderPortBoard(t){
       <small>${pk ? 'pico ' + esc(fmtMetric(x.m, pk[1])) + ' · ' + new Date(pk[0]).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }) + ' ' + fmtTime(pk[0]) : 'atenção ' + w + ' · alerta ' + c + (x.m.unit === '%' ? '%' : ' °C')}</small></div>`;
   }).join('');
 }
+function renderOptical(t){
+  const box = $('#dOpt'); if (!box) return;
+  const o = byId[t.olt], op = t.opt;
+  if (!op){
+    box.innerHTML = `<div class="opt-none"><b>Não coletado no Zabbix</b><span>${o.optCount ? 'O Zabbix tem itens de sinal desta OLT, mas nenhum desta porta.' : 'Os hosts desta OLT não têm itens de sinal óptico (RX/TX). Quando os itens forem criados, o sinal aparece aqui sozinho.'}</span></div>`;
+    return;
+  }
+  const cells = [];
+  cells.push(['TX da porta', op.tx ? fmtDbm(op.tx.v) : '—', op.tx ? 'potência do laser da OLT' : 'sem item', '']);
+  if (op.rx) cells.push(['RX da porta', fmtDbm(op.rx.v), 'recebido na OLT', rxSev(op.rx.v)]);
+  if (op.onuRx){
+    const r = op.onuRx;
+    cells.push(['RX pior ONU', fmtDbm(r.worst.v), 'ONU ' + r.worst.onu, rxSev(r.worst.v)]);
+    cells.push(['RX médio das ONUs', fmtDbm(r.avg), r.n + ' ONUs com leitura', rxSev(r.avg)]);
+    cells.push([`ONUs abaixo de ${fmtDbm(cfg.rxCrit)}`, String(r.low), 'de ' + r.n, r.low ? 'is-danger' : '']);
+  }
+  if (!op.rx && !op.onuRx) cells.push(['RX', '—', 'sem item', '']);
+  box.innerHTML = `<div class="d-stats">${cells.map(([l, v, sm, cls]) => `<div class="${cls}"><span>${esc(l)}</span><strong>${esc(v)}</strong><small>${esc(sm)}</small></div>`).join('')}</div>`;
+}
 function renderIface(t){
   const box = $('#dIface'); if (!box) return;
   const val = it => {
@@ -1851,12 +1915,13 @@ function updateDetail(full){
         <div class="chart-box" id="dChart"></div><div id="dLegend"></div></section>
       <div class="d-stats" id="dStats"></div>
       ${t.type === 'pon' ? `<section><div class="d-sec-h"><h3>Placa ${t.slot} · saúde</h3><small class="muted" id="dBoardWin"></small></div><div class="pb-grid" id="dBoard"></div></section>` : ''}
+      ${t.type === 'pon' ? `<section><div class="d-sec-h"><h3>Sinal óptico</h3><small class="muted">RX atenção ${fmtDbm(cfg.rxWarn)} · alerta ${fmtDbm(cfg.rxCrit)}</small></div><div id="dOpt"></div></section>` : ''}
       <section><div class="d-sec-h"><h3>Interface</h3></div><div class="d-stats" id="dIface"></div></section>
       ${loc}
       <section id="dAlerts"></section>`;
   }
   $('#dNow').innerHTML = nowBox('down') + nowBox('up');
-  renderPortBoard(t); renderIface(t);
+  renderPortBoard(t); renderOptical(t); renderIface(t);
   const rel = [...alerts.active.values()].filter(a => a.target === t.key).concat(alerts.history.filter(a => a.target === t.key)).slice(0, 6);
   $('#dAlerts').innerHTML = rel.length ? `<div class="d-sec-h"><h3>Alertas desta porta</h3></div><ul class="d-list">${rel.map(a => `<li><b>${a.dir === 'down' ? '↓ Download' : '↑ Upload'}</b><span class="mono">pico ${fmtPct(a.peak)}</span><span class="muted">${fmtTime(a.since)}${a.ended ? '–' + fmtTime(a.ended) + ' (' + fmtDur(a.ended - a.since) + ')' : ' · ainda ativo'}</span></li>`).join('')}</ul>` : '';
   if (ui.dSeries && Date.now() - ui.dSeries.at > 120000 && !ui.dLoading) loadSeries();
@@ -1919,7 +1984,7 @@ function renderChartArea(){
 /* ---------- configurações ---------- */
 function fillForm(c){
   $('#fThr').value = c.thr; $('#fWarn').value = c.warn; $('#fCapD').value = c.capDown; $('#fCapU').value = c.capUp;
-  $('#fCpu').value = `${c.cpuWarn} / ${c.cpuCrit}`; $('#fMem').value = `${c.memWarn} / ${c.memCrit}`; $('#fTemp').value = `${c.tempWarn} / ${c.tempCrit}`;
+  $('#fCpu').value = `${c.cpuWarn} / ${c.cpuCrit}`; $('#fMem').value = `${c.memWarn} / ${c.memCrit}`; $('#fTemp').value = `${c.tempWarn} / ${c.tempCrit}`; $('#fRx').value = `${c.rxWarn} / ${c.rxCrit}`;
   $('#fInt').value = c.interval; $('#fSound').checked = !!c.sound; $('#fNotify').checked = !!c.notify;
 }
 function openSettings(){
@@ -1951,6 +2016,11 @@ function readForm(){
   [next.cpuWarn, next.cpuCrit] = pair($('#fCpu').value, 'CPU');
   [next.memWarn, next.memCrit] = pair($('#fMem').value, 'Memória');
   [next.tempWarn, next.tempCrit] = pair($('#fTemp').value, 'Temperatura');
+  { const m = String($('#fRx').value).match(/^\s*(-?\d+(?:[.,]\d+)?)\s*[\/;]\s*(-?\d+(?:[.,]\d+)?)\s*$/);
+    if (!m) throw new Error('Sinal RX: use o formato "atenção / alerta", por exemplo -25 / -28.');
+    const a = +m[1].replace(',', '.'), b = +m[2].replace(',', '.');
+    if (!(b < a)) throw new Error('Sinal RX: o alerta precisa ser mais baixo (mais negativo) que a atenção.');
+    next.rxWarn = a; next.rxCrit = b; }
   next.interval = n('#fInt', 'Atualização', 10, 600);
   next.sound = $('#fSound').checked; next.notify = $('#fNotify').checked;
   return next;
