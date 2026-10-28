@@ -369,6 +369,7 @@ button.hc:hover{transform:scale(1.06);border-color:var(--line-strong)}
 .hc.bw{background:var(--warn-500);color:var(--on-warn)}
 .hc.bc{background:var(--danger-500);color:var(--on-solid);box-shadow:0 0 0 2px var(--danger-line)}
 .hc.bi{background:repeating-linear-gradient(45deg,transparent 0 4px,var(--line) 4px 6px);border-color:var(--line);cursor:default;font-weight:500}
+.hc.bq{background:var(--surface-3);color:var(--warn-text);border:1px dashed var(--warn-line)}
 .hc.none{visibility:hidden}
 .hc.dim{opacity:.18}
 .hc .up-mark{font-size:9px;margin-left:1px;vertical-align:1px}
@@ -734,6 +735,19 @@ function makePort(oltId, name, alias, active){
   setCaps(p);
   return p;
 }
+/* Teto físico da porta. Uma leitura acima dele não é tráfego (GPON não sobe
+   15 Gbps): é item mal configurado no Zabbix ou contador reiniciado. A porta
+   mostra "leitura inválida" em vez de um alerta falso. */
+function physMax(t, dir){
+  if (t.type === 'pon') return (t.kind === 'xgs' ? 10e9 : dir === 'down' ? 2.488e9 : 1.244e9) * 1.05;
+  return ((dir === 'down' ? t.capD : t.capU) || 0) * 1.05 || Infinity;
+}
+function cleanRate(t, dir, v){
+  const bad = v != null && v > physMax(t, dir);
+  if (dir === 'down') t.badD = bad ? v : null; else t.badU = bad ? v : null;
+  return bad ? null : v;
+}
+const isBad = p => p.badD != null || p.badU != null;
 function guessSpeed(name){ if (/^smartgroup/i.test(name)) return 0; if (/^xgei/i.test(name)) return 1e10; if (/^gei/i.test(name)) return 1e9; return 1e10; }
 function makeUplink(oltId, name, alias, active, speed){
   return { type:'uplink', key:oltId + '|' + name, olt:oltId, name, short:name, alias:alias || '', label:alias || '', region:alias || '',
@@ -865,10 +879,10 @@ function mergeInterfaces(o, items){
     t.active = active;
     if (isPon){
       setCaps(t, speed);
-      t.down = outR; t.up = inR; t.zD = r.it.ifHCOutOctets; t.zU = r.it.ifHCInOctets;
+      t.down = cleanRate(t, 'down', outR); t.up = cleanRate(t, 'up', inR); t.zD = r.it.ifHCOutOctets; t.zU = r.it.ifHCInOctets;
     } else {
       t.capD = t.capU = speed || guessSpeed(r.name) || t.capD;
-      t.down = inR; t.up = outR; t.zD = r.it.ifHCInOctets; t.zU = r.it.ifHCOutOctets;
+      t.down = cleanRate(t, 'down', inR); t.up = cleanRate(t, 'up', outR); t.zD = r.it.ifHCInOctets; t.zU = r.it.ifHCOutOctets;
     }
     if (t.down != null) pushPoint(t.hd, clockOf(t.zD), t.down);
     if (t.up != null) pushPoint(t.hu, clockOf(t.zU), t.up);
@@ -929,6 +943,11 @@ async function zHistory(o){
     }
   }
   for (const arr of map.values()) arr.sort((a, b) => a[0] - b[0]);
+  for (const t of [...o.ports, ...o.uplinks]){
+    const md = physMax(t, 'down'), mu = physMax(t, 'up');
+    if (t.hd.length) t.hd = t.hd.filter(a => a[1] <= md);
+    if (t.hu.length) t.hu = t.hu.filter(a => a[1] <= mu);
+  }
 }
 async function zPoll(o, first){
   await zResolve(o);
@@ -988,12 +1007,12 @@ function evaluate(now, silent){
   const fresh = [];
   for (const o of OLTS){
     for (const t of [...o.ports, ...o.uplinks]){
-      if (!t.active || t.down == null){
-        t.sev = t.active ? 'ok' : 'idle'; t.pd = t.pu = null;
+      if (!t.active || (t.down == null && t.up == null)){
+        t.sev = t.active ? 'ok' : 'idle'; t.pd = t.pu = null; t.sevD = t.sevU = 'ok';
         track(o, t, 'down', false, null, null, now, fresh); track(o, t, 'up', false, null, null, now, fresh);
         continue;
       }
-      t.pd = t.capD ? t.down / t.capD : null;
+      t.pd = (t.capD && t.down != null) ? t.down / t.capD : null;
       t.pu = (t.capU && t.up != null) ? t.up / t.capU : null;
       t.sevD = sevPct(t.pd, t.sevD); t.sevU = sevPct(t.pu, t.sevU); t.sev = worst(t.sevD, t.sevU);
       track(o, t, 'down', t.sevD === 'crit', t.down, t.pd, now, fresh);
@@ -1352,7 +1371,8 @@ function cardHTML(p){
 function fillCard(el, p, t1){
   if (!p.active) return;
   el.className = 'pon' + (p.sev === 'crit' ? ' is-danger' : p.sev === 'warn' ? ' is-warn' : '');
-  el.querySelector('.pon-pct').textContent = fmtPct(Math.max(p.pd || 0, p.pu || 0));
+  el.querySelector('.pon-pct').textContent = isBad(p) && !Math.max(p.pd || 0, p.pu || 0) ? 'leitura inválida' : fmtPct(Math.max(p.pd || 0, p.pu || 0));
+  el.title = isBad(p) ? heatTitle(p) : '';
   el.querySelector('.dmw').innerHTML = dmHTML('down', p.down, p.pd, p.sevD) + dmHTML('up', p.up, p.pu, p.sevU);
   el.querySelector('.spk').innerHTML = sparkSVG(p.hd, p.hu, p.capD, t1);
   el.setAttribute('aria-label', `Porta ${p.name}, ${p.region || 'sem descrição'}. Download ${fmtBps(p.down)} (${fmtPct(p.pd)}), upload ${fmtBps(p.up)} (${fmtPct(p.pu)}). Abrir gráfico`);
@@ -1387,10 +1407,21 @@ function renderPons(o, force){
 }
 function heatClass(p){
   if (!p.active) return 'bi';
+  if (isBad(p) && p.sev !== 'crit' && p.sev !== 'warn') return 'bq';
   if (p.sev === 'crit') return 'bc';
   if (p.sev === 'warn') return 'bw';
   const u = Math.max(p.pd || 0, p.pu || 0);
   return u < 0.1 ? 'b1' : u < 0.25 ? 'b2' : u < 0.5 ? 'b3' : 'b4';
+}
+function heatText(p){
+  const u = Math.max(p.pd || 0, p.pu || 0), upMax = (p.pu || 0) > (p.pd || 0);
+  if (isBad(p) && !u) return '?';
+  const v = u * 100;
+  return `${nf(v, v >= 0.05 && v < 1 ? 1 : 0)}%${upMax ? '<span class="up-mark" aria-hidden="true">↑</span>' : ''}`;
+}
+function heatTitle(p){
+  const bad = [p.badD != null ? `↓ leitura inválida (${fmtBps(p.badD)})` : '', p.badU != null ? `↑ leitura inválida (${fmtBps(p.badU)})` : ''].filter(Boolean).join(' · ');
+  return `${p.name} · ${p.region || 'sem descrição'} · ↓ ${fmtBps(p.down)} (${fmtPct(p.pd)} de ${fmtBps(p.capD)}) · ↑ ${fmtBps(p.up)} (${fmtPct(p.pu)} de ${fmtBps(p.capU)})${bad ? ' · ' + bad + ', acima do máximo do GPON: confira o item no Zabbix' : ''}`;
 }
 function renderHeat(o, force){
   const body = $('#ponBody');
@@ -1414,11 +1445,11 @@ function renderHeat(o, force){
     }
     h += `</div>`;
     keepFocus(body, () => {
-      body.innerHTML = `<div class="heat-wrap">${h}</div><div class="legend-row"><span>Utilização da direção mais carregada:</span>
+      body.innerHTML = `<div class="heat-wrap">${h}</div><div class="legend-row"><span>% do limite da porta (${esc(fmtBps(cfg.capDown * 1e6))}), direção mais carregada:</span>
         <span><i class="lg" style="background:var(--heat-1)"></i>&lt; 10%</span><span><i class="lg" style="background:var(--heat-2)"></i>10–25%</span>
         <span><i class="lg" style="background:var(--heat-3)"></i>25–50%</span><span><i class="lg" style="background:var(--heat-4)"></i>50–${cfg.warn}%</span>
         <span><i class="lg" style="background:var(--warn-500)"></i>${cfg.warn}–${cfg.thr}%</span><span><i class="lg" style="background:var(--danger-500)"></i>≥ ${cfg.thr}%</span>
-        <span><i class="lg" style="background:repeating-linear-gradient(45deg,transparent 0 3px,var(--line-strong) 3px 5px)"></i>sem link</span><span>↑ marca quando o upload é a direção mais carregada</span></div>`;
+        <span><i class="lg" style="background:repeating-linear-gradient(45deg,transparent 0 3px,var(--line-strong) 3px 5px)"></i>sem link</span><span><i class="lg" style="background:var(--surface-3);outline:1px dashed var(--warn-line)"></i>? leitura inválida</span><span>↑ marca quando o upload é a direção mais carregada</span></div>`;
     });
     pons.refs = new Map([...body.querySelectorAll('[data-key]')].map(el => [el.dataset.key, el]));
   }
@@ -1428,9 +1459,9 @@ function renderHeat(o, force){
     if (!p.active){ el.className = 'hc bi' + (dim ? ' dim' : ''); continue; }
     el.className = 'hc ' + heatClass(p) + (dim ? ' dim' : '');
     const u = Math.max(p.pd || 0, p.pu || 0), upMax = (p.pu || 0) > (p.pd || 0);
-    el.innerHTML = `${nf(u * 100, 0)}${upMax ? '<span class="up-mark" aria-hidden="true">↑</span>' : ''}`;
-    el.title = `${p.name} · ${p.region || 'sem descrição'} · ↓ ${fmtBps(p.down)} (${fmtPct(p.pd)}) · ↑ ${fmtBps(p.up)} (${fmtPct(p.pu)})`;
-    el.setAttribute('aria-label', `Porta ${p.short}, ${p.region || 'sem descrição'}: ${fmtPct(u)}${upMax ? ' no upload' : ' no download'}. Abrir gráfico`);
+    el.innerHTML = heatText(p);
+    el.title = heatTitle(p);
+    el.setAttribute('aria-label', `Porta ${p.short}, ${p.region || 'sem descrição'}: ${isBad(p) && !u ? 'leitura inválida' : fmtPct(u) + (upMax ? ' no upload' : ' no download')}. Abrir gráfico`);
   }
   for (const el of body.querySelectorAll('[data-hs]')){
     const sl = +el.dataset.hs, act = o.ports.filter(p => p.slot === sl && p.active);
@@ -1454,8 +1485,8 @@ function tvHeatHTML(o){
       const p = o.ports.find(x => x.slot === sl && x.idx === i);
       if (!p){ h += `<span class="hc none"></span>`; continue; }
       if (!p.active){ h += `<span class="hc bi" title="${esc(p.name)} · ${esc(p.region || 'sem descrição')} · sem link">–</span>`; continue; }
-      const u = Math.max(p.pd || 0, p.pu || 0), upMax = (p.pu || 0) > (p.pd || 0);
-      h += `<button type="button" class="hc ${heatClass(p)}" data-open="${esc(p.key)}" title="${esc(p.name)} · ${esc(p.region || 'sem descrição')} · ↓ ${esc(fmtBps(p.down))} (${fmtPct(p.pd)}) · ↑ ${esc(fmtBps(p.up))} (${fmtPct(p.pu)})" aria-label="Porta ${esc(p.short)}, ${esc(p.region || 'sem descrição')}: ${fmtPct(u)}">${nf(u * 100, 0)}${upMax ? '<span class="up-mark" aria-hidden="true">↑</span>' : ''}</button>`;
+      const u = Math.max(p.pd || 0, p.pu || 0);
+      h += `<button type="button" class="hc ${heatClass(p)}" data-open="${esc(p.key)}" title="${esc(heatTitle(p))}" aria-label="Porta ${esc(p.short)}, ${esc(p.region || 'sem descrição')}: ${isBad(p) && !u ? 'leitura inválida' : fmtPct(u)}">${heatText(p)}</button>`;
     }
   }
   return h + `</div>`;
@@ -1492,7 +1523,7 @@ function renderTv(){
   const anyErr = OLTS.some(x => x.error), loading = OLTS.some(x => x.loading && !x.updatedAt);
   $('#tvPill').dataset.state = anyErr ? 'error' : loading ? 'loading' : 'live';
   $('#tvSrc').textContent = anyErr ? 'Falha no Zabbix' : loading ? 'Conectando…' : 'Zabbix ao vivo';
-  $('#tvLegend').innerHTML = `<span><i class="lg" style="background:var(--heat-1)"></i>&lt;10%</span><span><i class="lg" style="background:var(--heat-2)"></i>10–25</span><span><i class="lg" style="background:var(--heat-3)"></i>25–50</span><span><i class="lg" style="background:var(--heat-4)"></i>50–${cfg.warn}</span><span><i class="lg" style="background:var(--warn-500)"></i>${cfg.warn}–${cfg.thr}</span><span><i class="lg" style="background:var(--danger-500)"></i>≥ ${cfg.thr}%</span><span>↑ upload</span>`;
+  $('#tvLegend').innerHTML = `<span><i class="lg" style="background:var(--heat-1)"></i>&lt;10%</span><span><i class="lg" style="background:var(--heat-2)"></i>10–25</span><span><i class="lg" style="background:var(--heat-3)"></i>25–50</span><span><i class="lg" style="background:var(--heat-4)"></i>50–${cfg.warn}</span><span><i class="lg" style="background:var(--warn-500)"></i>${cfg.warn}–${cfg.thr}</span><span><i class="lg" style="background:var(--danger-500)"></i>≥ ${cfg.thr}%</span><span>? inválida</span><span>↑ upload</span>`;
 }
 function tickClock(){ const el = $('#tvClock'); if (el) el.textContent = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }); }
 
@@ -1527,7 +1558,8 @@ async function zSeries(t, winH){
     return (rows || []).map(r => [+r.clock * 1000, +r.value]);
   };
   const [d, u] = await Promise.all([get(t.zD), get(t.zU)]);
-  return { d, u };
+  const md = physMax(t, 'down'), mu = physMax(t, 'up');
+  return { d:d.filter(a => a[1] <= md), u:u.filter(a => a[1] <= mu) };
 }
 async function loadSeries(){
   const t = targets.get(ui.detail); if (!t) return;
@@ -1566,6 +1598,9 @@ function updateDetail(full){
   const o = byId[t.olt];
   const nowBox = (dir) => {
     const v = dir === 'down' ? t.down : t.up, p = dir === 'down' ? t.pd : t.pu, cap = dir === 'down' ? t.capD : t.capU, sev = dir === 'down' ? t.sevD : t.sevU;
+    const bad = dir === 'down' ? t.badD : t.badU;
+    if (bad != null) return `<div class="nowbox is-warn"><label><i class="sw ${dir === 'down' ? 'in' : 'out'}"></i>${dir === 'down' ? 'Download agora' : 'Upload agora'}</label><strong>Leitura inválida</strong>
+      <small>O Zabbix informou ${esc(fmtBps(bad))}, acima do máximo físico da porta (${esc(fmtBps(physMax(t, dir) / 1.05))}). Confira esse item no Zabbix.</small></div>`;
     return `<div class="nowbox ${sev === 'crit' ? 'is-danger' : sev === 'warn' ? 'is-warn' : ''}"><label><i class="sw ${dir === 'down' ? 'in' : 'out'}"></i>${dir === 'down' ? 'Download agora' : 'Upload agora'}</label><strong>${bpsHTML(v)}</strong>
       ${dmHTML(dir, v, p, sev)}<small>${fmtPct(p)} de ${esc(fmtBps(cap))}</small></div>`;
   };
