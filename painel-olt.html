@@ -245,6 +245,23 @@ main .inner{display:flex;flex-direction:column;gap:var(--s-5)}
 .hside dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px var(--s-3);font-size:var(--fs-12)}
 .hside dt{color:var(--text-3)} .hside dd{margin:0;font-family:var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
 .hside .where{font-size:var(--fs-11);color:var(--text-3);overflow-wrap:anywhere}
+.hcard[data-open],.tv-g[data-open]{cursor:pointer;transition:border-color var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
+.hcard[data-open]:hover,.tv-g[data-open]:hover{border-color:var(--line-strong);box-shadow:var(--shadow-2)}
+.hcard-more{justify-self:end;font-size:var(--fs-12);font-weight:650;color:var(--info-text)}
+.d-title-sans{font-family:var(--font-sans)!important}
+.hb-list{display:grid;gap:var(--s-2)}
+.hb-row{display:grid;grid-template-columns:minmax(84px,auto) 64px minmax(60px,1fr) minmax(0,1.3fr) 82px;align-items:center;gap:var(--s-3);padding:var(--s-2) var(--s-3);border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
+.hb-row.is-warn{border-color:var(--warn-line)}
+.hb-row.is-danger{border-color:var(--danger-line);background:var(--danger-bg)}
+.hb-name{display:grid;font-weight:650;font-size:var(--fs-13);line-height:1.2}
+.hb-name small{font-weight:500;font-size:var(--fs-11);color:var(--text-3)}
+.hb-val{font-family:var(--font-mono);font-weight:700;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hb-row.is-warn .hb-val{color:var(--warn-text)} .hb-row.is-danger .hb-val{color:var(--danger-text)}
+.hb-row.is-warn .track i{background:var(--warn-500)} .hb-row.is-danger .track i{background:var(--danger-500)}
+.hb-spark{min-width:0}
+.hb-spark .spark{height:28px}
+.hb-peak{font-family:var(--font-mono);font-size:var(--fs-11);color:var(--text-3);text-align:right;white-space:nowrap}
+@media (max-width:540px){.hb-row{grid-template-columns:minmax(0,1fr) auto}.hb-bar,.hb-spark{grid-column:1/-1}.hb-peak{grid-column:1/-1;text-align:left}}
 @media (max-width:380px){.hbody{grid-template-columns:1fr}.gauge{margin:0 auto}}
 
 .grid-mid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:var(--s-4)}
@@ -330,6 +347,7 @@ main .inner{display:flex;flex-direction:column;gap:var(--s-5)}
 .sel{display:flex;align-items:center;gap:var(--s-2);font-size:var(--fs-13);color:var(--text-3)}
 select{height:36px;padding:0 var(--s-2);background:var(--surface-input);color:var(--text-1);border:1px solid var(--line);border-radius:var(--r-sm)}
 .seg{display:inline-flex;padding:2px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-input)}
+.d-sec-h .seg{flex-wrap:wrap;max-width:100%}
 .seg button{min-height:30px;padding:0 var(--s-3);border:0;border-radius:var(--r-1);background:transparent;color:var(--text-3);font-size:var(--fs-13);font-weight:600;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--grad-brand);color:var(--text-on-brand)}
 .legend-row{display:flex;flex-wrap:wrap;gap:var(--s-2) var(--s-4);margin-top:var(--s-3);font-size:var(--fs-11);color:var(--text-3);align-items:center}
@@ -378,6 +396,7 @@ button.hc:hover{transform:scale(1.06);border-color:var(--line-strong)}
 /* ---------- gaveta de detalhe ---------- */
 .scrim{position:fixed;inset:0;z-index:calc(var(--z-drawer) - 1);background:var(--scrim)}
 .drawer{position:fixed;top:0;right:0;bottom:0;z-index:var(--z-drawer);width:min(600px,100%);overflow-y:auto;display:flex;flex-direction:column;gap:var(--s-5);background:var(--surface-1);border-left:1px solid var(--line);box-shadow:var(--shadow-3);padding:calc(env(safe-area-inset-top,0px) + var(--s-5)) max(var(--s-5),env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + var(--s-8)) var(--s-5)}
+.drawer > *{flex-shrink:0}
 .d-head{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s-3)}
 .d-head h2{margin:var(--s-1) 0 0;font-family:var(--font-mono);font-size:var(--fs-24);letter-spacing:-.02em;overflow-wrap:anywhere}
 .d-head p{margin:var(--s-1) 0 0;font-weight:650}
@@ -633,6 +652,12 @@ const DEFAULTS = {
 };
 const TH = { cpu:{w:'cpuWarn',c:'cpuCrit',hy:3}, mem:{w:'memWarn',c:'memCrit',hy:2}, temp:{w:'tempWarn',c:'tempCrit',hy:2} };
 const RANK = { idle:-1, ok:0, warn:1, crit:2 };
+/* Períodos do gráfico. Até 48 h vem o histórico bruto do Zabbix; 7 e 30 dias
+   vêm das tendências (uma amostra por hora, com média e pico da hora). */
+const WINDOWS = [[6,'6 h'], [12,'12 h'], [24,'24 h'], [48,'48 h'], [168,'7 dias'], [720,'30 dias']];
+const TREND_FROM = 168;
+const winLabel = h => (WINDOWS.find(w => w[0] === h) || [h, h + ' h'])[1];
+const winSpan = h => h >= 168 ? `últimos ${h / 24} dias` : `últimas ${h} h`;
 
 /* ---------- utilidades ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -694,7 +719,7 @@ const ui = {
   filter: ['active','crit','warn','idle'].includes(uiSaved.filter) ? uiSaved.filter : 'active',
   sort: ['slot','util','region'].includes(uiSaved.sort) ? uiSaved.sort : 'slot',
   view: uiSaved.view === 'heat' ? 'heat' : 'cards',
-  q:'', detail:null, dWin:24, dSeries:null, dLoading:false, tv:false, lastFocus:null
+  q:'', detail:null, dWin:WINDOWS.some(w => w[0] === uiSaved.dWin) ? uiSaved.dWin : 24, dSeries:null, dLoading:false, tv:false, lastFocus:null
 };
 const OLTS = DATA.olts.map(d => ({ id:d.id, nome:d.nome, curto:d.curto, local:d.local, modelo:d.modelo, src:d,
   ports:[], portMap:new Map(), uplinks:[], health:{}, boards:[], updatedAt:null, error:null, loading:false, zhostid:null, zraw:{} }));
@@ -938,10 +963,12 @@ function mergeHealth(o, items){
     let m = o.health[id];
     if (!m){ m = mkMetric(o.id, id, labels[id][0], labels[id][1]); o.health[id] = m; }
     const g = groups[id];
-    if (!g.length){ m.missing = true; m.value = null; continue; }
+    if (!g.length){ m.missing = true; m.value = null; m.boards = []; continue; }
     g.sort((a, b) => b.v - a.v);
     if (m.zItem && m.zItem.itemid !== g[0].it.itemid) m.hist = [];
     m.missing = false; m.value = g[0].v; m.where = g[0].label; m.zItem = g[0].it;
+    m.boards = g.map(x => ({ key:x.b.key, label:x.b.label, slot:x.b.slot, v:x.v, it:x.it }))
+      .sort((a, b) => ((a.slot ?? 999) - (b.slot ?? 999)) || a.label.localeCompare(b.label, 'pt-BR', { numeric:true }));
     pushPoint(m.hist, g[0].clock, g[0].v);
     for (const x of g){
       const b = boards.get(x.b.key) || { label:x.b.label, slot:x.b.slot, cpu:null, mem:null, temp:null, ports:null };
@@ -1171,9 +1198,10 @@ function gaugeSVG(m){
     <text class="gauge-sub" x="${cx}" y="${cy + 22}">${isTemp ? '°C' : 'por cento'}</text>
   </svg>`;
 }
-function healthSpark(m, t1){
-  const W = 200, H = 34, t0 = t1 - WINDOW, isTemp = m.id === 'temp';
-  const pts = m.hist.filter(a => a[0] >= t0);
+function healthSpark(m, t1){ return metricSpark(m, m.hist, t1 - WINDOW, t1); }
+function metricSpark(m, series, t0, t1){
+  const W = 200, H = 34, isTemp = m.id === 'temp';
+  const pts = series.filter(a => a[0] >= t0);
   if (pts.length < 2) return '';
   const lo = isTemp ? Math.min(20, ...pts.map(p => p[1])) : 0, hi = isTemp ? Math.max(90, ...pts.map(p => p[1])) : 100;
   const X = t => clamp((t - t0) / (t1 - t0), 0, 1) * W, Y = v => H - 2 - ((v - lo) / (hi - lo)) * (H - 4);
@@ -1181,7 +1209,7 @@ function healthSpark(m, t1){
   const cy = Y(cfg[TH[m.id].c]);
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><line class="spark-thr" x1="0" x2="${W}" y1="${cy.toFixed(1)}" y2="${cy.toFixed(1)}"/><path class="spark-fill" d="${linePath(p)}L${p[p.length - 1][0].toFixed(1)} ${H}L${p[0][0].toFixed(1)} ${H}Z"/><path class="spark-in" d="${linePath(p)}"/></svg>`;
 }
-const NICE = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 1];
+const NICE = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 1, 1.25, 1.5, 2, 3, 5];
 let chartUid = 0;
 function chartSVG(W, d, u, capD, capU, t0, t1, winH){
   const H = 248, PL = 46, PR = 14, PT = 16, PB = 28, iw = W - PL - PR, ih = H - PT - PB;
@@ -1190,7 +1218,7 @@ function chartSVG(W, d, u, capD, capU, t0, t1, winH){
   for (const a of d) peak = Math.max(peak, a[1] / capD);
   for (const a of u) peak = Math.max(peak, a[1] / capU);
   let ymax = NICE.find(n => n >= peak * 1.12) || 1;
-  if (ymax >= 0.75) ymax = 1;
+  if (ymax >= 0.75 && ymax <= 1) ymax = 1;
   const X = t => PL + (t - t0) / (t1 - t0) * iw, Y = p => PT + ih - (Math.min(p, ymax) / ymax) * ih;
   const pd = d.map(a => [X(a[0]), Y(a[1] / capD)]), pu = u.map(a => [X(a[0]), Y(a[1] / capU)]);
   const id = 'g' + (++chartUid);
@@ -1199,9 +1227,10 @@ function chartSVG(W, d, u, capD, capU, t0, t1, winH){
     const v = ymax * k / 4, y = Y(v);
     grid += `<line class="chart-grid" x1="${PL}" x2="${PL + iw}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}"/><text class="chart-axis" x="${PL - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${nf(v * 100, v * 100 < 10 && v > 0 ? 1 : 0)}%</text>`;
   }
-  const stepH = winH <= 6 ? 1 : winH <= 24 ? 3 : 6;
+  const stepH = winH <= 6 ? 1 : winH <= 12 ? 2 : winH <= 24 ? 3 : winH <= 48 ? 6 : winH <= 168 ? 24 : 120;
   const tk = new Date(t0); tk.setMinutes(0, 0, 0); tk.setHours(tk.getHours() + 1);
-  while (tk.getHours() % stepH) tk.setHours(tk.getHours() + 1);
+  if (stepH >= 24){ while (tk.getHours() !== 0) tk.setHours(tk.getHours() + 1); }
+  else while (tk.getHours() % stepH) tk.setHours(tk.getHours() + 1);
   let xl = '';
   for (let t = tk.getTime(); t <= t1; t += stepH * HOUR){
     const x = X(t), dd = new Date(t);
@@ -1212,7 +1241,7 @@ function chartSVG(W, d, u, capD, capU, t0, t1, winH){
   const thrLine = thr <= ymax ? `<line class="chart-thr" x1="${PL}" x2="${PL + iw}" y1="${Y(thr).toFixed(1)}" y2="${Y(thr).toFixed(1)}"/><text class="chart-thr-label" x="${PL + iw}" y="${(Y(thr) - 6).toFixed(1)}" text-anchor="end">limite ${cfg.thr}%</text>` : '';
   const area = (pts) => pts.length > 1 ? `${linePath(pts)}L${pts[pts.length - 1][0].toFixed(1)} ${PT + ih}L${pts[0][0].toFixed(1)} ${PT + ih}Z` : '';
   const lastD = pd[pd.length - 1], lastU = pu[pu.length - 1];
-  const svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Utilização de download e upload nas últimas ${winH} horas, escala até ${Math.round(ymax * 100)}%">
+  const svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Utilização de download e upload, ${winSpan(winH)}, escala até ${Math.round(ymax * 100)}%">
     <defs>
       <linearGradient id="${id}i" x1="0" y1="0" x2="0" y2="1"><stop class="stop-in" offset="0%" stop-opacity=".34"/><stop class="stop-in" offset="100%" stop-opacity="0"/></linearGradient>
       <linearGradient id="${id}o" x1="0" y1="0" x2="0" y2="1"><stop class="stop-out" offset="0%" stop-opacity=".30"/><stop class="stop-out" offset="100%" stop-opacity="0"/></linearGradient>
@@ -1317,11 +1346,12 @@ function renderHealth(o){
     const pk = pts.length ? Math.max(...pts) : m.value, mn = pts.length ? Math.min(...pts) : m.value;
     const st = m.sev === 'crit' ? ['is-danger','badge--danger','Alerta'] : m.sev === 'warn' ? ['is-warn','badge--warn','Atenção'] : ['','badge--ok','Normal'];
     const u = m.unit === '%' ? '%' : ' °C';
-    return `<article class="card hcard ${st[0]}"><div class="hcard-h"><label>${label}</label><span class="badge ${st[1]}">${st[2]}</span></div>
+    const nb = (m.boards || []).length;
+    return `<article class="card hcard ${st[0]}" data-open="${esc(m.key)}" role="button" tabindex="0" aria-label="${label} da ${esc(o.curto)}: ${esc(fmtMetric(m, m.value))}. Ver as ${nb} placas"><div class="hcard-h"><label>${label}</label><span class="badge ${st[1]}">${st[2]}</span></div>
       <div class="hbody">${gaugeSVG(m)}<div class="hside">
         <dl><dt>Pico 2 h</dt><dd>${esc(fmtMetric(m, pk))}</dd><dt>Mínimo 2 h</dt><dd>${esc(fmtMetric(m, mn))}</dd><dt>Atenção / alerta</dt><dd>${cfg[th.w]} / ${cfg[th.c]}${u}</dd></dl>
         ${healthSpark(m, t1)}<span class="where">${esc(m.where || '')}${m.where ? ' · ' : ''}últimas 2 h</span>
-      </div></div></article>`;
+      </div></div><span class="hcard-more">Ver as ${nb} placas →</span></article>`;
   }).join('');
 }
 function dmHTML(dir, v, p, sev){
@@ -1532,7 +1562,7 @@ function tvHealthHTML(o){
     const pts = m.hist.filter(a => a[0] >= t1 - WINDOW).map(a => a[1]);
     const pk = pts.length ? Math.max(...pts) : m.value;
     const st = m.sev === 'crit' ? ['is-danger','badge--danger','Alerta'] : m.sev === 'warn' ? ['is-warn','badge--warn','Atenção'] : ['','badge--ok','Normal'];
-    return `<div class="tv-g ${st[0]}">${gaugeSVG(m)}<div class="tv-g-side"><label>${label}</label><span><span class="badge ${st[1]}">${st[2]}</span></span><small>pico 2 h ${esc(fmtMetric(m, pk))}</small>${healthSpark(m, t1)}</div></div>`;
+    return `<div class="tv-g ${st[0]}" data-open="${esc(m.key)}" role="button" tabindex="0" aria-label="${label} da ${esc(o.curto)}: ver todas as placas">${gaugeSVG(m)}<div class="tv-g-side"><label>${label}</label><span><span class="badge ${st[1]}">${st[2]}</span></span><small>pico 2 h ${esc(fmtMetric(m, pk))}</small>${healthSpark(m, t1)}</div></div>`;
   }).join('');
 }
 function renderTv(){
@@ -1585,23 +1615,63 @@ function setTab(id, fromHash){
 /* ---------- gaveta de detalhe ---------- */
 async function zSeries(t, winH){
   const from = Math.floor((Date.now() - winH * HOUR) / 1000);
-  const get = async it => {
+  const md = physMax(t, 'down'), mu = physMax(t, 'up');
+  const hist = async it => {
     if (!it || !isBpsUnit(it.units)) return [];
-    const rows = await zbx('history.get', { history:+it.value_type, itemids:[it.itemid], time_from:from, output:'extend', sortfield:'clock', sortorder:'ASC', limit:20000 });
+    const rows = await zbx('history.get', { history:+it.value_type, itemids:[it.itemid], time_from:from, output:'extend', sortfield:'clock', sortorder:'ASC', limit:50000 });
     return (rows || []).map(r => [+r.clock * 1000, +r.value]);
   };
-  const [d, u] = await Promise.all([get(t.zD), get(t.zU)]);
-  const md = physMax(t, 'down'), mu = physMax(t, 'up');
-  return { d:d.filter(a => a[1] <= md), u:u.filter(a => a[1] <= mu) };
+  const trend = async it => {
+    if (!it || !isBpsUnit(it.units)) return { max:[], avg:[] };
+    const rows = await zbx('trend.get', { itemids:[it.itemid], time_from:from, output:['itemid','clock','value_avg','value_max'], limit:5000 });
+    const r = (rows || []).map(x => [+x.clock * 1000, +x.value_max, +x.value_avg]).sort((a, b) => a[0] - b[0]);
+    return { max:r.map(x => [x[0], x[1]]), avg:r.map(x => [x[0], x[2]]) };
+  };
+  let kind = winH >= TREND_FROM ? 'trend' : 'history', d, u, dAvg = null, uAvg = null;
+  if (kind === 'history'){
+    [d, u] = await Promise.all([hist(t.zD), hist(t.zU)]);
+    if (d.length < 2 && winH >= 12) kind = 'trend';   // histórico bruto mais curto que o período
+  }
+  if (kind === 'trend'){
+    const [a, b] = await Promise.all([trend(t.zD), trend(t.zU)]);
+    d = a.max; u = b.max; dAvg = a.avg; uAvg = b.avg;
+  }
+  const okD = x => x[1] <= md, okU = x => x[1] <= mu;
+  return { kind, d:d.filter(okD), u:u.filter(okU), dAvg:dAvg && dAvg.filter(okD), uAvg:uAvg && uAvg.filter(okU) };
+}
+async function zHealthSeries(m, winH){
+  const from = Math.floor((Date.now() - winH * HOUR) / 1000);
+  const items = (m.boards || []).filter(b => b.it);
+  const idMap = new Map(items.map(b => [String(b.it.itemid), b.key]));
+  const out = Object.fromEntries(items.map(b => [b.key, []]));
+  let kind = winH >= TREND_FROM ? 'trend' : 'history';
+  if (kind === 'history'){
+    for (const vt of ['0','3']){
+      const ids = items.filter(b => String(b.it.value_type) === vt).map(b => String(b.it.itemid));
+      if (!ids.length) continue;
+      const rows = await zbx('history.get', { history:+vt, itemids:ids, time_from:from, output:['itemid','clock','value'], sortfield:'clock', sortorder:'ASC', limit:150000 });
+      for (const r of rows || []){ const k = idMap.get(String(r.itemid)); if (k) out[k].push([+r.clock * 1000, +r.value]); }
+    }
+    if (winH >= 12 && Object.values(out).every(a => a.length < 2)) kind = 'trend';
+  }
+  if (kind === 'trend' && idMap.size){
+    for (const k in out) out[k] = [];
+    const rows = await zbx('trend.get', { itemids:[...idMap.keys()], time_from:from, output:['itemid','clock','value_max'], limit:30000 });
+    for (const r of rows || []){ const k = idMap.get(String(r.itemid)); if (k) out[k].push([+r.clock * 1000, +r.value_max]); }
+    for (const k in out) out[k].sort((a, b) => a[0] - b[0]);
+  }
+  const ok = m.id === 'temp' ? (a => a[1] > -100 && a[1] < 150) : (a => a[1] >= 0 && a[1] <= 100);
+  for (const k in out) out[k] = out[k].filter(ok);
+  return { kind, boards:out };
 }
 async function loadSeries(){
   const t = targets.get(ui.detail); if (!t) return;
   const key = ui.detail, win = ui.dWin;
   ui.dLoading = true; renderChartArea();
   try {
-    const s = await zSeries(t, win);
+    const s = t.type === 'health' ? await zHealthSeries(t, win) : await zSeries(t, win);
     if (ui.detail !== key || ui.dWin !== win) return;
-    ui.dSeries = { key, win, d:s.d, u:s.u, at:Date.now(), err:null };
+    ui.dSeries = { key, win, kind:s.kind, d:s.d || [], u:s.u || [], dAvg:s.dAvg, uAvg:s.uAvg, boards:s.boards, at:Date.now(), err:null };
   } catch(e){
     if (ui.detail !== key) return;
     ui.dSeries = { key, win, d:[], u:[], at:Date.now(), err:e.message };
@@ -1625,9 +1695,56 @@ function closeDetail(){
   if (lf && document.contains(lf)) lf.focus();
   else if (lf && lf.dataset && lf.dataset.fk){ const el = document.querySelector(`[data-fk="${CSS.escape(lf.dataset.fk)}"]`); if (el) el.focus(); }
 }
+function updateHealthDetail(m, full){
+  const dr = $('#drawer'), o = byId[m.olt], th = TH[m.id], u = m.unit === '%' ? '%' : ' °C';
+  if (full || !dr.querySelector('.d-head')){
+    dr.innerHTML = `<div class="d-head"><div><p class="kicker">Saúde · ${esc(o.nome)}</p><h2 id="dTitle" class="d-title-sans">${esc(m.label)}</h2><p id="dSub"></p></div>
+        <button class="close-btn" type="button" data-act="close" aria-label="Fechar">${ICON.x}</button></div>
+      <div class="d-tags"><span class="badge badge--warn">Atenção ${cfg[th.w]}${u}</span><span class="badge badge--danger">Alerta ${cfg[th.c]}${u}</span><span class="badge badge--idle" id="dCount"></span></div>
+      <div class="d-stats" id="dStats"></div>
+      <section><div class="d-sec-h"><h3>Todas as placas</h3><div class="seg" role="group" aria-label="Período">${WINDOWS.map(([w, l]) => `<button type="button" data-win="${w}" aria-pressed="${ui.dWin === w}">${l}</button>`).join('')}</div></div>
+        <div id="dChart"></div><div id="dLegend"></div></section>`;
+  }
+  $('#dSub').textContent = m.value == null ? 'Sem leitura agora' : `Maior agora: ${fmtMetric(m, m.value)} na ${m.where}`;
+  $('#dCount').textContent = `${(m.boards || []).length} placas`;
+  renderChartArea();
+  if (ui.dSeries && Date.now() - ui.dSeries.at > 120000 && !ui.dLoading) loadSeries();
+}
+function renderHealthArea(m){
+  const box = $('#dChart'), leg = $('#dLegend'), st = $('#dStats');
+  const o = byId[m.olt], th = TH[m.id], w = cfg[th.w], c = cfg[th.c], isTemp = m.id === 'temp';
+  const lo = isTemp ? 20 : 0, hi = isTemp ? 90 : 100, f = v => clamp((v - lo) / (hi - lo), 0, 1);
+  const rows = m.boards || [];
+  if (!rows.length){ box.innerHTML = `<div class="empty" style="margin:0">Nenhuma placa com leitura no Zabbix.</div>`; leg.innerHTML = ''; st.innerHTML = ''; return; }
+  const s = ui.dSeries && ui.dSeries.key === ui.detail && ui.dSeries.win === ui.dWin ? ui.dSeries : null;
+  const now = Date.now(), t0 = now - ui.dWin * HOUR;
+  let topPk = null;
+  box.innerHTML = `<div class="hb-list">${rows.map(b => {
+    const arr = s && s.boards ? (s.boards[b.key] || []) : null;
+    let pk = null; if (arr) for (const a of arr) if (!pk || a[1] > pk[1]) pk = a;
+    if (pk && (!topPk || pk[1] > topPk.v)) topPk = { v:pk[1], t:pk[0], label:b.label };
+    const sev = b.v >= c ? 'is-danger' : b.v >= w ? 'is-warn' : '';
+    const ps = b.slot != null && b.slot >= 0 ? o.ports.filter(p => p.slot === b.slot) : [];
+    const sub = ps.length ? `${ps.filter(p => p.active).length}/${ps.length} PONs` : b.slot === -1 ? 'ambiente' : '';
+    const spark = arr ? (arr.length > 1 ? metricSpark(m, arr, t0, now) : '<small class="muted">sem histórico</small>') : (ui.dLoading ? '<small class="muted">carregando…</small>' : '');
+    return `<div class="hb-row ${sev}"><span class="hb-name">${esc(b.label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      <span class="hb-val">${esc(fmtMetric(m, b.v))}</span>
+      <span class="track hb-bar" style="--thr-pos:${(f(c) * 100).toFixed(1)}%"><i style="width:${(f(b.v) * 100).toFixed(1)}%"></i></span>
+      <span class="hb-spark">${spark}</span>
+      <span class="hb-peak">${pk ? 'pico ' + esc(fmtMetric(m, pk[1])) : ''}</span></div>`;
+  }).join('')}</div>`;
+  leg.innerHTML = `<div class="chart-legend" style="margin-top:var(--s-3)"><span><i class="sw in"></i>${esc(m.label)} ${s && s.kind === 'trend' ? '(pico de cada hora)' : ''}</span><span><i class="thr-sw"></i>Alerta ${c}${m.unit === '%' ? '%' : ' °C'}</span><span class="dim">${winSpan(ui.dWin)}</span></div>`;
+  const vals = rows.map(b => b.v), avg = vals.reduce((a, v) => a + v, 0) / vals.length;
+  const nWarn = rows.filter(b => b.v >= w).length;
+  st.innerHTML = `<div><span>Maior agora</span><strong>${esc(fmtMetric(m, m.value))}</strong><small>${esc(m.where || '')}</small></div>
+    <div><span>Média das placas</span><strong>${esc(fmtMetric(m, avg))}</strong><small>agora</small></div>
+    <div><span>Pico no período</span><strong>${topPk ? esc(fmtMetric(m, topPk.v)) : '—'}</strong><small>${topPk ? esc(topPk.label) + ' · ' + fmtDay(topPk.t) + ' às ' + fmtTime(topPk.t) : (ui.dLoading ? 'carregando…' : '')}</small></div>
+    <div><span>Placas acima da atenção</span><strong>${nWarn}</strong><small>de ${rows.length}</small></div>`;
+}
 function updateDetail(full){
   const t = targets.get(ui.detail), dr = $('#drawer');
   if (!t){ closeDetail(); return; }
+  if (t.type === 'health'){ updateHealthDetail(t, full); return; }
   const o = byId[t.olt];
   const nowBox = (dir) => {
     const v = dir === 'down' ? t.down : t.up, p = dir === 'down' ? t.pd : t.pu, cap = dir === 'down' ? t.capD : t.capU, sev = dir === 'down' ? t.sevD : t.sevU;
@@ -1654,7 +1771,7 @@ function updateDetail(full){
         <button class="close-btn" type="button" data-act="close" aria-label="Fechar">${ICON.x}</button></div>
       <div class="d-tags">${tags.join('')}</div>
       <div class="d-now" id="dNow"></div>
-      <section><div class="d-sec-h"><h3>Utilização no período</h3><div class="seg" role="group" aria-label="Período">${[6, 24, 48].map(w => `<button type="button" data-win="${w}" aria-pressed="${ui.dWin === w}">${w} h</button>`).join('')}</div></div>
+      <section><div class="d-sec-h"><h3>Utilização no período</h3><div class="seg" role="group" aria-label="Período">${WINDOWS.map(([w, l]) => `<button type="button" data-win="${w}" aria-pressed="${ui.dWin === w}">${l}</button>`).join('')}</div></div>
         <div class="chart-box" id="dChart"></div><div id="dLegend"></div></section>
       <div class="d-stats" id="dStats"></div>
       ${loc}
@@ -1669,6 +1786,7 @@ function renderChartArea(){
   const box = $('#dChart'), leg = $('#dLegend'), st = $('#dStats');
   const t = targets.get(ui.detail);
   if (!box || !t) return;
+  if (t.type === 'health') return renderHealthArea(t);
   const s = ui.dSeries;
   if (!s || s.key !== ui.detail || s.win !== ui.dWin){
     box.innerHTML = `<div class="empty" style="margin:0">${ui.dLoading ? 'Carregando histórico…' : 'Sem histórico.'}</div>`; leg.innerHTML = ''; st.innerHTML = ''; return;
@@ -1681,17 +1799,18 @@ function renderChartArea(){
   const c = chartSVG(W, s.d, s.u, t.capD, t.capU, t0, now, s.win);
   box.innerHTML = c.svg + `<div class="tip" hidden></div>`;
   const lastD = s.d[s.d.length - 1][1], lastU = s.u.length ? s.u[s.u.length - 1][1] : null;
-  leg.innerHTML = `<div class="chart-legend" style="margin-top:var(--s-3)"><span><i class="sw in"></i>Download — agora ${esc(fmtBps(lastD))}</span><span><i class="sw out"></i>Upload — agora ${esc(fmtBps(lastU))}</span><span><i class="thr-sw"></i>Limite ${cfg.thr}%</span><span class="dim">${s.d.length} amostras</span></div>
+  leg.innerHTML = `<div class="chart-legend" style="margin-top:var(--s-3)"><span><i class="sw in"></i>Download — agora ${esc(fmtBps(lastD))}</span><span><i class="sw out"></i>Upload — agora ${esc(fmtBps(lastU))}</span><span><i class="thr-sw"></i>Limite ${cfg.thr}%</span><span class="dim">${s.kind === 'trend' ? 'pico de cada hora · ' + s.d.length + ' horas' : s.d.length + ' amostras'}</span></div>
     ${c.ymax < cfg.thr / 100 ? `<p class="scale-note">Escala até ${nf(c.ymax * 100, 0)}% para mostrar a curva; o limite de ${cfg.thr}% fica acima do pico do período (${fmtPct(c.peak)}).</p>` : ''}`;
   const stat = (arr, cap) => { let pk = arr[0], sum = 0; for (const a of arr){ if (a[1] > pk[1]) pk = a; sum += a[1]; } return { pk, avg:sum / arr.length, cap }; };
   const sd = stat(s.d, t.capD), su = s.u.length ? stat(s.u, t.capU) : null;
+  if (s.kind === 'trend' && s.dAvg && s.dAvg.length) sd.avg = s.dAvg.reduce((a, x) => a + x[1], 0) / s.dAvg.length;
   let above = 0;
   const T = cfg.thr / 100;
   for (let i = 1; i < s.d.length; i++){ const dt = s.d[i][0] - s.d[i - 1][0]; const pu = valueAt(s.u, s.d[i][0]); if (s.d[i][1] / t.capD >= T || (pu != null && pu / t.capU >= T)) above += dt; }
   st.innerHTML = `<div><span>Pico de download</span><strong>${esc(fmtBps(sd.pk[1]))} · ${fmtPct(sd.pk[1] / t.capD)}</strong><small>${fmtDay(sd.pk[0])} às ${fmtTime(sd.pk[0])}</small></div>
-    <div><span>Média de download</span><strong>${esc(fmtBps(sd.avg))} · ${fmtPct(sd.avg / t.capD)}</strong><small>últimas ${s.win} h</small></div>
+    <div><span>Média de download</span><strong>${esc(fmtBps(sd.avg))} · ${fmtPct(sd.avg / t.capD)}</strong><small>${winSpan(s.win)}</small></div>
     <div><span>Pico de upload</span><strong>${su ? esc(fmtBps(su.pk[1])) + ' · ' + fmtPct(su.pk[1] / t.capU) : '—'}</strong><small>${su ? fmtDay(su.pk[0]) + ' às ' + fmtTime(su.pk[0]) : ''}</small></div>
-    <div><span>Tempo acima de ${cfg.thr}%</span><strong>${above ? esc(fmtDur(above)) : 'nenhum'}</strong><small>em qualquer direção</small></div>`;
+    <div><span>${s.kind === 'trend' ? 'Horas com pico ≥ ' + cfg.thr + '%' : 'Tempo acima de ' + cfg.thr + '%'}</span><strong>${s.kind === 'trend' ? (above ? Math.round(above / HOUR) + ' h' : 'nenhuma') : (above ? esc(fmtDur(above)) : 'nenhum')}</strong><small>em qualquer direção</small></div>`;
   const svg = box.querySelector('svg'), tip = box.querySelector('.tip'), g = svg.querySelector('.hover'), hit = svg.querySelector('.hit');
   const geo = c.geo;
   const move = ev => {
@@ -1708,7 +1827,7 @@ function renderChartArea(){
     hd.setAttribute('cx', cx); hd.setAttribute('cy', geo.Y(pt[1] / geo.capD));
     if (vu != null){ hu.setAttribute('cx', cx); hu.setAttribute('cy', geo.Y(vu / geo.capU)); hu.setAttribute('visibility', 'visible'); } else hu.setAttribute('visibility', 'hidden');
     tip.hidden = false;
-    tip.innerHTML = `<b>${esc(fmtDay(pt[0]))} · ${esc(fmtTime(pt[0]))}</b><span class="mono"><i class="sw in"></i> ↓ ${esc(fmtBps(pt[1]))} · ${fmtPct(pt[1] / geo.capD)}</span><span class="mono"><i class="sw out"></i> ↑ ${esc(fmtBps(vu))} · ${fmtPct(vu != null ? vu / geo.capU : null)}</span>`;
+    tip.innerHTML = `<b>${esc(fmtDay(pt[0]))} · ${esc(fmtTime(pt[0]))}${s.kind === 'trend' ? ' · pico da hora' : ''}</b><span class="mono"><i class="sw in"></i> ↓ ${esc(fmtBps(pt[1]))} · ${fmtPct(pt[1] / geo.capD)}</span><span class="mono"><i class="sw out"></i> ↑ ${esc(fmtBps(vu))} · ${fmtPct(vu != null ? vu / geo.capU : null)}</span>`;
     const px = cx * (r.width / geo.W), w = tip.offsetWidth;
     tip.style.left = clamp(px + 12, 0, r.width - w) + 'px';
     if (px + 12 + w > r.width) tip.style.left = clamp(px - w - 12, 0, r.width - w) + 'px';
@@ -1814,13 +1933,13 @@ function bind(){
       return;
     }
     const win = e.target.closest('[data-win]');
-    if (win){ ui.dWin = +win.dataset.win; for (const b of win.parentElement.children) b.setAttribute('aria-pressed', String(b === win)); loadSeries(); }
+    if (win){ ui.dWin = +win.dataset.win; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin }); for (const b of win.parentElement.children) b.setAttribute('aria-pressed', String(b === win)); loadSeries(); }
   });
   document.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('hist')) ui.histOpen = e.target.open; }, true);
-  $('#chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; ui.filter = b.dataset.f; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
+  $('#chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; ui.filter = b.dataset.f; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
   $('#q').addEventListener('input', e => { ui.q = e.target.value; renderPons(byId[ui.active], false); });
-  $('#sort').addEventListener('change', e => { ui.sort = e.target.value; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view }); renderPons(byId[ui.active], true); });
-  $('#viewSeg').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; ui.view = b.dataset.v; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
+  $('#sort').addEventListener('change', e => { ui.sort = e.target.value; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin }); renderPons(byId[ui.active], true); });
+  $('#viewSeg').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; ui.view = b.dataset.v; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
   $('#scrim').addEventListener('click', closeDetail);
   $('#setScrim').addEventListener('click', closeSettings);
   $('#setClose').addEventListener('click', closeSettings);
@@ -1832,6 +1951,7 @@ function bind(){
   document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && ui.tv) setTv(false); });
   document.addEventListener('visibilitychange', async () => { if (ui.tv && document.visibilityState === 'visible' && navigator.wakeLock){ try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } });
   document.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role="button"][data-open]')){ e.preventDefault(); openDetail(e.target.dataset.open); return; }
     if (e.key !== 'Escape') return;
     if (!$('#settings').hidden) closeSettings();
     else if (ui.detail) closeDetail();
