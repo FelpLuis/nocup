@@ -160,9 +160,6 @@ button,input,select{font:inherit}
 .icon-btn svg{width:18px;height:18px}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,214,160,.55)}70%{box-shadow:0 0 0 7px rgba(47,214,160,0)}100%{box-shadow:0 0 0 0 rgba(47,214,160,0)}}
 
-.demo-band{background:var(--warn-bg);border-bottom:1px solid var(--warn-line)}
-.demo-band .inner{display:flex;align-items:center;gap:var(--s-2) var(--s-4);flex-wrap:wrap;padding-block:var(--s-2);font-size:var(--fs-13);color:var(--text-1)}
-.demo-band strong{color:var(--warn-text)}
 
 /* ---------- tela ---------- */
 main{padding-block:var(--s-6) var(--s-16)}
@@ -470,20 +467,13 @@ pre.code{margin:var(--s-2) 0;padding:var(--s-3);overflow-x:auto;background:var(-
     <div class="tabs" role="tablist" aria-label="OLTs" id="tabs"></div>
     <div class="bar-right">
       <span class="who" id="who" hidden><span class="who-av" aria-hidden="true"></span><span class="who-name" id="whoName"></span><a class="who-out" href="/logout">Sair</a></span>
-      <button class="src-pill" id="srcPill" type="button" data-state="demo" title="Fonte dos dados"><span class="dot"></span><span id="srcText">Demonstração</span><span class="upd" id="updText"></span></button>
+      <button class="src-pill" id="srcPill" type="button" data-state="loading" title="Conexão com o Zabbix"><span class="dot"></span><span id="srcText">Conectando…</span><span class="upd" id="updText"></span></button>
       <button class="icon-btn" id="btnSound" type="button" aria-pressed="false" title="Som dos alertas" aria-label="Som dos alertas"></button>
       <button class="icon-btn" id="btnTv" type="button" aria-pressed="false" title="Modo TV: tela cheia e rodízio entre as OLTs" aria-label="Modo TV"></button>
       <button class="icon-btn" id="btnSettings" type="button" title="Configurações" aria-label="Configurações"></button>
     </div>
   </div>
 </header>
-
-<div class="demo-band" id="demoBand">
-  <div class="inner gutter">
-    <span><strong>Demonstração.</strong> Portas e descrições são as reais das duas OLTs; tráfego, CPU, memória e temperatura são simulados até ligar o Zabbix.</span>
-    <button class="btn" type="button" id="btnConnect">Conectar ao Zabbix</button>
-  </div>
-</div>
 
 <main id="main" tabindex="-1">
   <div class="inner gutter">
@@ -523,33 +513,10 @@ pre.code{margin:var(--s-2) 0;padding:var(--s-3);overflow-x:auto;background:var(-
   <form id="setForm" novalidate>
     <p class="form-err" id="formErr" hidden></p>
     <fieldset>
-      <legend>Fonte dos dados</legend>
-      <label class="radio"><input type="radio" name="source" value="demo" id="srcDemo"><span>Demonstração<small>Portas reais com tráfego simulado. Útil para conhecer o painel.</small></span></label>
-      <label class="radio"><input type="radio" name="source" value="zabbix" id="srcZbx"><span>Zabbix (API JSON-RPC)<small>Lê os itens de interface, CPU, memória e temperatura dos hosts das OLTs.</small></span></label>
-      <div class="fgrid">
-        <label class="field wide">URL da API<input id="fUrl" type="text" inputmode="url" placeholder="https://zbx7.lv.network/api_jsonrpc.php ou /zbx-api" autocomplete="off"></label>
-        <label class="field wide">Token de API<input id="fToken" type="password" autocomplete="off" placeholder="Deixe vazio se o proxy já envia o token"><small>Fica salvo só neste navegador.</small></label>
-        <label class="field">Host da C300<input id="fHostC300" type="text" autocomplete="off"></label>
-        <label class="field">Host da C350<input id="fHostC350" type="text" autocomplete="off"></label>
-      </div>
+      <legend>Conexão</legend>
+      <p class="note" style="margin-top:0">Os dados vêm do Zabbix da LV Network, consultado pelo servidor do painel. O token fica guardado no servidor e nunca passa pelo navegador.</p>
       <div class="row"><button class="btn" type="button" id="btnTest">Testar conexão</button><span class="out" id="testOut" role="status"></span></div>
     </fieldset>
-    <details class="help">
-      <summary>Como ligar ao Zabbix</summary>
-      <p>O navegador só consulta a API se o painel estiver no mesmo endereço dela. Publique este arquivo no nginx do seu servidor e encaminhe <span class="mono">/zbx-api</span> para o Zabbix, com o token guardado no próprio nginx:</p>
-      <pre class="code" id="nginxSnippet">location /painel-olt/ {
-    alias /var/www/painel-olt/;
-    index index.html;
-}
-location = /zbx-api {
-    proxy_pass https://zbx7.lv.network/api_jsonrpc.php;
-    proxy_ssl_server_name on;
-    proxy_set_header Host zbx7.lv.network;
-    proxy_set_header Authorization "Bearer SEU_TOKEN";
-}</pre>
-      <div class="row" style="margin-top:0"><button class="btn" type="button" id="btnCopy">Copiar configuração</button><span class="out" id="copyOut" role="status"></span></div>
-      <p>Se o painel foi instalado com o instalador do login, isso já está pronto: use <span class="mono">/zbx-api</span> como URL e deixe o token vazio. Confira o caminho da API com a LV Network. Pelo link do Claude o painel não consegue falar com servidores externos, então o modo Zabbix só funciona no arquivo hospedado.</p>
-    </details>
     <fieldset>
       <legend>Limites</legend>
       <div class="fgrid">
@@ -582,12 +549,13 @@ location = /zbx-api {
 <script>
 (function(){
 'use strict';
-const DATA = {"olts":[{"id":"c300","nome":"C300 Casqueiro","curto":"C300","local":"Casqueiro","modelo":"ZTE C300","host":"18400 UPT | OLT C300 CASQUEIRO","median":0.012,"pons":[["gpon_1/12/1","",2],["gpon_1/12/2","",2],["gpon_1/12/3","",2],["gpon_1/12/4","",2],["gpon_1/12/5","",2],["gpon_1/12/6","",2],["gpon_1/12/7","",2],["gpon_1/12/8","",2],["gpon_1/13/1","CARAGUATA VLAN 2601 F12 -23.93585167357365,-46.433251886005610",1],["gpon_1/13/2","CARAGUATA VLAN 2602 F11 -23.93498367035922,-46.42969595869228",1],["gpon_1/13/3","CARAGUATA VLAN 2603 F10 -23.93497448739209,-46.429945122597616",1],["gpon_1/13/4","CARAGUATA VLAN 2604 F9 -23.93338747895765,-46.43041104324761",1],["gpon_1/13/5","CARAGUATA VLAN 2605 F8 -23.932739152311058,-46.430582845783135",1],["gpon_1/13/6","CARAGUATA VLAN 2606 F7 -23.9321059016541,-46.43078641404977",1],["gpon_1/13/7","CARAGUATA VLAN 2607 F6 -23.931479863170097,-46.43089633441506",1],["gpon_1/13/8","VLAN 2608 ROTEADOR (SEM ENERGIA NO POP)",1],["gpon_1/13/9","CASQUEIRO VLAN 2609 F1 -23.926180401433275,-46.40740159719864",1],["gpon_1/13/10","CASQUEIRO VLAN 2610 F4 -23.930095193577635,-46.40530314199882",1],["gpon_1/13/11","PONTE NOVA VLAN 2611 F1 -23.933696539126178,-46.39917441350824",1],["gpon_1/13/12","PONTE NOVA VLAN 2612 F2 -23.932037797055198,-46.39885517294634",1],["gpon_1/13/13","PONTE NOVA VLAN 2614 F3 -23.930747634164273,-46.39985742778864",1],["gpon_1/13/14","PONTE NOVA VLAN 2614 F4 -23.92916125139121,-46.39952702728228",1],["gpon_1/13/15","CASQUEIRO VLAN 2615 F5 -23.9308434,-46.4054999",1],["gpon_1/13/16","CASQUEIRO VLAN 2616 F6 -23.9289863,-46.4096459",1],["gpon_1/14/1","BOLSAO 7 VLAN 2713 F7 -23.919913275606234,-46.42246828473011",1],["gpon_1/14/2","BOLSAO 7 VLAN 2712 F8 -23.920543291334685,-46.42193660728539",1],["gpon_1/14/3","BOLSAO 7 VLAN 2711 F9 -23.919254094645424,-46.423091269823445",1],["gpon_1/14/4","BOLSAO 7 VLAN 2710 F10 -23.919377230281363,-46.42200912487706",1],["gpon_1/14/5","BOLSAO 7 VLAN 2709 F11 -23.918434565089306,-46.42106424028599",1],["gpon_1/14/6","BOLSAO 7 VLAN 2708 F12 -23.91861107278898, -46.421180954590696",1],["gpon_1/14/7","BOLSAO 9 VLAN 2716 F7 -23.922376643729734,-46.43354094423924",1],["gpon_1/14/8","BOLSAO 9 VLAN 2707 F12 -23.921314606083286,-46.43083708589202",1],["gpon_1/14/9","BOLSAO 9 VLAN 2721 F10 -23.920491459083713,-46.43255820705769",1],["gpon_1/14/10","BOLSAO 8 VLAN 2706 F6 -23.919351358024603,-46.4278148981489",1],["gpon_1/14/11","BOLSAO 9 VLAN 2714 F5 -23.923032766644045, -46.43078480000098",1],["gpon_1/14/12","BOLSAO 9 VLAN 2715 F8 -23.920491459083713,-46.43255820705769",1],["gpon_1/14/13","MARACA B9 VLAN 2725 F1 -23.92372813466972,-46.42880944200515",1],["gpon_1/14/14","BOLSAO 9 VLAN 2724 F2 -23.921641414662297,-46.43162759778987",1],["gpon_1/14/15","BOLSAO 9 VLAN 2723 F3 -23.92107627834059,-46.43208774404405",1],["gpon_1/14/16","BOLSAO 9 VLAN 2722 F4 -23.92107627834059,-46.43208774404405",1],["gpon_1/15/1","BOLSAO 8 VLAN 2701 F1 -23.918941261177594,-46.426863348064245",1],["gpon_1/15/2","BOLSAO 8 VLAN 2702 F2 -23.919687732441247,-46.426250213582556",1],["gpon_1/15/3","BOLSAO 8 VLAN 2703 F3 -23.92036746692978,-46.425679308648405",1],["gpon_1/15/4","BOLSAO 8 VLAN 2704 F4 -23.92113787900409,-46.42505357392662",1],["gpon_1/15/5","CASQUEIRO VLAN 2705 F3 -23.93105977299494,-46.41132635895426",1],["gpon_1/15/6","CASQUEIRO VLAN 2706 F2 -23.927395293818233,-46.408369210586706",1],["gpon_1/15/7","CASQUEIRO VLAN 2707 F5 -23.928552685384638,-46.403572355712726",1],["gpon_1/15/8","RUBENS LARA VLAN 2708 F4 -23.9268887,-46.4152828",1],["gpon_1/15/9","CASQUEIRO VLAN 2709 F6 -23.926552126411252,-46.411338024582946",1],["gpon_1/15/10","PQ SAO LUIZ VLAN 2709 F5 -23.9254079,-46.4166999",1],["gpon_1/15/11","RUBENS LARA VLAN 2711 F11 -23.926407943116484,-46.41270204989923",1],["gpon_1/15/12","RUBENS LARA VLAN 2712 F3 -23.929816770434066,-46.414568513146286",1],["gpon_1/15/13","RUBENS LARA VLAN 2713 F1 -23.9279306,-46.4128805",1],["gpon_1/15/14","RUBENS LARA VLAN 2714 F2 -23.9284409,-46.4145384",1],["gpon_1/15/15","RUBENS LARA VLAN 2715 F6 -23.926910992345203,-46.414321760281396",1],["gpon_1/15/16","RUBENS LARA VLAN 2716 F4 -23.92661606988033,-46.4134634299394",1],["gpon_1/16/1","VPESCADORES VLAN 2717 F1 -23.9210391,-46.407408",1],["gpon_1/16/2","VPESCADORES VLAN 2718  F2 -23.9223027,-46.4079525",1],["gpon_1/16/3","VPESCADORES VLAN 2719 F3 -23.9230955,-46.4067645",1],["gpon_1/16/4","VPESCADORES VLAN 2720 F4 -23.9237913,-46.4060946",1],["gpon_1/16/5","VPESCADORES VLAN 2721 F5 -23.9250686,-46.4050767",1],["gpon_1/16/6","VPESCADORES VLAN 2722 F6 -23.9250686,-46.4050767",1],["gpon_1/16/7","VPESCADORES VLAN 2723 F7 -23.925604,-46.4041852",1],["gpon_1/16/8","VPESCADORES VLAN 2724 F8 -23.9252559,-46.4022676",1],["gpon_1/16/9","VPESCADORES VLAN 2725 F9 -23.9257814,-46.4027449",1],["gpon_1/16/10","VPESCADORES VLAN 2726 F10 -23.9248399,-46.4010207",1],["gpon_1/16/11","VPESCADORES VLAN 2727 F11 -23.9263724,-46.3993724",1],["gpon_1/16/12","VPESCADORES VLAN 2728 F12 -23.9265945,-46.3986932",1],["gpon_1/16/13","RUBENS LARA VLAN  2729 F8 -23.9279306,-46.4128805",1],["gpon_1/16/14","ALEMOA VLAN 2730 F2 -23.923482423573805,-46.38468967529988",1],["gpon_1/16/15","RUBENS LARA VLAN  2731 F7 -23.9268887 -46.4152828",1],["gpon_1/16/16","CASQUEIRO VLAN 2732 F7 -23.93105977299494,-46.41132635895426",1],["gpon_1/17/1","CASQUEIRO VLAN 2733 F8 -23.9300951,-46.4053031",1],["gpon_1/17/2","VLAN 2734",1],["gpon_1/17/3","VLAN 2735",1],["gpon_1/17/4","VLAN 2736",1],["gpon_1/17/5","",2],["gpon_1/17/6","",2],["gpon_1/17/7","",1],["gpon_1/17/8","",2],["gpon_1/17/9","",2],["gpon_1/17/10","",2],["gpon_1/17/11","",2],["gpon_1/17/12","",2],["gpon_1/17/13","",2],["gpon_1/17/14","",2],["gpon_1/17/15","",2],["gpon_1/17/16","",2]],"uplinks":[["smartgroup1","",2,0],["xgei_1/19/1","",2,10000000000],["xgei_1/19/2","",2,10000000000],["gei_1/19/3","",2,1000000000],["gei_1/19/4","",2,1000000000],["xgei_1/20/1","",1,10000000000],["xgei_1/20/2","",1,10000000000],["gei_1/20/3","",2,1000000000],["gei_1/20/4","",2,1000000000]],"lag":null},{"id":"c350","nome":"C350 Vila Natal","curto":"C350","local":"Vila Natal","modelo":"ZTE C350","host":"18400 UPT | OLT C350 VILA NATAL","median":0.03,"pons":[["gpon_1/2/1","VILA NOEL VLAN 2351   F6 -23.89174370587382, -46.437084049705994",1],["gpon_1/2/2","sabrina.jose.cm",1],["gpon_1/2/3","COSTA MUNIZ  - VLAN 2353  F1 -23.8948373,-46.4338883",1],["gpon_1/2/4","CAMINHO 2 VLAN 2354 F8 -23.898913015468786, -46.430882526329796",1],["gpon_1/2/5","CJ PADRE MANOEL DA NOBREGA VLAN 2355 F3 -23.8948373,-46.4338883",1],["gpon_1/2/6","CORTUME VIA  VLAN 2356 F5 -23.894140926945713, -46.4320311930683",1],["gpon_1/2/7","VALE VERDE B VLAN 2357 F3 -23.91115045467297, -46.46180980709815",1],["gpon_1/2/8","VALE VERDE A VLAN 2358 F1 -23.91115045467297, -46.46180980709815",1],["gpon_1/2/9","VNATAL R1 F1 VLAN2359 -23.897182195325346,-46.43245349524876",1],["gpon_1/2/10","VNATAL R2 VLAN 2360 F2 -23.898529052734375,-46.434329986572266",1],["gpon_1/2/11","VNATAL R3 VLAN 2361 F12 -23.89882469177246,-46.434139251708984",1],["gpon_1/2/12","VNATAL R4 VLAN 2362 F9 -23.898972967967364,-46.43372368965418",1],["gpon_1/2/13","VNATAL R5 VLAN 2363 F5 -23.89952909985177, -46.43385210576432",1],["gpon_1/2/14","VNATAL R6 VLAN 2364 F6 -23.899615609041, -46.43326409515476",1],["gpon_1/2/15","VNATAL R7 VLAN 2365 F7 -23.900276304124954, -46.43366909030002",1],["gpon_1/2/16","VNATAL R8 VLAN 2366 F10 -23.900950512725927, -46.434123211575184",1],["gpon_1/3/1","VSJOSE VLAN 2371 F12 -23.899791969877175,-46.42719856309355",1],["gpon_1/3/2","AGUA FRIA VLAN 2372 F8 -23.8933872,-46.4605233",1],["gpon_1/3/3","VSJOSE VLAN 2373 F11 -23.90605365696968,-46.42478121379174",1],["gpon_1/3/4","VSJOSE VLAN 2374 F9 -23.9016268,-46.4258258",1],["gpon_1/3/5","VSJOSE VLAN 2375 F8 -23.9024748,-46.4258381",1],["gpon_1/3/6","FABRIL VLAN 2376  F10 -23.879937611002347,-46.455077898443186",1],["gpon_1/3/7","VSJOSE VLAN 2377 F10 -23.91060404142218,-46.4232080792325",1],["gpon_1/3/8","VALE VERDE C VLAN 2378 F2 -23.912873,-46.4663425",1],["gpon_1/3/9","VNOVA VLAN 2379 F11 -23.893601017518332 -46.426258163867935",1],["gpon_1/3/10","COSTA SILVA VLAN 2380 F1 -23.875306375633816,-46.415971237738205",1],["gpon_1/3/11","PILOES VLAN 2381 F5 -23.89145958772323,-46.45418805984678",1],["gpon_1/3/12","VE AV PRINCIPAL VLAN 2382 F1 -23.9001545,-46.45204",1],["gpon_1/3/13","FABRIL VLAN 2383 F11 -23.881696293346597,-46.45582595417026",1],["gpon_1/3/14","FABRIL VLAN 2384 F12 -23.881589,-46.457327",1],["gpon_1/3/15","SITIO NOVO VLAN 2385 F6 -23.899998469482348,-46.441385374697624",1],["gpon_1/3/16","SITIO NOVO VLAN 2386 F7 -23.900982459418454,-46.44144091368851",1],["gpon_1/4/1","VALE NOVO VLAN 2391 F5 -23.91594331551796, -46.45771967889821",1],["gpon_1/4/2","SITIO NOVO VLAN 2392 F4 -23.901034493546547,-46.44429399924373",1],["gpon_1/4/3","SITIO NOVO VLAN 2393 F5 -23.901268846067993, -46.44459787443638",1],["gpon_1/4/4","SITIO NOVO VLAN 2394 F1 -23.900021019188294, -46.443435471822",1],["gpon_1/4/5","SITIO NOVO VLAN 2395 F2 -23.89998175378627,-46.44248671087953",1],["gpon_1/4/6","SITIO NOVO VLAN 2396 F3 -23.89998175378627,-46.44248671087953",1],["gpon_1/4/7","ILHA BELA VLAN 2397 F9 -23.901814908465827,-46.44250192346511",1],["gpon_1/4/8","ILHA BELA VLAN 2398 F8 -23.90372478411522,-46.44237420749738",1],["gpon_1/4/9","PILOES VLAN 2399 F7 -23.89018049177804,-46.45204491442578",1],["gpon_1/4/10","FABRIL VLAN 2400 F9 -23.88273571612045,-46.45625490274909",1],["gpon_1/4/11","VESP VLAN 2401 F3 TB2 48FO -23.8978926,-46.4430495",1],["gpon_1/4/12","VESP VLAN 2402 F5 TB2 48FO -23.8981487,-46.4451178",1],["gpon_1/4/13","VESP VLAN 2403 F1 TB2 48FO -23.8984094,-46.4389094",1],["gpon_1/4/14","VESP VLAN 2404 F4 TB2 48FO -23.8979581,-46.4444881",1],["gpon_1/4/15","VESP VLAN 2405 F2 TB2 48FO -23.8982149,-46.4397773",1],["gpon_1/4/16","VNOVA VLAN 2406 F5 -23.893601017518332,-46.426258163867935",1],["gpon_1/5/1","VESP VLAN 2431 F6 TB2 48FO -23.8982896,-46.4467962",1],["gpon_1/5/2","VESP VLAN 2432 F8 -23.9008668,-46.4532313",1],["gpon_1/5/3","VESP VLAN 2433 F11 -23.9025527,-46.4548792",1],["gpon_1/5/4","M.INDIO VLAN 2434 F10 -23.9009364,-46.4482125",1],["gpon_1/5/5","VESP VLAN 2435 F8 -23.8987815,-46.4496643",1],["gpon_1/5/6","M.INDIO VLAN 2436 F9 TB2 48FO -23.9003275,-46.4500287",1],["gpon_1/5/7","VESP VLAN 2437 F12 -23.903740383724298,-46.45958396699837",1],["gpon_1/5/8","COTA 200 VLAN 2438 F2 -23.89242357895762,-46.47597183650075",1],["gpon_1/5/9","COTA 200 VLAN 2439 F5 -23.890577068550108,-46.47194574129486",1],["gpon_1/5/10","VNOVA VLAN 2440 F7 -23.8966116818761,-46.42895163646526",1],["gpon_1/5/11","VNOVA VLAN 2441 F8 -23.89791101340184,-46.42294117972938",1],["gpon_1/5/12","VNOVA VLAN 2442 F4 -23.894055821974366, -46.42414368094046",1],["gpon_1/5/13","VNOVA VLAN 2443 F3/F1 -23.89452705050874,-46.421990587372605",1],["gpon_1/5/14","VNOVA VLAN 2444 F10 -23.89752565992175,-46.424746263049634",1],["gpon_1/5/15","VNOVA VLAN 2445 F6 -23.893463700755817,-46.42695728589613",1],["gpon_1/5/16","VNOVA VLAN 2446 F9 -23.897012197540505,-46.42712909384755",1],["gpon_1/8/1","31 DE MARCO VLAN 2447 F1 -23.891827632046976,-46.42912864428441",1],["gpon_1/8/2","31 DE MARCO VLAN 2448 F2 -23.89045501244187,-46.42892575598534",1],["gpon_1/8/3","CAMINHO 2 VLAN 2449 F11 -23.898658010340455,-46.43096001266233",1],["gpon_1/8/4","POSTO ALDO ZI VLAN 2450 F1 -23.847987021573484,-46.3911250353789",1],["gpon_1/8/5","VSANTA ROSA VLAN 2451 F1 -23.890938935260042,-46.42505652543848",1],["gpon_1/8/6","VPAULISTA VLAN 2452 F3 -23.8864411,-46.4271756",1],["gpon_1/8/7","COSTA.SILVA VLAN 2453 F2 -23.876586229563028,-46.41596313550236",1],["gpon_1/8/8","S.FRANCISCO VLAN 2454 F3 -23.882115935040055,-46.41883570819974",1],["gpon_1/8/9","V.ELIZABETH VLAN 2455 F3 -23.877257019046123,-46.424671826818575",1],["gpon_1/8/10","FERN JORGE VLAN 2456 F7 -23.878758806250477,-46.41460248525944",1],["gpon_1/8/11","S.FRANCISCO VLAN 2457 F1 -23.88493661982192,-46.41637909513273",1],["gpon_1/8/12","FERN JORGE VLAN 2458 F4 -23.8807245,-46.4187838",1],["gpon_1/8/13","FERN JORGE VLAN 2459 F8 -23.878758806250477,-46.41460248525944",1],["gpon_1/8/14","COSTA.SILVA VLAN 2460 F6 -23.8757880005894,-46.41411147891598",1],["gpon_1/8/15","S.FRANCISCO VLAN 2461 F6 -23.881694771440582,-46.41521823541418",1],["gpon_1/8/16","COSTA.SILVA VLAN 2462 F5 -23.878696,-46.417958",1],["gpon_1/9/1","FERN JORGE VLAN 2463 F2 -23.884642844885892,-46.418893691746945",1],["gpon_1/9/2","VPAULISTA VLAN 2464 F4 -23.885591508889004,-46.4211905204605",1],["gpon_1/9/3","VSANTA ROSA VLAN 2465 F2 -23.8884318,-46.4225358",1],["gpon_1/9/4","VNATAL CDHU VLAN 2466 F1 -23.901880387655563,-46.43471785770538",1],["gpon_1/9/5","CAIQUE VLAN 2467 F11 -23.89882469177246,-46.434139251708984",1],["gpon_1/9/6","VNATAL CDHU VLAN 2468 F2 -23.901486790216712,-46.43405716212146",1],["gpon_1/9/7","AGUA FRIA VLAN 2469 F2 -23.88998794555664,-46.456787109375",1],["gpon_1/9/8","ANA COSTA CDHU 2470 F8 -23.879687260997766,-46.42003133344457",1],["gpon_1/9/9","FABRIL VLAN 2471 F8 -23.88039957760252,-46.455037345994945",1],["gpon_1/9/10","FABRIL VLAN 2472 F7 -23.882737878630063,-46.455720814106115",1],["gpon_1/9/11","VNATAL CDHU VLAN 2473 F3 -23.90109059356758,-46.43307961684951",1],["gpon_1/9/12","VNATAL CDHU VLAN 2474 F4 -23.900728169998693,-46.43196282819447",1],["gpon_1/9/13","VNATAL CDHU VLAN 2475 F5 -23.900489151751007,-46.43131207861322",1],["gpon_1/9/14","VNATAL CDHU VLAN 2476 F6 -23.90111527470164,-46.431121684630924",1],["gpon_1/9/15","POSTO ALDO ZI VLAN 2477 F1 -23.8484073931, -46.375601322",1],["gpon_1/9/16","VNOVA VLAN 2478 F12 -23.89752565992175 -46.424746263049634",1],["gpon_1/10/1","COTA 200 VLAN 2479 F1 -23.89242357895762,-46.47597183650075",1],["gpon_1/10/2","COTA 200 VLAN 2480 F3 -23.89242357895762,-46.47597183650075",1],["gpon_1/10/3","VALE VERDE VLAN 2481 F6 -23.9115382671, -46.4613272328",1],["gpon_1/10/4","CAIQUE VLAN 2482 F7 -23.9018485906, -46.4360097264",1],["gpon_1/10/5","CAIQUE VLAN 2483 F8 -23.9018485906, -46.4360097264",1],["gpon_1/10/6","CAIQUE VLAN 2484 F9 -23.9018485906, -46.4360097264",1],["gpon_1/10/7","CAIQUE VLAN 2485 F10 -23.9018485906, -46.4360097264",1],["gpon_1/10/8","CAIQUE VLAN 2486 F11 -23.9018485906, -46.4360097264",1],["gpon_1/10/9","CAIQUE VLAN 2487 F12 -23.9018485906, -46.4360097264",1],["gpon_1/10/10","M.INDIO VLAN 2488 F12 -23.9009364,-46.4482125",1],["gpon_1/10/11","V.PAULISTA VLAN 2489",1],["gpon_1/10/12","ILHA BELA VLAN2490 F10 -23.903617742565938, -46.442351073205685",1],["gpon_1/10/13","VLAN 2491 AUTENTICACOES",1]],"uplinks":[["smartgroup1","",1,30000000000],["xgei_1/0/1","DIR-SW",1,10000000000],["xgei_1/1/1","LACP-SW_6730-CORE-XGE0/0/11",1,10000000000],["xgei_1/1/2","LACP-SW_6730-CORE-XGE0/0/12",1,10000000000]],"lag":{"name":"smartgroup1","members":["xgei_1/0/1","xgei_1/1/1","xgei_1/1/2"]}}]};
+const DATA = {"olts":[{"id":"c300","nome":"C300 Casqueiro","curto":"C300","local":"Casqueiro","modelo":"ZTE C300","lag":null},{"id":"c350","nome":"C350 Vila Natal","curto":"C350","local":"Vila Natal","modelo":"ZTE C350","lag":{"name":"smartgroup1","members":["xgei_1/0/1","xgei_1/1/1","xgei_1/1/2"]}}]};
 const MIN = 60000, HOUR = 3600000, TAU = Math.PI * 2, WINDOW = 120 * MIN;
 const STORE = 'updown.painel-olt.v1', STORE_UI = 'updown.painel-olt.ui';
+/* Fonte fixa: o nginx do servidor encaminha /zbx-api para https://zbx7.lv.network/api_jsonrpc.php com o token. */
+const ZBX = { url:'/zbx-api', token:'' };
+const HOSTS = { c300:'18400 UPT | OLT C300 CASQUEIRO', c350:'18400 UPT | OLT C350 VILA NATAL' };
 const DEFAULTS = {
-  source:'demo', url:'', token:'',
-  hosts:{ c300:'18400 UPT | OLT C300 CASQUEIRO', c350:'18400 UPT | OLT C350 VILA NATAL' },
   thr:90, warn:75, capDown:1250, capUp:1250,
   cpuWarn:75, cpuCrit:90, memWarn:80, memCrit:90, tempWarn:60, tempCrit:70,
   interval:30, sound:false, notify:false
@@ -622,10 +590,6 @@ function fmtDur(ms){
   const h = Math.floor(m / 60), r = m % 60;
   return h + ' h' + (r ? ' ' + String(r).padStart(2,'0') + ' min' : '');
 }
-function hash(str){ let h = 2166136261; for (let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
-function rnd(seed){ let t = (seed + 0x6D2B79F5) | 0; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
-function gauss(seed){ const u1 = Math.max(1e-9, rnd(seed)), u2 = rnd(seed ^ 0x9e3779b9); return Math.sqrt(-2 * Math.log(u1)) * Math.cos(TAU * u2); }
-const jit = (seed, ms, period = 20000) => rnd((seed ^ Math.imul(Math.floor(ms / period) | 0, 0x9E3779B1)) >>> 0) - .5;
 function load(key){ try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch(e){ return null; } }
 function store(key, v){ try { localStorage.setItem(key, JSON.stringify(v)); return true; } catch(e){ return false; } }
 function loadCfg(){
@@ -635,7 +599,11 @@ function loadCfg(){
   // limite antigo de fábrica (capacidade nominal GPON 2488/1244) passa para o limite real de 1,25 Gbps
   if (o.capDown === 2488) o.capDown = DEFAULTS.capDown;
   if (o.capUp === 1244) o.capUp = DEFAULTS.capUp;
-  return Object.assign(base, o, { hosts: Object.assign(base.hosts, o.hosts || {}) });
+  // fonte e hosts agora são fixos; token salvo por versões antigas sai do navegador
+  const hadOld = 'token' in o || 'url' in o || 'source' in o || 'hosts' in o;
+  delete o.source; delete o.url; delete o.token; delete o.hosts;
+  if (hadOld) store(STORE, o);
+  return Object.assign(base, o);
 }
 
 const ICON = {
@@ -747,128 +715,7 @@ function valueAt(arr, t){
   return ans < 0 ? null : arr[ans][1];
 }
 
-/* ---------- simulação (modo demonstração) ---------- */
-function curve(ms){
-  const d = new Date(ms), h = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-  const g = (c, w) => { let x = Math.abs(h - c); x = Math.min(x, 24 - x); return Math.exp(-x * x / (2 * w * w)); };
-  return Math.min(1, (0.17 + 0.30 * g(12.5, 3.4) + 0.72 * g(21.2, 2.4)) / 0.93);
-}
-const DEMO_SPECIAL = {
-  'c300|gpon_1/15/4':'osc', 'c300|gpon_1/16/7':'upHot', 'c300|gpon_1/13/2':'warn',
-  'c350|gpon_1/4/11':'steady', 'c350|gpon_1/9/4':'osc', 'c350|gpon_1/5/13':'warn', 'c350|gpon_1/10/4':'warn2'
-};
-function demoProfile(p, median){
-  const seed = hash(p.key);
-  return { seed, kind:DEMO_SPECIAL[p.key] || 'normal',
-    w:clamp(Math.exp(Math.log(median) + 0.75 * gauss(seed)), 0.004, 0.36),
-    r:0.10 + rnd(seed ^ 0x51ed) * 0.12,
-    ph1:rnd(seed ^ 0xa1) * TAU, ph2:rnd(seed ^ 0xb2) * TAU, ph3:rnd(seed ^ 0xc3) * TAU };
-}
-function demoUtil(p, ms){
-  const P = p.demo, c = curve(ms);
-  const s1 = Math.sin(TAU * ms / (37 * MIN) + P.ph1), s2 = Math.sin(TAU * ms / (138 * MIN) + P.ph2), s3 = Math.sin(TAU * ms / (9 * MIN) + P.ph3);
-  let d, u;
-  switch (P.kind){
-    case 'steady': d = 0.918 + 0.022 * c + 0.010 * s1 + 0.006 * s3; break;
-    case 'osc':    d = 0.872 + 0.052 * Math.sin(TAU * ms / (19 * MIN) + P.ph1) + 0.010 * s3; break;
-    case 'warn':   d = 0.790 + 0.035 * s1 + 0.020 * c; break;
-    case 'warn2':  d = 0.600 + 0.190 * c + 0.030 * s1; break;
-    case 'upHot':  d = 0.160 + 0.100 * c + 0.020 * s1; break;
-    default:       d = P.w * c * (1 + 0.12 * s1 + 0.07 * s2 + 0.05 * s3);
-  }
-  d += jit(P.seed, ms) * (P.kind === 'normal' ? P.w * 0.05 : 0.012);
-  if (P.kind === 'upHot') u = 0.918 + 0.016 * Math.sin(TAU * ms / (27 * MIN) + P.ph2) + jit(P.seed ^ 7, ms) * 0.008;
-  else u = (clamp(d, 0, 1) * p.capD * P.r * (1 + 0.18 * s2)) / p.capU;
-  return [clamp(d, 0, 0.985), clamp(u, 0, 0.985)];
-}
-function demoUplinks(o, t, D, U){
-  const res = new Map();
-  const lag = o.uplinks.find(u => u.isLag && u.active && u.members.length);
-  if (lag){
-    const ws = lag.members.map((m, i) => 1 + 0.05 * Math.sin(TAU * t / (41 * MIN) + i * 2.1));
-    const sum = ws.reduce((a, b) => a + b, 0);
-    const Dt = D * 1.012 + 35e6, Ut = U * 1.02 + 12e6;
-    lag.members.forEach((m, i) => res.set(m, [Dt * ws[i] / sum, Ut * ws[i] / sum]));
-    res.set(lag.name, [Dt, Ut]);
-  } else {
-    const act = o.uplinks.filter(u => u.active && !u.isLag);
-    act.forEach((u, i) => {
-      const w = i === 0 ? 0.965 : 0.035 / Math.max(1, act.length - 1);
-      const base = i === 0 ? 40e6 : 22e6;
-      res.set(u.name, [D * w + base, U * w + base * 0.4]);
-    });
-  }
-  return res;
-}
-function demoHealth(o, ms){
-  const c = curve(ms), s = hash(o.id);
-  const b = o.id === 'c300' ? { cpu:19, cpuA:11, mem:57.6, temp:46.5 } : { cpu:13, cpuA:9, mem:43.2, temp:40.2 };
-  return {
-    cpu: clamp(b.cpu + b.cpuA * c + 3.2 * Math.sin(TAU * ms / (7 * MIN) + (s % 7)) + jit(s, ms, 15000) * 4, 1, 99),
-    mem: b.mem + 0.5 * Math.sin(TAU * ms / (180 * MIN)) + jit(s ^ 3, ms, 60000) * 0.2,
-    temp: b.temp + 2.4 * c + 0.35 * Math.sin(TAU * ms / (23 * MIN))
-  };
-}
-function demoBoards(o, ms, h){
-  const c = curve(ms);
-  const slots = [...new Set(o.ports.map(p => p.slot))].sort((a, b) => a - b);
-  const rows = [{ label:'Controladora', cpu:h.cpu, mem:h.mem, temp:h.temp, ports:null }];
-  for (const sl of slots){
-    const seed = hash(o.id + 's' + sl), ps = o.ports.filter(p => p.slot === sl);
-    const act = ps.filter(p => p.active).length;
-    let temp = 43 + rnd(seed) * 8 + 2 * c + 0.3 * Math.sin(TAU * ms / (17 * MIN) + seed % 5);
-    if (o.id === 'c300' && sl === 17) temp = 61.3 + 0.5 * Math.sin(TAU * ms / (29 * MIN));
-    rows.push({ label:'Placa ' + sl, slot:sl, cpu: act ? 9 + rnd(seed ^ 9) * 18 + 9 * c + jit(seed, ms, 15000) * 3 : 3 + rnd(seed) * 2, mem:null, temp, ports:act + '/' + ps.length });
-  }
-  return rows;
-}
-function buildDemo(o){
-  const d = o.src;
-  o.ports = d.pons.map(([name, alias, oper]) => { const p = makePort(o.id, name, alias, oper === 1); p.demo = demoProfile(p, d.median); return p; });
-  o.portMap = new Map(o.ports.map(p => [p.name, p]));
-  o.uplinks = d.uplinks.map(([name, alias, oper, speed]) => makeUplink(o.id, name, alias, oper === 1, speed));
-  applyLag(o);
-  o.health = { cpu:mkMetric(o.id, 'cpu', 'Processamento', '%'), mem:mkMetric(o.id, 'mem', 'Memória', '%'), temp:mkMetric(o.id, 'temp', 'Temperatura', '°C') };
-}
-function demoAt(o, t, bucket){
-  let D = 0, U = 0;
-  for (const p of o.ports){
-    if (!p.active){ p.down = p.up = null; continue; }
-    const [d, u] = demoUtil(p, t);
-    p.down = d * p.capD; p.up = u * p.capU; D += p.down; U += p.up;
-    pushPoint(p.hd, bucket, p.down); pushPoint(p.hu, bucket, p.up);
-  }
-  const uv = demoUplinks(o, t, D, U);
-  for (const u of o.uplinks){
-    const v = uv.get(u.name);
-    if (!u.active || !v){ u.down = u.up = null; continue; }
-    u.down = v[0]; u.up = v[1]; pushPoint(u.hd, bucket, u.down); pushPoint(u.hu, bucket, u.up);
-  }
-  const h = demoHealth(o, t);
-  for (const id of ['cpu','mem','temp']){ const m = o.health[id]; m.value = h[id]; m.where = 'Controladora'; pushPoint(m.hist, bucket, h[id]); }
-  return h;
-}
-function demoStep(now){
-  const bucket = Math.floor(now / MIN) * MIN;
-  for (const o of OLTS){
-    const h = demoAt(o, now, bucket);
-    o.boards = demoBoards(o, now, h);
-    o.updatedAt = now; o.error = null; o.loading = false;
-  }
-}
-function startDemo(){
-  for (const o of OLTS) buildDemo(o);
-  rebuildIndex();
-  const now = Date.now(), cur = Math.floor(now / MIN) * MIN;
-  for (let k = 120; k >= 1; k--){ const t = cur - k * MIN; for (const o of OLTS) demoAt(o, t, t); }
-  replay(now);
-  demoStep(now);
-  evaluate(now, true);
-  timer = setInterval(() => { const t = Date.now(); demoStep(t); evaluate(t, false); update(); }, 5000);
-}
-
 /* ---------- Zabbix ---------- */
-function insideClaude(){ return /claude|anthropic/i.test(location.hostname); }
 async function zcall(conn, method, params, auth = true){
   const headers = { 'Content-Type':'application/json-rpc' };
   if (auth && conn.token) headers.Authorization = 'Bearer ' + conn.token.trim();
@@ -876,20 +723,19 @@ async function zcall(conn, method, params, auth = true){
   try {
     res = await fetch(conn.url.trim(), { method:'POST', headers, body:JSON.stringify({ jsonrpc:'2.0', method, params, id:Date.now() }) });
   } catch(e){
-    throw new Error(insideClaude()
-      ? 'Pelo link do Claude o painel não alcança servidores externos. Hospede o arquivo na sua rede para ler o Zabbix.'
-      : 'Sem resposta da API do Zabbix. Confira a URL e se este endereço pode consultá-la (mesmo domínio ou proxy).');
+    throw new Error('Sem resposta do servidor do painel. Confira a conexão e se o serviço está no ar.');
   }
-  if (res.status === 401 && !/^https?:/i.test(conn.url.trim())){
+  if (res.status === 401){
     location.href = '/login?next=' + encodeURIComponent(location.pathname || '/');
     throw new Error('Sua sessão expirou. Entre novamente.');
   }
+  if (res.status === 404 || res.status === 502 || res.status === 504) throw new Error(`O servidor não alcançou o Zabbix (HTTP ${res.status}).`);
   const text = await res.text();
   let body; try { body = JSON.parse(text); } catch(e){ throw new Error(`A API respondeu algo que não é JSON (HTTP ${res.status}). Confira a URL.`); }
   if (body && body.error) throw new Error(`Zabbix ${method}: ${body.error.message}${body.error.data ? ' — ' + body.error.data : ''}`);
   return body ? body.result : null;
 }
-const zbx = (method, params, auth) => zcall(cfg, method, params, auth);
+const zbx = (method, params, auth) => zcall(ZBX, method, params, auth);
 const IOUT = ['itemid','name','key_','lastvalue','lastclock','units','value_type'];
 function isBpsUnit(u){ return /^b(ps|\/s)$/.test(String(u || '').trim()); }
 function rateFrom(o, it){
@@ -904,7 +750,7 @@ function rateFrom(o, it){
 }
 async function zResolve(o){
   if (o.zhostid) return;
-  const name = (cfg.hosts[o.id] || '').trim();
+  const name = (HOSTS[o.id] || '').trim();
   if (!name) throw new Error('Informe o nome do host desta OLT nas configurações.');
   let r = await zbx('host.get', { output:['hostid','name'], filter:{ name:[name] } });
   if (!r || !r.length) r = await zbx('host.get', { output:['hostid','name'], search:{ name }, limit:5 });
@@ -1038,12 +884,7 @@ async function zTick(first){
   update();
 }
 function startZabbix(){
-  for (const o of OLTS){ o.health = {}; }
-  if (!cfg.url.trim()){
-    for (const o of OLTS){ o.error = 'Informe a URL da API do Zabbix nas configurações.'; }
-    return;
-  }
-  for (const o of OLTS) o.loading = true;
+  for (const o of OLTS){ o.health = {}; o.loading = true; }
   zTick(true);
   timer = setInterval(() => zTick(false), clamp(+cfg.interval || 30, 10, 600) * 1000);
 }
@@ -1292,10 +1133,10 @@ function updateChrome(){
   const total = alerts.active.size;
   document.title = (total ? `(${total}) ` : '') + 'Painel OLT UpDown';
   const pill = $('#srcPill'), anyErr = OLTS.some(o => o.error), o = byId[ui.active];
-  pill.dataset.state = cfg.source === 'demo' ? 'demo' : anyErr ? 'error' : 'live';
-  $('#srcText').textContent = cfg.source === 'demo' ? 'Demonstração' : anyErr ? 'Falha no Zabbix' : 'Zabbix ao vivo';
+  const loading = OLTS.some(x => x.loading && !x.updatedAt);
+  pill.dataset.state = anyErr ? 'error' : loading ? 'loading' : 'live';
+  $('#srcText').textContent = anyErr ? 'Falha no Zabbix' : loading ? 'Conectando…' : 'Zabbix ao vivo';
   $('#updText').textContent = o.updatedAt ? fmtTimeS(o.updatedAt) : '';
-  $('#demoBand').hidden = cfg.source !== 'demo';
 }
 function keepFocus(container, fn){
   const ae = document.activeElement;
@@ -1304,7 +1145,7 @@ function keepFocus(container, fn){
   if (k){ const el = container.querySelector(`[data-fk="${CSS.escape(k)}"]`); if (el) el.focus({ preventScroll:true }); }
 }
 function renderHead(o){
-  const meta = cfg.source === 'zabbix' ? (o.zhostname || cfg.hosts[o.id]) : o.src.host;
+  const meta = o.zhostname || HOSTS[o.id];
   $('#oltHead').innerHTML = `<div><p class="kicker">${esc(o.modelo)} · OLT</p><h1>${esc(o.nome)}</h1><p class="meta">Host no Zabbix: <span class="mono">${esc(meta)}</span></p></div>`;
   const act = o.ports.filter(p => p.active), D = act.reduce((s, p) => s + (p.down || 0), 0), U = act.reduce((s, p) => s + (p.up || 0), 0);
   const nCrit = o.ports.filter(p => p.sev === 'crit').length, nWarn = o.ports.filter(p => p.sev === 'warn').length;
@@ -1349,7 +1190,7 @@ function renderHealth(o){
   sec.innerHTML = ['cpu','mem','temp'].map(id => {
     const m = o.health[id];
     const label = { cpu:'Processamento', mem:'Memória', temp:'Temperatura' }[id];
-    if (!m || m.missing || (m.value == null && cfg.source === 'zabbix')){
+    if (!m || m.missing || m.value == null){
       return `<article class="card hcard"><div class="hcard-h"><label>${label}</label><span class="badge badge--idle">sem item</span></div><p class="muted" style="margin:0">${o.loading ? 'Carregando…' : 'Nenhum item de ' + label.toLowerCase() + ' encontrado neste host do Zabbix.'}</p></article>`;
     }
     const th = TH[id], pts = m.hist.filter(a => a[0] >= t1 - WINDOW).map(a => a[1]);
@@ -1549,22 +1390,6 @@ function setTab(id, fromHash){
 }
 
 /* ---------- gaveta de detalhe ---------- */
-function demoSeries(t, winH){
-  const now = Date.now(), step = winH <= 6 ? MIN : winH <= 24 ? 3 * MIN : 5 * MIN;
-  const t0 = Math.floor((now - winH * HOUR) / step) * step;
-  const d = [], u = [], o = byId[t.olt];
-  for (let x = t0; x <= now; x += step){
-    if (t.type === 'pon'){ const [a, b] = demoUtil(t, x); d.push([x, a * t.capD]); u.push([x, b * t.capU]); }
-    else {
-      let D = 0, U = 0;
-      for (const p of o.ports){ if (!p.active) continue; const [a, b] = demoUtil(p, x); D += a * p.capD; U += b * p.capU; }
-      const v = demoUplinks(o, x, D, U).get(t.name) || [0, 0];
-      d.push([x, v[0]]); u.push([x, v[1]]);
-    }
-  }
-  d.push([now, t.down]); u.push([now, t.up]);
-  return { d, u };
-}
 async function zSeries(t, winH){
   const from = Math.floor((Date.now() - winH * HOUR) / 1000);
   const get = async it => {
@@ -1580,7 +1405,7 @@ async function loadSeries(){
   const key = ui.detail, win = ui.dWin;
   ui.dLoading = true; renderChartArea();
   try {
-    const s = cfg.source === 'demo' ? demoSeries(t, win) : await zSeries(t, win);
+    const s = await zSeries(t, win);
     if (ui.detail !== key || ui.dWin !== win) return;
     ui.dSeries = { key, win, d:s.d, u:s.u, at:Date.now(), err:null };
   } catch(e){
@@ -1641,7 +1466,7 @@ function updateDetail(full){
   $('#dNow').innerHTML = nowBox('down') + nowBox('up');
   const rel = [...alerts.active.values()].filter(a => a.target === t.key).concat(alerts.history.filter(a => a.target === t.key)).slice(0, 6);
   $('#dAlerts').innerHTML = rel.length ? `<div class="d-sec-h"><h3>Alertas desta porta</h3></div><ul class="d-list">${rel.map(a => `<li><b>${a.dir === 'down' ? '↓ Download' : '↑ Upload'}</b><span class="mono">pico ${fmtPct(a.peak)}</span><span class="muted">${fmtTime(a.since)}${a.ended ? '–' + fmtTime(a.ended) + ' (' + fmtDur(a.ended - a.since) + ')' : ' · ainda ativo'}</span></li>`).join('')}</ul>` : '';
-  if (ui.dSeries && Date.now() - ui.dSeries.at > (cfg.source === 'demo' ? 60000 : 120000) && !ui.dLoading) loadSeries();
+  if (ui.dSeries && Date.now() - ui.dSeries.at > 120000 && !ui.dLoading) loadSeries();
 }
 function renderChartArea(){
   const box = $('#dChart'), leg = $('#dLegend'), st = $('#dStats');
@@ -1697,9 +1522,6 @@ function renderChartArea(){
 
 /* ---------- configurações ---------- */
 function fillForm(c){
-  $('#srcDemo').checked = c.source === 'demo'; $('#srcZbx').checked = c.source === 'zabbix';
-  $('#fUrl').value = c.url; $('#fToken').value = c.token;
-  $('#fHostC300').value = c.hosts.c300; $('#fHostC350').value = c.hosts.c350;
   $('#fThr').value = c.thr; $('#fWarn').value = c.warn; $('#fCapD').value = c.capDown; $('#fCapU').value = c.capUp;
   $('#fCpu').value = `${c.cpuWarn} / ${c.cpuCrit}`; $('#fMem').value = `${c.memWarn} / ${c.memCrit}`; $('#fTemp').value = `${c.tempWarn} / ${c.tempCrit}`;
   $('#fInt').value = c.interval; $('#fSound').checked = !!c.sound; $('#fNotify').checked = !!c.notify;
@@ -1709,7 +1531,7 @@ function openSettings(){
   fillForm(cfg);
   $('#formErr').hidden = true; $('#testOut').textContent = ''; $('#notifyOut').textContent = '';
   $('#setScrim').hidden = false; $('#settings').hidden = false;
-  $('#settings').querySelector(cfg.source === 'demo' ? '#srcDemo' : '#srcZbx').focus();
+  $('#fThr').focus();
 }
 function closeSettings(){
   $('#setScrim').hidden = true; $('#settings').hidden = true;
@@ -1725,9 +1547,6 @@ function pair(str, name){
 function readForm(){
   const n = (id, name, lo, hi) => { const v = +$(id).value; if (!isFinite(v) || v < lo || v > hi) throw new Error(`${name}: informe um número entre ${lo} e ${hi}.`); return v; };
   const next = JSON.parse(JSON.stringify(cfg));
-  next.source = $('#srcZbx').checked ? 'zabbix' : 'demo';
-  next.url = $('#fUrl').value.trim(); next.token = $('#fToken').value.trim();
-  next.hosts = { c300:$('#fHostC300').value.trim() || DEFAULTS.hosts.c300, c350:$('#fHostC350').value.trim() || DEFAULTS.hosts.c350 };
   next.thr = n('#fThr', 'Alerta de tráfego', 50, 100);
   next.warn = n('#fWarn', 'Atenção de tráfego', 10, 99);
   if (next.warn >= next.thr) throw new Error('A atenção de tráfego precisa ser menor que o alerta.');
@@ -1738,11 +1557,10 @@ function readForm(){
   [next.tempWarn, next.tempCrit] = pair($('#fTemp').value, 'Temperatura');
   next.interval = n('#fInt', 'Atualização', 10, 600);
   next.sound = $('#fSound').checked; next.notify = $('#fNotify').checked;
-  if (next.source === 'zabbix' && !next.url) throw new Error('Para usar o Zabbix, informe a URL da API.');
   return next;
 }
 function applyCfg(next){
-  const restart = next.source !== cfg.source || next.url !== cfg.url || next.token !== cfg.token || next.hosts.c300 !== cfg.hosts.c300 || next.hosts.c350 !== cfg.hosts.c350 || next.interval !== cfg.interval;
+  const restart = next.interval !== cfg.interval;
   cfg = next;
   const saved = store(STORE, cfg);
   document.documentElement.style.setProperty('--thr-pos', cfg.thr + '%');
@@ -1809,7 +1627,6 @@ function bind(){
   $('#setClose').addEventListener('click', closeSettings);
   $('#btnSettings').addEventListener('click', openSettings);
   $('#srcPill').addEventListener('click', openSettings);
-  $('#btnConnect').addEventListener('click', () => { openSettings(); $('#srcZbx').checked = true; $('#fUrl').focus(); });
   $('#btnSound').addEventListener('click', () => { cfg.sound = !cfg.sound; store(STORE, cfg); setSoundBtn(); if (cfg.sound){ ensureAudio(); beep(); toast('Som dos alertas ligado', 'Toca ao abrir um alerta e repete a cada minuto até reconhecer.', 'info', 4000); } });
   $('#btnTv').addEventListener('click', () => setTv(!ui.tv));
   document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && ui.tv) setTv(false); });
@@ -1827,30 +1644,21 @@ function bind(){
   });
   $('#btnReset').addEventListener('click', () => {
     const d = JSON.parse(JSON.stringify(DEFAULTS));
-    d.source = $('#srcZbx').checked ? 'zabbix' : 'demo';
-    d.url = $('#fUrl').value; d.token = $('#fToken').value;
-    d.hosts = { c300:$('#fHostC300').value, c350:$('#fHostC350').value };
     fillForm(d);
     $('#testOut').className = 'out'; $('#testOut').textContent = 'Limites e avisos voltaram ao padrão. Salve para aplicar.';
   });
   $('#btnTest').addEventListener('click', async () => {
-    const out = $('#testOut'), conn = { url:$('#fUrl').value.trim(), token:$('#fToken').value.trim() };
-    if (!conn.url){ out.className = 'out err'; out.textContent = 'Informe a URL da API.'; return; }
+    const out = $('#testOut');
     out.className = 'out'; out.textContent = 'Testando…';
     try {
-      const ver = await zcall(conn, 'apiinfo.version', {}, false);
+      const ver = await zcall(ZBX, 'apiinfo.version', {}, false);
       const found = [];
-      for (const [id, inp] of [['C300', '#fHostC300'], ['C350', '#fHostC350']]){
-        const r = await zcall(conn, 'host.get', { output:['hostid','name'], search:{ name:$(inp).value.trim() }, limit:3 });
-        found.push(`${id}: ${r && r.length ? 'encontrada' : 'não encontrada'}`);
+      for (const id of ['c300', 'c350']){
+        const r = await zcall(ZBX, 'host.get', { output:['hostid','name'], search:{ name:HOSTS[id] }, limit:3 });
+        found.push(`${id.toUpperCase()}: ${r && r.length ? 'encontrada' : 'não encontrada'}`);
       }
       out.className = 'out ok'; out.textContent = `Zabbix ${ver} respondeu. ${found.join(' · ')}.`;
     } catch(err){ out.className = 'out err'; out.textContent = err.message; }
-  });
-  $('#btnCopy').addEventListener('click', () => {
-    const txt = $('#nginxSnippet').textContent, out = $('#copyOut');
-    const fallback = () => { const r = document.createRange(); r.selectNodeContents($('#nginxSnippet')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); out.textContent = 'Texto selecionado: use Ctrl+C.'; };
-    try { navigator.clipboard.writeText(txt).then(() => { out.textContent = 'Copiado.'; }, fallback); } catch(e){ fallback(); }
   });
   $('#fNotify').addEventListener('change', e => {
     const out = $('#notifyOut');
@@ -1873,10 +1681,9 @@ function start(){
   alerts.active.clear(); alerts.history.length = 0;
   for (const o of OLTS){ o.ports = []; o.portMap = new Map(); o.uplinks = []; o.health = {}; o.boards = []; o.updatedAt = null; o.error = null; o.loading = false; o.zhostid = null; o.zraw = {}; }
   if (ui.detail) closeDetail();
-  if (cfg.source === 'zabbix') startZabbix(); else startDemo();
+  startZabbix();
   rebuildIndex();
   renderScreen();
-  if (cfg.source === 'demo') announceInitial();
 }
 function checkSession(){
   if (!/^https?:$/.test(location.protocol) || typeof fetch !== 'function') return;
