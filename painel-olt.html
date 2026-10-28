@@ -896,19 +896,41 @@ function boardLabel(name){
     .replace(/\b(cpu|processador|processor|processamento|utiliza[cç][aã]o|utilization|usage|uso|load|carga|mem[oó]ria|memory|temperatura|temperature|temp|util|ratio|percent)\b/gi, '')
     .replace(/[:()\[\]%]+/g, ' ').replace(/\s{2,}/g, ' ').replace(/^[\s\-–_]+|[\s\-–_]+$/g, '').trim() || 'Geral';
 }
+/* Itens de saúde das OLTs ZTE no Zabbix da LV: "CPU Load Placa 1.1.X" (%, sem
+   unidade) e "Temperatura Placa 1.1.X" (ºC; -1000 = slot vazio), mais
+   "Device: Temperature" do chassi. "ICMP - Tempo de Resposta" não é temperatura. */
+function healthKind(it){
+  const n = String(it.name), k = String(it.key_), u = String(it.units || '').trim();
+  if (/icmp|ping|tempo de resposta|response time/i.test(n) || /^icmp/i.test(k)) return null;
+  if (/temperat/i.test(n) || /^[º°]?C$/i.test(u) && /temp/i.test(n + k)) return 'temp';
+  if (/mem[oó]ria|memory|\bmem\b|\bram\b/i.test(n) || /memory|mem\./i.test(k)) return 'mem';
+  if (/\bcpu\b|processa|processor/i.test(n) || /cpu/i.test(k)) return 'cpu';
+  return null;
+}
+function boardOf(name){
+  const n = String(name);
+  const m = n.match(/(\d+)\.(\d+)\.(\d+)\s*$/) || n.match(/(?:placa|slot|card)\s*(\d+)\s*$/i);
+  if (m){ const slot = +(m[3] || m[1]); return { key:'s' + slot, label:'Placa ' + slot, slot }; }
+  const l = boardLabel(n);
+  return /^(device|chassi[s]?|system|sistema|geral)$/i.test(l) ? { key:'chassi', label:'Chassi', slot:-1 } : { key:l, label:l, slot:null };
+}
 function mergeHealth(o, items){
-  const groups = { cpu:[], mem:[], temp:[] };
+  const groups = { cpu:[], mem:[], temp:[] }, absent = new Set();
+  const parsed = [];
   for (const it of items || []){
     if (/^net\.if/.test(it.key_) || /^Interface\s/i.test(it.name)) continue;
     if (!['0','3'].includes(String(it.value_type))) continue;
-    const n = it.name; let id = null;
-    if (/temp/i.test(n)) id = 'temp'; else if (/cpu|process/i.test(n)) id = 'cpu'; else if (/mem/i.test(n)) id = 'mem';
-    if (!id) continue;
-    const u = String(it.units || '').trim(), v = +it.lastvalue;
-    if (!isFinite(v)) continue;
-    if ((id === 'cpu' || id === 'mem') && ((u && u !== '%') || v < 0 || v > 100)) continue;
-    if (id === 'temp' && (v < -20 || v > 150)) continue;
-    groups[id].push({ it, v, label:boardLabel(n), clock:+it.lastclock * 1000 });
+    const id = healthKind(it); if (!id) continue;
+    const v = +it.lastvalue; if (it.lastvalue === '' || !isFinite(v)) continue;
+    const b = boardOf(it.name);
+    if (id === 'temp' && v <= -100){ absent.add(b.key); continue; }   // slot vazio
+    parsed.push({ id, it, v, b, u:String(it.units || '').trim(), clock:+it.lastclock * 1000 });
+  }
+  for (const x of parsed){
+    if (absent.has(x.b.key)) continue;
+    if ((x.id === 'cpu' || x.id === 'mem') && ((x.u && x.u !== '%') || x.v < 0 || x.v > 100)) continue;
+    if (x.id === 'temp' && (x.v < -20 || x.v > 150)) continue;
+    groups[x.id].push({ it:x.it, v:x.v, label:x.b.label, b:x.b, clock:x.clock });
   }
   const labels = { cpu:['Processamento','%'], mem:['Memória','%'], temp:['Temperatura','°C'] };
   const boards = new Map();
@@ -921,9 +943,18 @@ function mergeHealth(o, items){
     if (m.zItem && m.zItem.itemid !== g[0].it.itemid) m.hist = [];
     m.missing = false; m.value = g[0].v; m.where = g[0].label; m.zItem = g[0].it;
     pushPoint(m.hist, g[0].clock, g[0].v);
-    for (const x of g){ const b = boards.get(x.label) || { label:x.label, cpu:null, mem:null, temp:null, ports:null }; b[id] = x.v; boards.set(x.label, b); }
+    for (const x of g){
+      const b = boards.get(x.b.key) || { label:x.b.label, slot:x.b.slot, cpu:null, mem:null, temp:null, ports:null };
+      b[id] = x.v; boards.set(x.b.key, b);
+    }
   }
-  o.boards = [...boards.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR', { numeric:true }));
+  for (const b of boards.values()){
+    if (b.slot != null && b.slot >= 0){
+      const ps = o.ports.filter(p => p.slot === b.slot);
+      if (ps.length) b.ports = ps.filter(p => p.active).length + '/' + ps.length;
+    }
+  }
+  o.boards = [...boards.values()].sort((a, b) => ((a.slot ?? 999) - (b.slot ?? 999)) || a.label.localeCompare(b.label, 'pt-BR', { numeric:true }));
 }
 async function zHistory(o){
   const from = Math.floor((Date.now() - WINDOW) / 1000);
@@ -1280,7 +1311,7 @@ function renderHealth(o){
     const m = o.health[id];
     const label = { cpu:'Processamento', mem:'Memória', temp:'Temperatura' }[id];
     if (!m || m.missing || m.value == null){
-      return `<article class="card hcard"><div class="hcard-h"><label>${label}</label><span class="badge badge--idle">sem item</span></div><p class="muted" style="margin:0">${o.loading ? 'Carregando…' : 'Nenhum item de ' + label.toLowerCase() + ' encontrado neste host do Zabbix.'}</p></article>`;
+      return `<article class="card hcard"><div class="hcard-h"><label>${label}</label><span class="badge badge--idle">sem item</span></div><p class="muted" style="margin:0">${o.loading ? 'Carregando…' : 'O Zabbix não coleta ' + label.toLowerCase() + ' desta OLT. Quando o item for criado no host, ele aparece aqui sozinho.'}</p></article>`;
     }
     const th = TH[id], pts = m.hist.filter(a => a[0] >= t1 - WINDOW).map(a => a[1]);
     const pk = pts.length ? Math.max(...pts) : m.value, mn = pts.length ? Math.min(...pts) : m.value;
@@ -1320,10 +1351,12 @@ function renderBoards(o){
   const card = $('#boardCard');
   const tc = (v, w, c) => v == null ? '' : v >= c ? 'is-danger' : v >= w ? 'is-warn' : '';
   const rows = o.boards || [];
-  card.innerHTML = `<div class="card-h"><h2>Placas</h2><small>${rows.length ? 'CPU e temperatura por placa' : ''}</small></div>
-    ${rows.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Placa</th><th class="r">PONs</th><th class="r">CPU</th><th class="r">Temp.</th></tr></thead><tbody>
+  const hasMem = rows.some(b => b.mem != null);
+  card.innerHTML = `<div class="card-h"><h2>Placas</h2><small>${rows.length ? (hasMem ? 'CPU, memória e temperatura por placa' : 'CPU e temperatura por placa') : ''}</small></div>
+    ${rows.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Placa</th><th class="r">PONs</th><th class="r">CPU</th>${hasMem ? '<th class="r">Mem.</th>' : ''}<th class="r">Temp.</th></tr></thead><tbody>
       ${rows.map(b => `<tr><td>${esc(b.label)}</td><td class="r">${b.ports == null ? '—' : esc(b.ports)}</td>
         <td class="r ${tc(b.cpu, cfg.cpuWarn, cfg.cpuCrit)}">${b.cpu == null ? '—' : nf(b.cpu, 0) + '%'}</td>
+        ${hasMem ? `<td class="r ${tc(b.mem, cfg.memWarn, cfg.memCrit)}">${b.mem == null ? '—' : nf(b.mem, 0) + '%'}</td>` : ''}
         <td class="r ${tc(b.temp, cfg.tempWarn, cfg.tempCrit)}">${b.temp == null ? '—' : nf(b.temp, 1) + ' °C'}</td></tr>`).join('')}
     </tbody></table></div>` : `<p class="muted">${o.loading ? 'Carregando…' : 'Sem itens por placa no Zabbix.'}</p>`}`;
 }
@@ -1495,7 +1528,7 @@ function tvHealthHTML(o){
   const t1 = Date.now();
   return ['cpu','mem','temp'].map(id => {
     const m = o.health[id], label = { cpu:'Processamento', mem:'Memória', temp:'Temperatura' }[id];
-    if (!m || m.missing || m.value == null) return `<div class="tv-g none"><span>${label}: ${o.loading ? 'carregando…' : 'sem item no Zabbix'}</span></div>`;
+    if (!m || m.missing || m.value == null) return `<div class="tv-g none"><span>${label}: ${o.loading ? 'carregando…' : 'não coletada no Zabbix'}</span></div>`;
     const pts = m.hist.filter(a => a[0] >= t1 - WINDOW).map(a => a[1]);
     const pk = pts.length ? Math.max(...pts) : m.value;
     const st = m.sev === 'crit' ? ['is-danger','badge--danger','Alerta'] : m.sev === 'warn' ? ['is-warn','badge--warn','Atenção'] : ['','badge--ok','Normal'];
