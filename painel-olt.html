@@ -249,6 +249,21 @@ main .inner{display:flex;flex-direction:column;gap:var(--s-5)}
 .hcard[data-open]:hover,.tv-g[data-open]:hover{border-color:var(--line-strong);box-shadow:var(--shadow-2)}
 .hcard-more{justify-self:end;font-size:var(--fs-12);font-weight:650;color:var(--info-text)}
 .d-title-sans{font-family:var(--font-sans)!important}
+.pb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:var(--s-3)}
+.pb{position:relative;overflow:hidden;display:grid;gap:var(--s-1);padding:var(--s-3);border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2);min-width:0;cursor:pointer;transition:border-color var(--dur-1) var(--ease)}
+.pb::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--grad-brand);opacity:.8}
+.pb.is-warn::before{background:var(--grad-warn)} .pb.is-danger::before{background:var(--grad-danger)}
+.pb:hover{border-color:var(--line-strong)}
+.pb.is-danger{border-color:var(--danger-line)}
+.pb-v{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s-1) var(--s-2)}
+.pb label{font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
+.pb strong{font-size:var(--fs-24);font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1}
+.pb.is-warn strong{color:var(--warn-text)} .pb.is-danger strong{color:var(--danger-text)}
+.pb small{font-size:var(--fs-11);color:var(--text-3);font-family:var(--font-mono)}
+.pb .spark{height:28px}
+.pb.none{cursor:default;color:var(--text-3);font-size:var(--fs-12);align-content:start}
+.pb.none::before{display:none}
+.d-sec-h small{font-size:var(--fs-12)}
 .hb-list{display:grid;gap:var(--s-2)}
 .hb-row{display:grid;grid-template-columns:minmax(84px,auto) 64px minmax(60px,1fr) minmax(0,1.3fr) 82px;align-items:center;gap:var(--s-3);padding:var(--s-2) var(--s-3);border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
 .hb-row.is-warn{border-color:var(--warn-line)}
@@ -420,6 +435,7 @@ button.hc:hover{transform:scale(1.06);border-color:var(--line-strong)}
 .tip .mono{font-size:var(--fs-11)}
 .scale-note{margin:var(--s-2) 0 0;font-size:var(--fs-12);color:var(--text-3)}
 .d-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.d-stats > div:last-child:nth-child(odd){grid-column:1/-1}
 .d-stats div{background:var(--surface-1);padding:var(--s-3) var(--s-4);display:grid;gap:2px;min-width:0}
 .d-stats span{font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
 .d-stats strong{font-family:var(--font-mono);font-size:var(--fs-14);font-weight:600}
@@ -869,7 +885,7 @@ async function zResolve(o){
 function mergeInterfaces(o, items){
   const ifs = new Map();
   for (const it of items || []){
-    const km = String(it.key_).match(/\[(ifHCInOctets|ifHCOutOctets|ifOperStatus|ifHighSpeed|ifSpeed)\.(\d+)\]/);
+    const km = String(it.key_).match(/\[(ifHCInOctets|ifHCOutOctets|ifOperStatus|ifHighSpeed|ifSpeed|ifInErrors|ifOutErrors|ifInDiscards|ifOutDiscards)\.(\d+)\]/);
     if (!km) continue;
     const nm = String(it.name).match(/^Interface\s+(.+?):\s/);
     if (!nm) continue;
@@ -902,6 +918,9 @@ function mergeInterfaces(o, items){
       (isPon ? o.ports : o.uplinks).push(t);
     }
     t.active = active;
+    t.oper = oper; t.speedRaw = speed;
+    t.zx = { inErr:r.it.ifInErrors, outErr:r.it.ifOutErrors, inDisc:r.it.ifInDiscards, outDisc:r.it.ifOutDiscards };
+    t.lastClock = Math.max(...[r.it.ifHCInOctets, r.it.ifHCOutOctets, r.it.ifOperStatus].filter(Boolean).map(x => +x.lastclock * 1000), 0) || null;
     if (isPon){
       setCaps(t, speed);
       t.down = cleanRate(t, 'down', outR); t.up = cleanRate(t, 'up', inR); t.zD = r.it.ifHCOutOctets; t.zU = r.it.ifHCInOctets;
@@ -1664,14 +1683,31 @@ async function zHealthSeries(m, winH){
   for (const k in out) out[k] = out[k].filter(ok);
   return { kind, boards:out };
 }
+function boardMetrics(t){
+  const o = byId[t.olt];
+  return ['cpu','mem','temp'].map(id => {
+    const m = o.health[id];
+    const b = m && m.boards ? m.boards.find(x => x.slot === t.slot) : null;
+    return { id, m, b, label:{ cpu:'Processamento', mem:'Memória', temp:'Temperatura' }[id] };
+  });
+}
+async function zBoardSeries(t, winH){
+  const out = {};
+  await Promise.all(boardMetrics(t).map(async x => {
+    if (!x.m || !x.b) return;
+    try { const r = await zHealthSeries({ id:x.id, boards:[x.b] }, winH); out[x.id] = r.boards[x.b.key] || []; }
+    catch(e){ out[x.id] = []; }
+  }));
+  return out;
+}
 async function loadSeries(){
   const t = targets.get(ui.detail); if (!t) return;
   const key = ui.detail, win = ui.dWin;
   ui.dLoading = true; renderChartArea();
   try {
-    const s = t.type === 'health' ? await zHealthSeries(t, win) : await zSeries(t, win);
+    const [s, bs] = t.type === 'health' ? [await zHealthSeries(t, win), null] : await Promise.all([zSeries(t, win), t.type === 'pon' ? zBoardSeries(t, win) : null]);
     if (ui.detail !== key || ui.dWin !== win) return;
-    ui.dSeries = { key, win, kind:s.kind, d:s.d || [], u:s.u || [], dAvg:s.dAvg, uAvg:s.uAvg, boards:s.boards, at:Date.now(), err:null };
+    ui.dSeries = { key, win, kind:s.kind, d:s.d || [], u:s.u || [], dAvg:s.dAvg, uAvg:s.uAvg, boards:s.boards, board:bs, at:Date.now(), err:null };
   } catch(e){
     if (ui.detail !== key) return;
     ui.dSeries = { key, win, d:[], u:[], at:Date.now(), err:e.message };
@@ -1741,6 +1777,46 @@ function renderHealthArea(m){
     <div><span>Pico no período</span><strong>${topPk ? esc(fmtMetric(m, topPk.v)) : '—'}</strong><small>${topPk ? esc(topPk.label) + ' · ' + fmtDay(topPk.t) + ' às ' + fmtTime(topPk.t) : (ui.dLoading ? 'carregando…' : '')}</small></div>
     <div><span>Placas acima da atenção</span><strong>${nWarn}</strong><small>de ${rows.length}</small></div>`;
 }
+function renderPortBoard(t){
+  const box = $('#dBoard'); if (!box || t.type !== 'pon') return;
+  const s = ui.dSeries && ui.dSeries.key === ui.detail && ui.dSeries.win === ui.dWin ? ui.dSeries.board : null;
+  const now = Date.now(), t0 = now - ui.dWin * HOUR;
+  $('#dBoardWin').textContent = winSpan(ui.dWin);
+  box.innerHTML = boardMetrics(t).map(x => {
+    if (!x.m || !x.b || x.b.v == null){
+      return `<div class="pb none"><label>${x.label}</label><span>${x.m && !x.m.missing ? 'Sem leitura desta placa' : 'Não coletada no Zabbix'}</span></div>`;
+    }
+    const th = TH[x.id], w = cfg[th.w], c = cfg[th.c], v = x.b.v;
+    const cls = v >= c ? 'is-danger' : v >= w ? 'is-warn' : '';
+    const badge = v >= c ? ['badge--danger','Alerta'] : v >= w ? ['badge--warn','Atenção'] : ['badge--ok','Normal'];
+    const arr = s ? (s[x.id] || []) : null;
+    let pk = null; if (arr) for (const a of arr) if (!pk || a[1] > pk[1]) pk = a;
+    return `<div class="pb ${cls}" data-open="${esc(x.m.key)}" role="button" tabindex="0" aria-label="${x.label} da placa ${t.slot}: ${esc(fmtMetric(x.m, v))}. Ver todas as placas">
+      <label>${x.label}</label>
+      <div class="pb-v"><strong>${esc(fmtMetric(x.m, v))}</strong><span class="badge ${badge[0]}">${badge[1]}</span></div>
+      ${arr ? (arr.length > 1 ? metricSpark(x.m, arr, t0, now) : '<small>sem histórico no período</small>') : (ui.dLoading ? '<small>carregando…</small>' : '')}
+      <small>${pk ? 'pico ' + esc(fmtMetric(x.m, pk[1])) + ' · ' + new Date(pk[0]).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }) + ' ' + fmtTime(pk[0]) : 'atenção ' + w + ' · alerta ' + c + (x.m.unit === '%' ? '%' : ' °C')}</small></div>`;
+  }).join('');
+}
+function renderIface(t){
+  const box = $('#dIface'); if (!box) return;
+  const val = it => {
+    if (!it || it.lastvalue === '' || it.lastvalue == null) return null;
+    const v = +it.lastvalue; if (!isFinite(v)) return null;
+    const u = String(it.units || '').trim();
+    return nf(v, v % 1 ? 2 : 0) + (u ? ' ' + u : '');
+  };
+  const z = t.zx || {};
+  const cells = [
+    ['Estado', t.active ? 'Com link' : 'Sem link', t.oper != null ? 'ifOperStatus ' + t.oper : ''],
+    ['Velocidade da porta', t.speedRaw ? fmtBps(t.speedRaw) : '—', t.type === 'pon' ? 'limite do painel ' + fmtBps(t.capD) : ''],
+  ];
+  const err = [['Erros de entrada', z.inErr], ['Erros de saída', z.outErr], ['Descartes de entrada', z.inDisc], ['Descartes de saída', z.outDisc]].filter(e => e[1]);
+  for (const [l, it] of err){ const v = val(it); cells.push([l, v == null ? '—' : v, it.lastclock ? 'lido ' + fmtTime(+it.lastclock * 1000) : '']); }
+  cells.push(['Última leitura', t.lastClock ? fmtTimeS(t.lastClock) : '—', t.lastClock ? fmtDay(t.lastClock) : '']);
+  if (!err.length) cells.push(['Erros e descartes', 'não coletados', 'sem itens no Zabbix']);
+  box.innerHTML = cells.map(([l, v, sm]) => `<div><span>${esc(l)}</span><strong>${esc(v)}</strong><small>${esc(sm)}</small></div>`).join('');
+}
 function updateDetail(full){
   const t = targets.get(ui.detail), dr = $('#drawer');
   if (!t){ closeDetail(); return; }
@@ -1774,10 +1850,13 @@ function updateDetail(full){
       <section><div class="d-sec-h"><h3>Utilização no período</h3><div class="seg" role="group" aria-label="Período">${WINDOWS.map(([w, l]) => `<button type="button" data-win="${w}" aria-pressed="${ui.dWin === w}">${l}</button>`).join('')}</div></div>
         <div class="chart-box" id="dChart"></div><div id="dLegend"></div></section>
       <div class="d-stats" id="dStats"></div>
+      ${t.type === 'pon' ? `<section><div class="d-sec-h"><h3>Placa ${t.slot} · saúde</h3><small class="muted" id="dBoardWin"></small></div><div class="pb-grid" id="dBoard"></div></section>` : ''}
+      <section><div class="d-sec-h"><h3>Interface</h3></div><div class="d-stats" id="dIface"></div></section>
       ${loc}
       <section id="dAlerts"></section>`;
   }
   $('#dNow').innerHTML = nowBox('down') + nowBox('up');
+  renderPortBoard(t); renderIface(t);
   const rel = [...alerts.active.values()].filter(a => a.target === t.key).concat(alerts.history.filter(a => a.target === t.key)).slice(0, 6);
   $('#dAlerts').innerHTML = rel.length ? `<div class="d-sec-h"><h3>Alertas desta porta</h3></div><ul class="d-list">${rel.map(a => `<li><b>${a.dir === 'down' ? '↓ Download' : '↑ Upload'}</b><span class="mono">pico ${fmtPct(a.peak)}</span><span class="muted">${fmtTime(a.since)}${a.ended ? '–' + fmtTime(a.ended) + ' (' + fmtDur(a.ended - a.since) + ')' : ' · ainda ativo'}</span></li>`).join('')}</ul>` : '';
   if (ui.dSeries && Date.now() - ui.dSeries.at > 120000 && !ui.dLoading) loadSeries();
@@ -1787,6 +1866,7 @@ function renderChartArea(){
   const t = targets.get(ui.detail);
   if (!box || !t) return;
   if (t.type === 'health') return renderHealthArea(t);
+  renderPortBoard(t);
   const s = ui.dSeries;
   if (!s || s.key !== ui.detail || s.win !== ui.dWin){
     box.innerHTML = `<div class="empty" style="margin:0">${ui.dLoading ? 'Carregando histórico…' : 'Sem histórico.'}</div>`; leg.innerHTML = ''; st.innerHTML = ''; return;
