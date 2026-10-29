@@ -158,6 +158,7 @@ button,input,select{font:inherit}
 .icon-btn:hover{background:var(--appbar-soft)}
 .icon-btn[aria-pressed="true"]{background:var(--appbar-on);border-color:rgba(29,201,255,.6)}
 .icon-btn svg{width:18px;height:18px}
+#btnSettings[hidden]{display:none!important}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,214,160,.55)}70%{box-shadow:0 0 0 7px rgba(47,214,160,0)}100%{box-shadow:0 0 0 0 rgba(47,214,160,0)}}
 
 
@@ -564,7 +565,7 @@ body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;rig
       <button class="src-pill" id="srcPill" type="button" data-state="loading" title="Conexão com o Zabbix"><span class="dot"></span><span id="srcText">Conectando…</span><span class="upd" id="updText"></span></button>
       <button class="icon-btn" id="btnSound" type="button" aria-pressed="false" title="Som dos alertas" aria-label="Som dos alertas"></button>
       <button class="icon-btn" id="btnTv" type="button" aria-pressed="false" title="Modo TV: mapa de calor e saúde das duas OLTs em tela cheia" aria-label="Modo TV"></button>
-      <button class="icon-btn" id="btnSettings" type="button" title="Configurações" aria-label="Configurações"></button>
+      <button class="icon-btn" id="btnSettings" type="button" title="Configurações" aria-label="Configurações" hidden></button>
     </div>
   </div>
 </header>
@@ -1989,6 +1990,8 @@ function fillForm(c){
   $('#fInt').value = c.interval; $('#fSound').checked = !!c.sound; $('#fNotify').checked = !!c.notify;
 }
 function openSettings(){
+  // Defesa na interface: nunca abre configurações sem perfil autorizado.
+  if (!canAccessSettings()) return;
   ui.lastFocus = document.activeElement;
   fillForm(cfg);
   $('#formErr').hidden = true; $('#testOut').textContent = ''; $('#notifyOut').textContent = '';
@@ -2095,7 +2098,8 @@ function bind(){
   $('#setScrim').addEventListener('click', closeSettings);
   $('#setClose').addEventListener('click', closeSettings);
   $('#btnSettings').addEventListener('click', openSettings);
-  $('#srcPill').addEventListener('click', openSettings);
+  // O indicador de conexão também abria configurações; aplique a mesma permissão.
+  $('#srcPill').addEventListener('click', () => { if (canAccessSettings()) openSettings(); });
   $('#btnSound').addEventListener('click', () => { cfg.sound = !cfg.sound; store(STORE, cfg); setSoundBtn(); if (cfg.sound){ ensureAudio(); beep(); toast('Som dos alertas ligado', 'Toca ao abrir um alerta e repete a cada minuto até reconhecer.', 'info', 4000); } });
   $('#btnTv').addEventListener('click', () => setTv(!ui.tv));
   $('#tvExit').addEventListener('click', () => setTv(false));
@@ -2157,6 +2161,28 @@ function start(){
   rebuildIndex();
   renderScreen();
 }
+// Permissões recebidas da sessão do servidor. Perfil ausente = negar por segurança.
+let currentUserRole = null;
+let sessionChecked = false;
+function normalizeRole(value){
+  return String(value ?? '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .trim().toLowerCase();
+}
+function canAccessSettings(){
+  // Sem sessão/perfil confirmado, ou para analista, as configurações ficam bloqueadas.
+  return sessionChecked && !!currentUserRole && !['analista', 'analyst'].includes(currentUserRole);
+}
+function applySettingsPermission(){
+  const allowed = canAccessSettings();
+  const button = $('#btnSettings');
+  const status = $('#srcPill');
+  button.hidden = !allowed;
+  button.title = allowed ? 'Configurações' : 'Configurações indisponíveis para este perfil';
+  status.setAttribute('aria-disabled', String(!allowed));
+  status.title = allowed ? 'Conexão com o Zabbix' : 'Status da conexão com o Zabbix';
+  if (!allowed && !$('#settings').hidden) closeSettings();
+}
 function checkSession(){
   if (!/^https?:$/.test(location.protocol) || typeof fetch !== 'function') return;
   fetch('/sessao', { credentials:'same-origin', cache:'no-store' })
@@ -2164,11 +2190,23 @@ function checkSession(){
     .then(d => {
       if (!d || !d.authenticated || !d.user) return;
       $('#whoName').textContent = d.user;
-      $('#who').querySelector('.who-av').textContent = d.user.slice(0, 1);
+      $('#who').querySelector('.who-av').textContent = String(d.user).slice(0, 1);
       $('#who').title = 'Conectado como ' + d.user;
       $('#who').hidden = false;
+
+      // /sessao deve fornecer o perfil em um destes campos: perfil, role,
+      // tipo_usuario, tipo, cargo, user_role ou userRole.
+      const rawRole = d.perfil ?? d.role ?? d.tipo_usuario ?? d.tipo ?? d.cargo ?? d.user_role ?? d.userRole;
+      currentUserRole = rawRole == null ? null : normalizeRole(rawRole);
+      sessionChecked = true;
+      applySettingsPermission();
     })
-    .catch(() => {});
+    .catch(() => {
+      // Falha ao validar a sessão: mantém o acesso às configurações bloqueado.
+      currentUserRole = null;
+      sessionChecked = false;
+      applySettingsPermission();
+    });
 }
 buildStatic();
 setSoundBtn();
