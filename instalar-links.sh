@@ -44,7 +44,10 @@ case "$PORTA" in 8443|8080|80|443|19090|"$PORTA_API"|"$PORTA_LOGIN") erro "A por
 NGV="$(nginx -V 2>&1)"
 [[ "$NGV" == *http_auth_request_module* ]] || erro "Este nginx não tem o módulo auth_request (instale nginx-full ou nginx-extras)."
 id www-data >/dev/null 2>&1 || erro "Usuário www-data não existe."
-PY="$(command -v python3)"
+# usa o python do sistema, nunca o de um venv ativo no shell (o serviço roda fora dele)
+PY=""
+for c in /usr/bin/python3 /usr/local/bin/python3; do [ -x "$c" ] && { PY="$c"; break; }; done
+[ -n "$PY" ] || PY="$(env -u VIRTUAL_ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin sh -c 'command -v python3' || true)"
 "$PY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 7) else 1)' || erro "Precisa de Python 3.7 ou mais novo."
 
 code="$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORTA_LOGIN/sessao" || true)"
