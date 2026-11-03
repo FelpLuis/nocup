@@ -158,7 +158,6 @@ button,input,select{font:inherit}
 .icon-btn:hover{background:var(--appbar-soft)}
 .icon-btn[aria-pressed="true"]{background:var(--appbar-on);border-color:rgba(29,201,255,.6)}
 .icon-btn svg{width:18px;height:18px}
-#btnSettings[hidden]{display:none!important}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,214,160,.55)}70%{box-shadow:0 0 0 7px rgba(47,214,160,0)}100%{box-shadow:0 0 0 0 rgba(47,214,160,0)}}
 
 
@@ -404,6 +403,20 @@ button.hc:hover{transform:scale(1.06);border-color:var(--line-strong)}
 .hc.bc{background:var(--danger-500);color:var(--on-solid);box-shadow:0 0 0 2px var(--danger-line)}
 .hc.bi{background:repeating-linear-gradient(45deg,transparent 0 4px,var(--line) 4px 6px);border-color:var(--line);cursor:default;font-weight:500}
 .hc.bq{background:var(--surface-3);color:var(--warn-text);border:1px dashed var(--warn-line)}
+.hc.rok{background:var(--ok-bg);color:var(--ok-text);border-color:var(--ok-line)}
+.hc.rq{background:var(--surface-3);color:var(--text-3)}
+.pon-opt{display:block;font-family:var(--font-mono);font-size:var(--fs-11);color:var(--text-3)}
+.pon-opt b{color:var(--text-1);font-weight:700}
+.pon-opt.is-warn b{color:var(--warn-text)} .pon-opt.is-danger b{color:var(--danger-text)}
+.pon-opt small{font-size:inherit}
+.onu-h{margin:var(--s-3) 0 var(--s-2);font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
+.onu-list{display:flex;flex-wrap:wrap;gap:var(--s-2)}
+.onu{display:inline-flex;gap:var(--s-2);align-items:baseline;padding:2px var(--s-2);border:1px solid var(--line);border-radius:var(--r-full);background:var(--surface-2);font-family:var(--font-mono);font-size:var(--fs-12);font-variant-numeric:tabular-nums}
+.onu b{font-family:var(--font-sans);font-weight:650;font-size:var(--fs-11);color:var(--text-3)}
+.onu.is-warn{border-color:var(--warn-line);color:var(--warn-text)} .onu.is-danger{border-color:var(--danger-line);background:var(--danger-bg);color:var(--danger-text)}
+.onu.more{color:var(--text-3);font-family:var(--font-sans)}
+.opt-chart{margin-top:var(--s-4)}
+.chart-thr.warn{stroke:var(--warn-500)}
 .hc.none{visibility:hidden}
 .hc.dim{opacity:.18}
 .hc .up-mark{font-size:9px;margin-left:1px;vertical-align:1px}
@@ -565,7 +578,7 @@ body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;rig
       <button class="src-pill" id="srcPill" type="button" data-state="loading" title="Conexão com o Zabbix"><span class="dot"></span><span id="srcText">Conectando…</span><span class="upd" id="updText"></span></button>
       <button class="icon-btn" id="btnSound" type="button" aria-pressed="false" title="Som dos alertas" aria-label="Som dos alertas"></button>
       <button class="icon-btn" id="btnTv" type="button" aria-pressed="false" title="Modo TV: mapa de calor e saúde das duas OLTs em tela cheia" aria-label="Modo TV"></button>
-      <button class="icon-btn" id="btnSettings" type="button" title="Configurações" aria-label="Configurações" hidden></button>
+      <button class="icon-btn" id="btnSettings" type="button" title="Configurações" aria-label="Configurações"></button>
     </div>
   </div>
 </header>
@@ -590,6 +603,7 @@ body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;rig
         <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="sr">Buscar</span><input id="q" type="search" placeholder="Porta, região ou VLAN" autocomplete="off"></label>
         <label class="sel">Ordenar <select id="sort"><option value="slot">Placa e porta</option><option value="util">Maior utilização</option><option value="region">Região</option></select></label>
         <div class="seg" role="group" aria-label="Visualização" id="viewSeg"><button type="button" data-v="cards" aria-pressed="true">Cartões</button><button type="button" data-v="heat" aria-pressed="false">Mapa de calor</button></div>
+        <div class="seg" role="group" aria-label="O que o mapa mostra" id="metricSeg" hidden><button type="button" data-m="traffic" aria-pressed="true">Tráfego</button><button type="button" data-m="rx" aria-pressed="false">Sinal RX</button></div>
       </div>
       <div id="ponBody"></div>
     </section>
@@ -743,6 +757,7 @@ const ui = {
   filter: ['active','crit','warn','idle'].includes(uiSaved.filter) ? uiSaved.filter : 'active',
   sort: ['slot','util','region'].includes(uiSaved.sort) ? uiSaved.sort : 'slot',
   view: uiSaved.view === 'heat' ? 'heat' : 'cards',
+  heatMetric: uiSaved.heatMetric === 'rx' ? 'rx' : 'traffic',
   q:'', detail:null, dWin:WINDOWS.some(w => w[0] === uiSaved.dWin) ? uiSaved.dWin : 24, dSeries:null, dLoading:false, tv:false, lastFocus:null
 };
 const OLTS = DATA.olts.map(d => ({ id:d.id, nome:d.nome, curto:d.curto, local:d.local, modelo:d.modelo, src:d,
@@ -828,9 +843,46 @@ function applyLag(o){
 /* Sinal óptico (dBm). O painel reconhece itens com RX/TX (ou sinal, óptico,
    power, laser) no nome e a porta no formato 1/2/1; com ":N" depois da porta o
    item é de uma ONU. Enquanto o Zabbix não coletar, a porta mostra "não coletado". */
+const portNum = name => { const m = String(name).match(/(\d+)\/(\d+)\/(\d+)\s*$/); return m ? `${m[1]}/${m[2]}/${m[3]}` : null; };
+function finishOnuRx(op){
+  const list = (op.onus || []).filter(x => x && isFinite(x.v)).sort((a, b) => a.v - b.v);
+  if (!list.length && op._worst == null) return;
+  op.onuRx = {
+    n: list.length || op._count || 0,
+    worst: list.length ? list[0] : { onu:op._worstonu, v:op._worst },
+    avg: list.length ? list.reduce((a, x) => a + x.v, 0) / list.length : op._avg,
+    list,
+    low: list.length ? list.filter(x => x.v <= cfg.rxCrit).length : (op._low || 0),
+    warn: list.filter(x => x.v <= cfg.rxWarn && x.v > cfg.rxCrit).length,
+    over: list.filter(x => x.v > -8).length
+  };
+}
 function mergeOptical(o, items){
-  for (const p of o.ports) p.opt = null;
-  o.optCount = 0;
+  for (const t of [...o.ports, ...o.uplinks]) t.opt = null;
+  o.optCount = 0; o.optSource = null;
+  const byNum = new Map();
+  for (const t of [...o.ports, ...o.uplinks]){ const k = portNum(t.name); if (k && !t.isLag) byNum.set(k, t); }
+  let modern = false;
+  for (const it of items || []){
+    const km = String(it.key_).match(/^zte\.(?:pon\.rx\.(worst|worstonu|avg|count|low|onus)|opt\.(tx|rx))\[(\d+\/\d+\/\d+)\]$/);
+    if (!km) continue;
+    modern = true;
+    const t = byNum.get(km[3]); if (!t) continue;
+    const op = t.opt || (t.opt = { tx:null, rx:null, onus:[], onuRx:null, z:{} });
+    const lv = it.lastvalue, has = lv !== '' && lv != null && +it.lastclock > 0;
+    const f = km[1] || km[2];
+    op.z[km[2] ? 'mod' + f : f] = it;
+    if (!has) continue;
+    if (km[2]){ if (isFinite(+lv)) op[f] = { v:+lv, clock:+it.lastclock * 1000 }; }
+    else if (f === 'onus'){ try { const arr = JSON.parse(lv); if (Array.isArray(arr)) op.onus = arr.filter(x => Array.isArray(x)).map(x => ({ onu:+x[0], v:+x[1] })); } catch(e){} }
+    else op['_' + f] = +lv;
+    o.optCount++;
+  }
+  if (modern){
+    for (const t of [...o.ports, ...o.uplinks]) if (t.opt) finishOnuRx(t.opt);
+    o.optSource = 'zte';
+    return;
+  }
   const byShort = new Map(o.ports.map(p => [p.short, p]));
   for (const it of items || []){
     if (/^net\.if/.test(it.key_) || /^Interface\s.+:\s(Bits|Operational|Speed|Inbound|Outbound)/i.test(it.name)) continue;
@@ -843,7 +895,7 @@ function mergeOptical(o, items){
     const pm = n.match(/(\d+)[\/.](\d+)[\/.](\d+)(?:\s*[:]\s*(\d+))?/) || String(it.key_).match(/(\d+)[\/.](\d+)[\/.](\d+)(?:\s*[:]\s*(\d+))?/);
     if (!pm) continue;
     const p = byShort.get(`${pm[1]}/${pm[2]}/${pm[3]}`); if (!p) continue;
-    p.opt = p.opt || { tx:null, rx:null, onus:[] };
+    p.opt = p.opt || { tx:null, rx:null, onus:[], z:{} };
     if (pm[4] != null) p.opt.onus.push({ onu:+pm[4], dir, v });
     else p.opt[dir] = { v, clock:+it.lastclock * 1000 };
     o.optCount++;
@@ -853,12 +905,15 @@ function mergeOptical(o, items){
     const rx = p.opt.onus.filter(x => x.dir === 'rx');
     if (rx.length){
       let worst = rx[0]; for (const x of rx) if (x.v < worst.v) worst = x;
-      p.opt.onuRx = { n:rx.length, worst, avg:rx.reduce((a, x) => a + x.v, 0) / rx.length, low:rx.filter(x => x.v <= cfg.rxCrit).length };
+      p.opt.onuRx = { n:rx.length, worst, avg:rx.reduce((a, x) => a + x.v, 0) / rx.length, low:rx.filter(x => x.v <= cfg.rxCrit).length,
+        warn:rx.filter(x => x.v <= cfg.rxWarn && x.v > cfg.rxCrit).length, over:rx.filter(x => x.v > -8).length, list:rx.slice().sort((a, b) => a.v - b.v) };
     }
   }
 }
-const fmtDbm = v => v == null || !isFinite(v) ? '—' : nf(v, 1).replace('-', '−') + ' dBm';
-function rxSev(v){ if (v == null) return ''; if (v <= cfg.rxCrit || v > -8) return 'is-danger'; if (v <= cfg.rxWarn) return 'is-warn'; return ''; }
+const fmtDbm = v => v == null || !isFinite(v) ? '—' : (v > 0 ? '+' : '') + nf(v, 1).replace('-', '−') + ' dBm';
+function rxSev(v){ if (v == null || !isFinite(v)) return ''; if (v <= cfg.rxCrit || v > -8) return 'is-danger'; if (v <= cfg.rxWarn) return 'is-warn'; return ''; }
+function txSev(v){ if (v == null || !isFinite(v)) return ''; if (v < 0.5 || v > 8) return 'is-danger'; if (v < 1.5 || v > 7) return 'is-warn'; return ''; }
+const fmtDbmShort = v => v == null || !isFinite(v) ? '—' : (v > 0 ? '+' : '') + nf(v, 1).replace('-', '−');
 function mkMetric(oltId, id, label, unit){ return { type:'health', key:oltId + '|h|' + id, olt:oltId, id, label, unit, value:null, hist:[], sev:'ok', where:'', missing:false }; }
 function rebuildIndex(){
   targets.clear();
@@ -1077,8 +1132,12 @@ async function zPoll(o, first){
   catch(e){ hitems = []; }
   mergeHealth(o, hitems);
   let oitems = [];
-  try { oitems = await zbx('item.get', { hostids:[o.zhostid], output:IOUT, search:{ name:['*rx*','*tx*','*sinal*','*optic*','*óptic*','*power*','*potência*','*dbm*','*laser*'] }, searchByAny:true, searchWildcardsEnabled:true, limit:10000 }); }
+  try { oitems = await zbx('item.get', { hostids:[o.zhostid], output:IOUT, search:{ key_:['zte.pon.rx.','zte.opt.tx[','zte.opt.rx['] }, searchByAny:true, filter:{ status:0 }, limit:20000 }); }
   catch(e){ oitems = []; }
+  if (!oitems.length){
+    try { oitems = await zbx('item.get', { hostids:[o.zhostid], output:IOUT, search:{ name:['*rx*','*tx*','*sinal*','*optic*','*óptic*','*power*','*potência*','*dbm*','*laser*'] }, searchByAny:true, searchWildcardsEnabled:true, limit:10000 }); }
+    catch(e){ oitems = []; }
+  }
   mergeOptical(o, oitems);
   rebuildIndex();
   if (first) await zHistory(o);
@@ -1472,6 +1531,8 @@ function renderChips(o){
   $('#ponTitle').textContent = `${o.ports.length} portas · ${c.active} ativas`;
   $('#ponLegend').innerHTML = `<span><i class="sw in"></i>Download</span><span><i class="sw out"></i>Upload</span><span><i class="thr-sw"></i>Limite ${cfg.thr}%</span><span class="dim">curvas das últimas 2 h</span>`;
   for (const b of $('#viewSeg').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === ui.view));
+  $('#metricSeg').hidden = ui.view !== 'heat';
+  for (const b of $('#metricSeg').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.m === ui.heatMetric));
 }
 function visiblePorts(o){
   const q = norm(ui.q.trim());
@@ -1494,7 +1555,7 @@ function cardHTML(p){
   return `<button type="button" class="pon" data-key="${esc(p.key)}" data-open="${esc(p.key)}" data-fk="p-${esc(p.key)}">
     <span class="pon-top"><span class="pon-id">${esc(p.short)}</span><span class="pon-pct"></span></span>
     <span><span class="pon-reg">${esc(p.region || 'Sem descrição')}</span>${meta ? `<span class="pon-meta">${esc(meta)}</span>` : ''}</span>
-    <span class="dmw"></span><span class="spk"></span></button>`;
+    <span class="dmw"></span><span class="spk"></span><span class="pon-opt" hidden></span></button>`;
 }
 function fillCard(el, p, t1){
   if (!p.active) return;
@@ -1503,6 +1564,13 @@ function fillCard(el, p, t1){
   el.title = isBad(p) ? heatTitle(p) : '';
   el.querySelector('.dmw').innerHTML = dmHTML('down', p.down, p.pd, p.sevD) + dmHTML('up', p.up, p.pu, p.sevU);
   el.querySelector('.spk').innerHTML = sparkSVG(p.hd, p.hu, p.capD, t1);
+  const po = el.querySelector('.pon-opt'), r = p.opt && p.opt.onuRx, tx = p.opt && p.opt.tx;
+  if (po){
+    po.hidden = !(r || tx);
+    po.className = 'pon-opt ' + (r ? rxSev(r.worst.v) : '');
+    po.innerHTML = r || tx ? `${r ? `RX pior <b>${esc(fmtDbmShort(r.worst.v))}</b>` : ''}${tx ? `${r ? ' · ' : ''}TX ${esc(fmtDbmShort(tx.v))}` : ''} <small>dBm</small>` : '';
+    po.title = r ? `Pior ONU ${r.worst.onu ?? ''}: ${fmtDbm(r.worst.v)} · média ${fmtDbm(r.avg)} · ${r.n} ONUs` : '';
+  }
   el.setAttribute('aria-label', `Porta ${p.name}, ${p.region || 'sem descrição'}. Download ${fmtBps(p.down)} (${fmtPct(p.pd)}), upload ${fmtBps(p.up)} (${fmtPct(p.pu)}). Abrir gráfico`);
 }
 function slotSummary(o, sl){
@@ -1556,7 +1624,7 @@ function renderHeat(o, force){
   const body = $('#ponBody');
   const slots = [...new Set(o.ports.map(p => p.slot))].sort((a, b) => a - b);
   const cols = Math.max(...o.ports.map(p => p.idx), 1);
-  const sig = ['heat', o.id, o.ports.length, cols].join('|');
+  const sig = ['heat', ui.heatMetric, o.id, o.ports.length, cols].join('|');
   const vis = new Set(visiblePorts(o).map(p => p.key));
   if (force || sig !== pons.sig){
     pons.sig = sig;
@@ -1574,7 +1642,7 @@ function renderHeat(o, force){
     }
     h += `</div>`;
     keepFocus(body, () => {
-      body.innerHTML = `<div class="heat-wrap">${h}</div><div class="legend-row"><span>% do limite da porta (${esc(fmtBps(cfg.capDown * 1e6))}), direção mais carregada:</span>
+      body.innerHTML = ui.heatMetric === 'rx' ? `<div class="heat-wrap">${h}</div>${rxLegend(o)}` : `<div class="heat-wrap">${h}</div><div class="legend-row"><span>% do limite da porta (${esc(fmtBps(cfg.capDown * 1e6))}), direção mais carregada:</span>
         <span><i class="lg" style="background:var(--heat-1)"></i>&lt; 10%</span><span><i class="lg" style="background:var(--heat-2)"></i>10–25%</span>
         <span><i class="lg" style="background:var(--heat-3)"></i>25–50%</span><span><i class="lg" style="background:var(--heat-4)"></i>50–${cfg.warn}%</span>
         <span><i class="lg" style="background:var(--warn-500)"></i>${cfg.warn}–${cfg.thr}%</span><span><i class="lg" style="background:var(--danger-500)"></i>≥ ${cfg.thr}%</span>
@@ -1586,6 +1654,14 @@ function renderHeat(o, force){
     const el = pons.refs.get(p.key); if (!el) continue;
     const dim = !vis.has(p.key) && (ui.q.trim() || ui.filter !== 'active');
     if (!p.active){ el.className = 'hc bi' + (dim ? ' dim' : ''); continue; }
+    if (ui.heatMetric === 'rx'){
+      const r = p.opt && p.opt.onuRx, sev = r ? rxSev(r.worst.v) : '';
+      el.className = 'hc ' + (!r ? 'rq' : sev === 'is-danger' ? 'bc' : sev === 'is-warn' ? 'bw' : 'rok') + (dim ? ' dim' : '');
+      el.innerHTML = r ? esc(fmtDbmShort(r.worst.v)) : '–';
+      el.title = `${p.name} · ${p.region || 'sem descrição'}${r ? ` · pior ONU ${r.worst.onu ?? ''} ${fmtDbm(r.worst.v)} · média ${fmtDbm(r.avg)} · ${r.n} ONUs${r.low ? ` · ${r.low} abaixo de ${fmtDbm(cfg.rxCrit)}` : ''}` : ' · sem leitura de sinal'}${p.opt && p.opt.tx ? ' · TX ' + fmtDbm(p.opt.tx.v) : ''}`;
+      el.setAttribute('aria-label', `Porta ${p.short}, ${p.region || 'sem descrição'}: ${r ? 'pior ONU ' + fmtDbm(r.worst.v) : 'sem leitura de sinal'}. Abrir detalhes`);
+      continue;
+    }
     el.className = 'hc ' + heatClass(p) + (dim ? ' dim' : '');
     const u = Math.max(p.pd || 0, p.pu || 0), upMax = (p.pu || 0) > (p.pd || 0);
     el.innerHTML = heatText(p);
@@ -1594,8 +1670,20 @@ function renderHeat(o, force){
   }
   for (const el of body.querySelectorAll('[data-hs]')){
     const sl = +el.dataset.hs, act = o.ports.filter(p => p.slot === sl && p.active);
-    el.textContent = '↓ ' + fmtBps(act.reduce((s, p) => s + (p.down || 0), 0));
+    if (ui.heatMetric === 'rx'){
+      const low = act.reduce((s, p) => s + ((p.opt && p.opt.onuRx && p.opt.onuRx.low) || 0), 0);
+      el.textContent = low ? `${low} ${low === 1 ? 'ONU' : 'ONUs'} ≤ ${fmtDbmShort(cfg.rxCrit)}` : 'sinal ok';
+    } else el.textContent = '↓ ' + fmtBps(act.reduce((s, p) => s + (p.down || 0), 0));
   }
+}
+function rxLegend(o){
+  const com = o.ports.filter(p => p.opt && p.opt.onuRx).length;
+  if (!com) return `<div class="legend-row"><span>${o.optSource === 'zte' ? 'O Zabbix ainda não tem leitura de sinal desta OLT.' : 'O Zabbix ainda não coleta o sinal desta OLT. Rode o provisionar-zabbix.py (versão 2) no servidor.'}</span></div>`;
+  return `<div class="legend-row"><span>RX da pior ONU de cada PON (dBm):</span>
+    <span><i class="lg" style="background:var(--ok-bg);outline:1px solid var(--ok-line)"></i>acima de ${esc(fmtDbmShort(cfg.rxWarn))}</span>
+    <span><i class="lg" style="background:var(--warn-500)"></i>${esc(fmtDbmShort(cfg.rxWarn))} a ${esc(fmtDbmShort(cfg.rxCrit))}</span>
+    <span><i class="lg" style="background:var(--danger-500)"></i>${esc(fmtDbmShort(cfg.rxCrit))} ou menos, ou acima de −8</span>
+    <span><i class="lg" style="background:var(--surface-3)"></i>sem leitura</span><span>${com} de ${o.ports.filter(p => p.active).length} PONs com sinal</span></div>`;
 }
 
 /* modo TV */
@@ -1752,9 +1840,10 @@ async function loadSeries(){
   const key = ui.detail, win = ui.dWin;
   ui.dLoading = true; renderChartArea();
   try {
-    const [s, bs] = t.type === 'health' ? [await zHealthSeries(t, win), null] : await Promise.all([zSeries(t, win), t.type === 'pon' ? zBoardSeries(t, win) : null]);
+    const [s, bs, os] = t.type === 'health' ? [await zHealthSeries(t, win), null, null]
+      : await Promise.all([zSeries(t, win), t.type === 'pon' ? zBoardSeries(t, win) : null, t.type === 'pon' ? zOptSeries(t, win).catch(() => null) : null]);
     if (ui.detail !== key || ui.dWin !== win) return;
-    ui.dSeries = { key, win, kind:s.kind, d:s.d || [], u:s.u || [], dAvg:s.dAvg, uAvg:s.uAvg, boards:s.boards, board:bs, at:Date.now(), err:null };
+    ui.dSeries = { key, win, kind:s.kind, d:s.d || [], u:s.u || [], dAvg:s.dAvg, uAvg:s.uAvg, boards:s.boards, board:bs, opt:os, at:Date.now(), err:null };
   } catch(e){
     if (ui.detail !== key) return;
     ui.dSeries = { key, win, d:[], u:[], at:Date.now(), err:e.message };
@@ -1847,22 +1936,84 @@ function renderPortBoard(t){
 }
 function renderOptical(t){
   const box = $('#dOpt'); if (!box) return;
-  const o = byId[t.olt], op = t.opt;
-  if (!op){
-    box.innerHTML = `<div class="opt-none"><b>Não coletado no Zabbix</b><span>${o.optCount ? 'O Zabbix tem itens de sinal desta OLT, mas nenhum desta porta.' : 'Os hosts desta OLT não têm itens de sinal óptico (RX/TX). Quando os itens forem criados, o sinal aparece aqui sozinho.'}</span></div>`;
+  const sec = $('#dOptSec'), o = byId[t.olt], op = t.opt;
+  if (t.type !== 'pon'){
+    const has = op && (op.tx || op.rx);
+    if (sec) sec.hidden = !has;
+    if (!has) return;
+    box.innerHTML = `<div class="d-stats">
+      <div><span>RX do módulo</span><strong>${esc(op.rx ? fmtDbm(op.rx.v) : '—')}</strong><small>recebido do equipamento vizinho</small></div>
+      <div><span>TX do módulo</span><strong>${esc(op.tx ? fmtDbm(op.tx.v) : '—')}</strong><small>enviado pela OLT</small></div></div>`;
+    return;
+  }
+  if (sec) sec.hidden = false;
+  if (!op || (!op.tx && !op.onuRx)){
+    const coleta = o.optSource === 'zte';
+    box.innerHTML = `<div class="opt-none"><b>${coleta ? 'Sem leitura de sinal desta porta' : 'Não coletado no Zabbix'}</b><span>${coleta
+      ? 'O Zabbix já coleta o sinal desta OLT, mas não tem leitura desta PON. Ela pode estar sem ONUs ou a primeira coleta ainda não chegou.'
+      : 'O Zabbix ainda não tem os itens de RX e TX desta OLT. Rode o provisionar-zabbix.py (versão 2) no servidor para criar.'}</span></div>`;
     return;
   }
   const cells = [];
-  cells.push(['TX da porta', op.tx ? fmtDbm(op.tx.v) : '—', op.tx ? 'potência do laser da OLT' : 'sem item', '']);
-  if (op.rx) cells.push(['RX da porta', fmtDbm(op.rx.v), 'recebido na OLT', rxSev(op.rx.v)]);
-  if (op.onuRx){
-    const r = op.onuRx;
-    cells.push(['RX pior ONU', fmtDbm(r.worst.v), 'ONU ' + r.worst.onu, rxSev(r.worst.v)]);
+  cells.push(['TX da porta', op.tx ? fmtDbm(op.tx.v) : '—', op.tx ? 'laser da OLT' + (txSev(op.tx.v) ? ' · fora da faixa usual' : '') : 'sem leitura', txSev(op.tx && op.tx.v)]);
+  const r = op.onuRx;
+  if (r){
+    cells.push(['RX da pior ONU', fmtDbm(r.worst.v), r.worst.onu != null && isFinite(r.worst.onu) ? 'ONU ' + r.worst.onu : '', rxSev(r.worst.v)]);
     cells.push(['RX médio das ONUs', fmtDbm(r.avg), r.n + ' ONUs com leitura', rxSev(r.avg)]);
-    cells.push([`ONUs abaixo de ${fmtDbm(cfg.rxCrit)}`, String(r.low), 'de ' + r.n, r.low ? 'is-danger' : '']);
+    cells.push([`ONUs abaixo de ${fmtDbm(cfg.rxCrit)}`, String(r.low), (r.warn ? r.warn + ' em atenção · ' : '') + 'de ' + r.n + (r.over ? ` · ${r.over} acima de −8 dBm` : ''), r.low ? 'is-danger' : r.warn ? 'is-warn' : '']);
+  } else {
+    cells.push(['RX das ONUs', '—', 'sem leitura', '']);
   }
-  if (!op.rx && !op.onuRx) cells.push(['RX', '—', 'sem item', '']);
-  box.innerHTML = `<div class="d-stats">${cells.map(([l, v, sm, cls]) => `<div class="${cls}"><span>${esc(l)}</span><strong>${esc(v)}</strong><small>${esc(sm)}</small></div>`).join('')}</div>`;
+  const worst = r && r.list ? r.list.slice(0, 12) : [];
+  box.innerHTML = `<div class="d-stats">${cells.map(([l, v, sm, cls]) => `<div class="${cls}"><span>${esc(l)}</span><strong>${esc(v)}</strong><small>${esc(sm)}</small></div>`).join('')}</div>
+    ${worst.length ? `<div class="onu-h">ONUs com o sinal mais fraco</div><div class="onu-list">${worst.map(x => `<span class="onu ${rxSev(x.v)}"><b>ONU ${esc(x.onu)}</b>${esc(fmtDbmShort(x.v))}</span>`).join('')}${r.n > worst.length ? `<span class="onu more">+${r.n - worst.length} ONUs</span>` : ''}</div>` : ''}
+    <div class="opt-chart" id="dOptChart"></div>`;
+  renderOptChart(t);
+}
+function renderOptChart(t){
+  const box = $('#dOptChart'); if (!box || !t.opt) return;
+  const z = t.opt.z || {};
+  if (!z.worst && !z.avg){ box.innerHTML = ''; return; }
+  const s = ui.dSeries && ui.dSeries.key === ui.detail && ui.dSeries.win === ui.dWin ? ui.dSeries.opt : null;
+  if (!s){ box.innerHTML = `<small class="muted">${ui.dLoading ? 'Carregando o histórico do sinal…' : ''}</small>`; return; }
+  const w = z.worst ? (s[String(z.worst.itemid)] || []) : [], a = z.avg ? (s[String(z.avg.itemid)] || []) : [];
+  if (w.length < 2 && a.length < 2){ box.innerHTML = `<small class="muted">Sem histórico do sinal neste período.</small>`; return; }
+  const W = Math.max(300, Math.round(box.clientWidth || 520)), H = 150, PL = 46, PR = 14, PT = 10, PB = 24, iw = W - PL - PR, ih = H - PT - PB;
+  const t1 = Date.now(), t0 = t1 - ui.dWin * HOUR;
+  const vals = [...w, ...a].map(x => x[1]);
+  const lo = Math.floor(Math.min(cfg.rxCrit - 2, ...vals) - 1), hi = Math.ceil(Math.max(-12, ...vals) + 1);
+  const X = tt => PL + clamp((tt - t0) / (t1 - t0), 0, 1) * iw, Y = v => PT + ih - (clamp(v, lo, hi) - lo) / (hi - lo) * ih;
+  const path = arr => arr.length > 1 ? linePath(arr.map(x => [X(x[0]), Y(x[1])])) : '';
+  let grid = '';
+  const step = (hi - lo) > 16 ? 5 : 2;
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) grid += `<line class="chart-grid" x1="${PL}" x2="${PL + iw}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="chart-axis" x="${PL - 8}" y="${(Y(v) + 3.5).toFixed(1)}" text-anchor="end">${fmtDbmShort(v)}</text>`;
+  const thr = (v, cls) => v > lo && v < hi ? `<line class="${cls}" x1="${PL}" x2="${PL + iw}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/>` : '';
+  box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Sinal RX da pior ONU e média, ${winSpan(ui.dWin)}">
+      ${grid}${thr(cfg.rxWarn, 'chart-thr warn')}${thr(cfg.rxCrit, 'chart-thr')}
+      <path class="chart-in" d="${path(a)}"/><path class="chart-out" d="${path(w)}"/>
+    </svg>
+    <div class="chart-legend" style="margin-top:var(--s-2)"><span><i class="sw out"></i>RX da pior ONU</span><span><i class="sw in"></i>RX médio</span><span><i class="thr-sw"></i>Alerta ${esc(fmtDbm(cfg.rxCrit))}</span><span class="dim">${s.kind === 'trend' ? 'pior valor de cada hora' : 'a cada 5 min'}</span></div>`;
+}
+async function zOptSeries(t, winH){
+  const z = t.opt && t.opt.z; if (!z || (!z.worst && !z.avg)) return null;
+  const items = [z.worst, z.avg].filter(Boolean);
+  const from = Math.floor((Date.now() - winH * HOUR) / 1000);
+  const out = Object.fromEntries(items.map(i => [String(i.itemid), []]));
+  let kind = winH >= TREND_FROM ? 'trend' : 'history';
+  if (kind === 'history'){
+    const rows = await zbx('history.get', { history:0, itemids:items.map(i => String(i.itemid)), time_from:from, output:['itemid','clock','value'], sortfield:'clock', sortorder:'ASC', limit:100000 });
+    for (const r of rows || []) if (out[String(r.itemid)]) out[String(r.itemid)].push([+r.clock * 1000, +r.value]);
+    if (winH >= 12 && Object.values(out).every(a => a.length < 2)) kind = 'trend';
+  }
+  if (kind === 'trend'){
+    for (const k in out) out[k] = [];
+    const rows = await zbx('trend.get', { itemids:items.map(i => String(i.itemid)), time_from:from, output:['itemid','clock','value_min','value_avg'], limit:20000 });
+    const worstId = z.worst ? String(z.worst.itemid) : null;
+    for (const r of rows || []){ const k = String(r.itemid); if (out[k]) out[k].push([+r.clock * 1000, k === worstId ? +r.value_min : +r.value_avg]); }
+    for (const k in out) out[k].sort((x, y) => x[0] - y[0]);
+  }
+  out.kind = kind;
+  return out;
 }
 function renderIface(t){
   const box = $('#dIface'); if (!box) return;
@@ -1870,7 +2021,7 @@ function renderIface(t){
     if (!it || it.lastvalue === '' || it.lastvalue == null) return null;
     const v = +it.lastvalue; if (!isFinite(v)) return null;
     const u = String(it.units || '').trim();
-    return nf(v, v % 1 ? 2 : 0) + (u ? ' ' + u : '');
+    return nf(v, v > 0 && v < 0.1 ? 3 : v % 1 ? 2 : 0) + (u ? (u.startsWith('/') ? u : ' ' + u) : '');
   };
   const z = t.zx || {};
   const cells = [
@@ -1917,7 +2068,7 @@ function updateDetail(full){
         <div class="chart-box" id="dChart"></div><div id="dLegend"></div></section>
       <div class="d-stats" id="dStats"></div>
       ${t.type === 'pon' ? `<section><div class="d-sec-h"><h3>Placa ${t.slot} · saúde</h3><small class="muted" id="dBoardWin"></small></div><div class="pb-grid" id="dBoard"></div></section>` : ''}
-      ${t.type === 'pon' ? `<section><div class="d-sec-h"><h3>Sinal óptico</h3><small class="muted">RX atenção ${fmtDbm(cfg.rxWarn)} · alerta ${fmtDbm(cfg.rxCrit)}</small></div><div id="dOpt"></div></section>` : ''}
+      <section id="dOptSec"><div class="d-sec-h"><h3>${t.type === 'pon' ? 'Sinal óptico' : 'Sinal óptico do módulo'}</h3><small class="muted">${t.type === 'pon' ? `RX atenção ${fmtDbm(cfg.rxWarn)} · alerta ${fmtDbm(cfg.rxCrit)}` : ''}</small></div><div id="dOpt"></div></section>
       <section><div class="d-sec-h"><h3>Interface</h3></div><div class="d-stats" id="dIface"></div></section>
       ${loc}
       <section id="dAlerts"></section>`;
@@ -1933,7 +2084,7 @@ function renderChartArea(){
   const t = targets.get(ui.detail);
   if (!box || !t) return;
   if (t.type === 'health') return renderHealthArea(t);
-  renderPortBoard(t);
+  renderPortBoard(t); renderOptChart(t);
   const s = ui.dSeries;
   if (!s || s.key !== ui.detail || s.win !== ui.dWin){
     box.innerHTML = `<div class="empty" style="margin:0">${ui.dLoading ? 'Carregando histórico…' : 'Sem histórico.'}</div>`; leg.innerHTML = ''; st.innerHTML = ''; return;
@@ -1990,8 +2141,6 @@ function fillForm(c){
   $('#fInt').value = c.interval; $('#fSound').checked = !!c.sound; $('#fNotify').checked = !!c.notify;
 }
 function openSettings(){
-  // Defesa na interface: nunca abre configurações sem perfil autorizado.
-  if (!canAccessSettings()) return;
   ui.lastFocus = document.activeElement;
   fillForm(cfg);
   $('#formErr').hidden = true; $('#testOut').textContent = ''; $('#notifyOut').textContent = '';
@@ -2087,19 +2236,19 @@ function bind(){
       return;
     }
     const win = e.target.closest('[data-win]');
-    if (win){ ui.dWin = +win.dataset.win; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin }); for (const b of win.parentElement.children) b.setAttribute('aria-pressed', String(b === win)); loadSeries(); }
+    if (win){ ui.dWin = +win.dataset.win; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin, heatMetric:ui.heatMetric }); for (const b of win.parentElement.children) b.setAttribute('aria-pressed', String(b === win)); loadSeries(); }
   });
   document.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('hist')) ui.histOpen = e.target.open; }, true);
-  $('#chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; ui.filter = b.dataset.f; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
+  $('#chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; ui.filter = b.dataset.f; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin, heatMetric:ui.heatMetric }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
   $('#q').addEventListener('input', e => { ui.q = e.target.value; renderPons(byId[ui.active], false); });
-  $('#sort').addEventListener('change', e => { ui.sort = e.target.value; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin }); renderPons(byId[ui.active], true); });
-  $('#viewSeg').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; ui.view = b.dataset.v; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
+  $('#sort').addEventListener('change', e => { ui.sort = e.target.value; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin, heatMetric:ui.heatMetric }); renderPons(byId[ui.active], true); });
+  $('#metricSeg').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (!b) return; ui.heatMetric = b.dataset.m; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin, heatMetric:ui.heatMetric }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
+  $('#viewSeg').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; ui.view = b.dataset.v; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin, heatMetric:ui.heatMetric }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
   $('#scrim').addEventListener('click', closeDetail);
   $('#setScrim').addEventListener('click', closeSettings);
   $('#setClose').addEventListener('click', closeSettings);
   $('#btnSettings').addEventListener('click', openSettings);
-  // O indicador de conexão também abria configurações; aplique a mesma permissão.
-  $('#srcPill').addEventListener('click', () => { if (canAccessSettings()) openSettings(); });
+  $('#srcPill').addEventListener('click', openSettings);
   $('#btnSound').addEventListener('click', () => { cfg.sound = !cfg.sound; store(STORE, cfg); setSoundBtn(); if (cfg.sound){ ensureAudio(); beep(); toast('Som dos alertas ligado', 'Toca ao abrir um alerta e repete a cada minuto até reconhecer.', 'info', 4000); } });
   $('#btnTv').addEventListener('click', () => setTv(!ui.tv));
   $('#tvExit').addEventListener('click', () => setTv(false));
@@ -2161,28 +2310,6 @@ function start(){
   rebuildIndex();
   renderScreen();
 }
-// Permissões recebidas da sessão do servidor. Perfil ausente = negar por segurança.
-let currentUserRole = null;
-let sessionChecked = false;
-function normalizeRole(value){
-  return String(value ?? '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .trim().toLowerCase();
-}
-function canAccessSettings(){
-  // Sem sessão/perfil confirmado, ou para analista, as configurações ficam bloqueadas.
-  return sessionChecked && !!currentUserRole && !['analista', 'analyst'].includes(currentUserRole);
-}
-function applySettingsPermission(){
-  const allowed = canAccessSettings();
-  const button = $('#btnSettings');
-  const status = $('#srcPill');
-  button.hidden = !allowed;
-  button.title = allowed ? 'Configurações' : 'Configurações indisponíveis para este perfil';
-  status.setAttribute('aria-disabled', String(!allowed));
-  status.title = allowed ? 'Conexão com o Zabbix' : 'Status da conexão com o Zabbix';
-  if (!allowed && !$('#settings').hidden) closeSettings();
-}
 function checkSession(){
   if (!/^https?:$/.test(location.protocol) || typeof fetch !== 'function') return;
   fetch('/sessao', { credentials:'same-origin', cache:'no-store' })
@@ -2190,23 +2317,11 @@ function checkSession(){
     .then(d => {
       if (!d || !d.authenticated || !d.user) return;
       $('#whoName').textContent = d.user;
-      $('#who').querySelector('.who-av').textContent = String(d.user).slice(0, 1);
+      $('#who').querySelector('.who-av').textContent = d.user.slice(0, 1);
       $('#who').title = 'Conectado como ' + d.user;
       $('#who').hidden = false;
-
-      // /sessao deve fornecer o perfil em um destes campos: perfil, role,
-      // tipo_usuario, tipo, cargo, user_role ou userRole.
-      const rawRole = d.perfil ?? d.role ?? d.tipo_usuario ?? d.tipo ?? d.cargo ?? d.user_role ?? d.userRole;
-      currentUserRole = rawRole == null ? null : normalizeRole(rawRole);
-      sessionChecked = true;
-      applySettingsPermission();
     })
-    .catch(() => {
-      // Falha ao validar a sessão: mantém o acesso às configurações bloqueado.
-      currentUserRole = null;
-      sessionChecked = false;
-      applySettingsPermission();
-    });
+    .catch(() => {});
 }
 buildStatic();
 setSoundBtn();

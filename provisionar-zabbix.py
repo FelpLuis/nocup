@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Monitoramento das OLTs no Zabbix da UpDown (UPT-UBUNTU02, porta 19090)
+Monitoramento das OLTs no Zabbix da UpDown (UPT-UBUNTU02, porta 19090) — versão 2
 
   python3 provisionar-zabbix.py
 
 O que faz, em ordem:
   1. entra na API do Zabbix local com o usuário administrador (você digita a senha)
-  2. copia do Zabbix da LV os endereços SNMP e o OID de temperatura das OLTs
-  3. testa o SNMP do servidor até cada OLT e sonda memória e sinal óptico
-  4. cria o template "UpDown ZTE OLT SNMP" (tráfego, estado, velocidade, erros e
-     descartes de cada porta; CPU, memória e temperatura de cada placa)
-  5. cria os hosts OLT C350 VILA NATAL e OLT C300 CASQUEIRO com esse template
-  6. cria o usuário somente leitura "painel-olt" e um token de API para ele
-  7. espera chegarem os primeiros dados e, se você confirmar, troca o painel
-     (nginx /zbx-api) para este Zabbix
+  2. pede a comunidade SNMP de cada OLT (C350 e C300 são diferentes) e testa
+  3. sonda memória, sinal RX das ONUs e a tabela óptica (TX) de cada OLT
+  4. cria/atualiza o template "UpDown ZTE OLT SNMP":
+       - tráfego, estado, velocidade, erros e descartes de cada porta
+       - CPU, memória e temperatura de cada placa
+       - sinal RX das ONUs resumido por PON (pior, média, quantidade, abaixo do limite, lista)
+       - TX de cada porta PON e RX/TX dos módulos de uplink
+  5. cria/atualiza os hosts OLT C350 VILA NATAL e OLT C300 CASQUEIRO
+  6. usuário somente leitura "painel-olt" com token (reaproveita o atual se ainda vale)
+  7. espera os primeiros dados e deixa o painel (nginx /zbx-api) apontado para este Zabbix
 
-Pode rodar de novo: o que já existe é reaproveitado, nada é duplicado.
-Nenhuma senha fica gravada; a comunidade SNMP vai como macro secreta no host.
+Pode rodar de novo: o que já existe é reaproveitado ou atualizado, nada é duplicado.
+Nenhuma senha fica gravada; as comunidades SNMP vão como macro secreta em cada host.
 """
 import getpass
 import json
@@ -38,8 +40,8 @@ STATE_DIR = os.environ.get("STATE_DIR", "/etc/painel-olt")
 PROBE_FILE = os.environ.get("PROBE_FILE", "/root/olt-sondagem-snmp.txt")
 
 OLTS = [
-    {"nome": "OLT C350 VILA NATAL", "ip": "172.16.255.1", "lv_hostid": "29174"},
-    {"nome": "OLT C300 CASQUEIRO", "ip": "172.16.255.3", "lv_hostid": "29173"},
+    {"nome": "OLT C350 VILA NATAL", "curto": "C350", "ip": "172.16.255.1", "lv_hostid": "29174"},
+    {"nome": "OLT C300 CASQUEIRO", "curto": "C300", "ip": "172.16.255.3", "lv_hostid": "29173"},
 ]
 HOST_GROUP = "OLTs UpDown"
 TEMPLATE = "UpDown ZTE OLT SNMP"
@@ -48,20 +50,120 @@ PANEL_USER = "painel-olt"
 PANEL_GROUP = "Painel OLT - leitura"
 TOKEN_NAME = "Painel das OLTs"
 
+SYSNAME = "1.3.6.1.2.1.1.5.0"
+IFNAME = "1.3.6.1.2.1.31.1.1.1.1"
 # Tabela de placas da ZTE (ZXAN): índice rack.shelf.slot, ex. 1.1.13
-CPU_BASE = "1.3.6.1.4.1.3902.1015.2.1.1.3.1.9"     # carga de CPU (%), o mesmo que a LV coleta
-MEM_BASE = "1.3.6.1.4.1.3902.1015.2.1.1.3.1.11"    # uso de memória (%), confirmado pela sondagem
+CPU_BASE = "1.3.6.1.4.1.3902.1015.2.1.1.3.1.9"
+MEM_BASE = "1.3.6.1.4.1.3902.1015.2.1.1.3.1.11"
 TEMP_BASE_DEFAULT = "1.3.6.1.4.1.3902.1015.2.1.3.13.5.1.1"
-OPT_CANDIDATES = [
-    ("Tabela óptica das portas", "1.3.6.1.4.1.3902.1015.3.1.13.1"),
-    ("RX das ONUs medido na OLT", "1.3.6.1.4.1.3902.1015.1010.11.2.1.2"),
-    ("Óptica das ONUs (GPON)", "1.3.6.1.4.1.3902.1012.3.50.12.1.1"),
+# Sinal das ONUs: (OID, formato). "milli" = milésimos de dBm; "zte002" = valor*0,002-30
+ONU_RX_CANDIDATES = [
+    ("1.3.6.1.4.1.3902.1015.1010.11.2.1.2", "milli"),
+    ("1.3.6.1.4.1.3902.1012.3.50.12.1.1.10", "zte002"),
 ]
+OPT_TABLE = "1.3.6.1.4.1.3902.1015.3.1.13.1"      # módulos ópticos das portas (colunas: RX, TX, …)
+INVALIDO = 2147483647
 
 IF_FILTER = r"^(gpon|xgs|xg-pon|epon|xgei|gei|smartgroup)"
 PREP_CHANGE = {"type": 10, "params": "", "error_handler": 0, "error_handler_params": ""}
+
+
 def prep_mult(n):
     return {"type": 1, "params": str(n), "error_handler": 0, "error_handler_params": ""}
+
+
+def prep_js(code):
+    return {"type": 21, "params": code, "error_handler": 0, "error_handler_params": ""}
+
+
+def prep_jsonpath(path, discard=False):
+    return {"type": 12, "params": path, "error_handler": 1 if discard else 0, "error_handler_params": ""}
+
+
+# ------------------------------------------------------------------ JavaScript do Zabbix (ES5)
+# O mesmo decodificador de índice nos dois resumos:
+#   0x11RRSSPP  (ifIndex do IF-MIB)        -> RR/SS/PP
+#   0x10SSPP00  (índice de PON da ZTE)     -> 1/SS/PP, com PP a partir de 0 quando a tabela tem PP=0
+JS_ONU_RX = r"""
+var BASE = '{$ONU.RX.OID}'.replace(/^\./, '') + '.';
+var FMT = '{$ONU.RX.FMT}';
+var LOW = parseFloat('{$ONU.RX.LOW}');
+if (isNaN(LOW)) LOW = -28;
+var lines = String(value).split('\n'), rows = [], zero = false;
+for (var i = 0; i < lines.length; i++) {
+  var m = /^\.?([0-9.]+)\s*=\s*[A-Za-z0-9 -]+:\s*"?(-?[0-9.]+)/.exec(lines[i]);
+  if (!m || m[1].indexOf(BASE) !== 0) continue;
+  var idx = m[1].substr(BASE.length).split('.');
+  if (idx.length < 2) continue;
+  var p = parseInt(idx[0], 10), onu = parseInt(idx[idx.length - 1], 10), raw = parseFloat(m[2]), dbm;
+  if (isNaN(p) || isNaN(onu) || isNaN(raw)) continue;
+  if (FMT === 'zte002') { if (raw <= 0 || raw >= 32768) continue; dbm = raw * 0.002 - 30; }
+  else { if (raw <= -2147483647 || raw >= 2147483647) continue; dbm = raw / 1000; }
+  if (!(dbm > -50 && dbm < 10)) continue;
+  var top = (p >>> 24) & 255;
+  if (top === 17) rows.push([(p >>> 16) & 255, (p >>> 8) & 255, p & 255, onu, dbm, false]);
+  else { var pb = (p >>> 8) & 255; if (pb === 0) zero = true; rows.push([1, (p >>> 16) & 255, pb, onu, dbm, true]); }
+}
+var out = {};
+for (var j = 0; j < rows.length; j++) {
+  var r = rows[j], key = r[0] + '/' + r[1] + '/' + (r[2] + (r[5] && zero ? 1 : 0));
+  var o = out[key];
+  if (!o) o = out[key] = { n: 0, sum: 0, min: null, minOnu: null, low: 0, onus: [] };
+  var v = Math.round(r[4] * 100) / 100;
+  o.n++; o.sum += v;
+  if (o.min === null || v < o.min) { o.min = v; o.minOnu = r[3]; }
+  if (v <= LOW) o.low++;
+  o.onus.push([r[3], v]);
+}
+for (var k in out) {
+  var q = out[k];
+  q.avg = Math.round(q.sum / q.n * 100) / 100;
+  delete q.sum;
+  q.onus.sort(function (a, b) { return a[1] - b[1]; });
+}
+return JSON.stringify(out);
+"""
+
+JS_OPT = r"""
+var BASE = '1.3.6.1.4.1.3902.1015.3.1.13.1.';
+var TX = parseInt('{$OPT.TX.COL}', 10) || 0, RX = parseInt('{$OPT.RX.COL}', 10) || 0;
+var SCALE = parseFloat('{$OPT.SCALE}') || 1000;
+var lines = String(value).split('\n'), rows = [], zero = false;
+for (var i = 0; i < lines.length; i++) {
+  var m = /^\.?([0-9.]+)\s*=\s*[A-Za-z0-9 -]+:\s*"?(-?[0-9.]+)/.exec(lines[i]);
+  if (!m || m[1].indexOf(BASE) !== 0) continue;
+  var parts = m[1].substr(BASE.length).split('.');
+  if (parts.length < 2) continue;
+  var col = parseInt(parts[0], 10), p = parseInt(parts[1], 10), raw = parseFloat(m[2]);
+  if (isNaN(p) || isNaN(raw) || (col !== TX && col !== RX)) continue;
+  var top = (p >>> 24) & 255, pb = (p >>> 8) & 255;
+  if (top !== 17 && pb === 0) zero = true;
+  if (raw <= -2147483647 || raw >= 2147483647) continue;
+  var dbm = raw / SCALE;
+  if (!(dbm > -50 && dbm < 15)) continue;
+  if (top === 17) rows.push([(p >>> 16) & 255, (p >>> 8) & 255, p & 255, col, dbm, false]);
+  else rows.push([1, (p >>> 16) & 255, pb, col, dbm, true]);
+}
+var out = {};
+for (var j = 0; j < rows.length; j++) {
+  var r = rows[j], key = r[0] + '/' + r[1] + '/' + (r[2] + (r[5] && zero ? 1 : 0));
+  var o = out[key] || (out[key] = {});
+  o[r[3] === TX ? 'tx' : 'rx'] = Math.round(r[4] * 100) / 100;
+}
+return JSON.stringify(out);
+"""
+
+JS_LLD_PON = r"""
+var o = JSON.parse(value), a = [];
+for (var k in o) a.push({ '{#PON}': k });
+return JSON.stringify(a);
+"""
+
+JS_LLD_PORT = r"""
+var o = JSON.parse(value), a = [];
+for (var k in o) a.push({ '{#PORT}': k });
+return JSON.stringify(a);
+"""
 
 
 def ok(m):    print("\033[32m✔\033[0m " + m, flush=True)
@@ -80,6 +182,10 @@ def pergunta(texto, padrao="n"):
     return (r or padrao) in ("s", "sim", "y", "yes")
 
 
+def dbm(v):
+    return ("%+.2f dBm" % v).replace("-", "−").replace(".", ",")
+
+
 class ZbxError(Exception):
     pass
 
@@ -95,7 +201,7 @@ class Api:
             headers["Authorization"] = "Bearer " + self.token
         req = urllib.request.Request(self.url, json.dumps(body).encode("utf-8"), headers)
         try:
-            with urllib.request.urlopen(req, timeout=90) as resp:
+            with urllib.request.urlopen(req, timeout=120) as resp:
                 data = json.load(resp)
         except urllib.error.HTTPError as e:
             raise ZbxError("%s: HTTP %s" % (method, e.code))
@@ -116,9 +222,9 @@ def versao(v):
 # ---------------------------------------------------------------- SNMP
 
 def garantir_snmp():
-    if shutil.which("snmpget") and shutil.which("snmpwalk"):
+    if shutil.which("snmpget") and shutil.which("snmpbulkwalk"):
         return True
-    info("Instalando as ferramentas SNMP (pacote snmp) para testar as OLTs…")
+    info("Instalando as ferramentas SNMP (pacote snmp)…")
     r = subprocess.run(["apt-get", "install", "-y", "snmp"], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     if r.returncode != 0 or not shutil.which("snmpget"):
         aviso("Não consegui instalar o pacote snmp: " + r.stderr.strip()[-200:])
@@ -126,8 +232,8 @@ def garantir_snmp():
     return True
 
 
-def snmp(cmd, comunidade, ip, oid, timeout=40):
-    args = [cmd, "-v2c", "-c", comunidade, "-On", "-t", "3", "-r", "1"]
+def snmp(cmd, comunidade, ip, oid, timeout=60, espera=5):
+    args = [cmd, "-v2c", "-c", comunidade, "-On", "-t", str(espera), "-r", "1"]
     if cmd == "snmpbulkwalk":
         args += ["-Cr25"]
     try:
@@ -138,7 +244,7 @@ def snmp(cmd, comunidade, ip, oid, timeout=40):
 
 
 def valores(saida, base):
-    """{índice: valor} de uma saída snmpwalk -On."""
+    """{índice: valor} de uma saída snmpwalk -On (número quando dá, texto quando não)."""
     out = {}
     pref = "." + base.lstrip(".") + "."
     for linha in saida.splitlines():
@@ -151,6 +257,142 @@ def valores(saida, base):
         except (ValueError, IndexError):
             out[idx] = val
     return out
+
+
+def decodificador(indices):
+    """Mesmo critério do JavaScript: índice de PON da ZTE -> '1/slot/porta'."""
+    ints = [int(i) for i in indices]
+    zero = any(((p >> 24) & 255) != 17 and ((p >> 8) & 255) == 0 for p in ints)
+
+    def nome(p):
+        p = int(p)
+        if ((p >> 24) & 255) == 17:
+            return "%d/%d/%d" % ((p >> 16) & 255, (p >> 8) & 255, p & 255)
+        return "1/%d/%d" % ((p >> 16) & 255, ((p >> 8) & 255) + (1 if zero else 0))
+    return nome
+
+
+def tipos_de_porta(com, ip):
+    """{'1/2/1': 'pon', '1/0/1': 'up'} a partir do ifName."""
+    tipos = {}
+    for _, nome in valores(snmp("snmpbulkwalk", com, ip, IFNAME, timeout=90), IFNAME).items():
+        m = re.match(r"^([a-z0-9-]+?)(?:-olt)?_(\d+)/(\d+)/(\d+)$", str(nome), re.I)
+        if not m:
+            continue
+        t = m.group(1).lower()
+        k = "%s/%s/%s" % (m.group(2), m.group(3), m.group(4))
+        if t.startswith(("gpon", "xgs", "xg-pon", "epon")):
+            tipos[k] = "pon"
+        elif t.endswith("gei") or t.startswith(("xgei", "gei", "xxgei", "cgei")):
+            tipos[k] = "up"
+    return tipos
+
+
+def sondar_onu_rx(com, ip, relatorio):
+    for oid, fmt in ONU_RX_CANDIDATES:
+        saida = snmp("snmpbulkwalk", com, ip, oid, timeout=240)
+        brutos = valores(saida, oid)
+        bons = {}
+        for idx, raw in brutos.items():
+            if not isinstance(raw, float) or "." not in idx:
+                continue
+            v = raw * 0.002 - 30 if fmt == "zte002" else raw / 1000.0
+            if fmt == "zte002" and not (0 < raw < 32768):
+                continue
+            if -50 < v < 10:
+                bons[idx] = v
+        relatorio.append("ONU RX %s (%s): %d leituras, %d válidas" % (oid, fmt, len(brutos), len(bons)))
+        relatorio.extend("   %s = %.2f dBm" % (k, v) for k, v in list(bons.items())[:8])
+        if len(bons) >= 3:
+            nome = decodificador([k.split(".")[0] for k in bons])
+            pons = {}
+            for k, v in bons.items():
+                pons.setdefault(nome(k.split(".")[0]), []).append(v)
+            return {"oid": oid, "fmt": fmt, "onus": len(bons), "pons": pons}
+    return None
+
+
+def sondar_modulos(com, ip, tipos, relatorio):
+    saida = snmp("snmpbulkwalk", com, ip, OPT_TABLE, timeout=240)
+    cols = {}
+    pref = "." + OPT_TABLE + "."
+    for linha in saida.splitlines():
+        m = re.match(r"^(\.[\d.]+)\s*=\s*\w[\w\- ]*:\s*\"?(-?[\d.]+)", linha)
+        if not m or not m.group(1).startswith(pref):
+            continue
+        partes = m.group(1)[len(pref):].split(".")
+        if len(partes) != 2:
+            continue
+        cols.setdefault(int(partes[0]), {})[int(partes[1])] = float(m.group(2))
+    if not cols:
+        relatorio.append("Tabela óptica %s: sem resposta" % OPT_TABLE)
+        return None
+    todos = set()
+    for c in cols.values():
+        todos.update(c.keys())
+    nome = decodificador(todos)
+    relatorio.append("Tabela óptica %s: %d colunas" % (OPT_TABLE, len(cols)))
+    amostra_pon = next((i for i in sorted(todos) if tipos.get(nome(i)) == "pon" and any(abs(c.get(i, INVALIDO)) < INVALIDO for c in cols.values())), None)
+    amostra_up = next((i for i in sorted(todos) if tipos.get(nome(i)) == "up" and abs(cols.get(1, {}).get(i, INVALIDO)) < INVALIDO), None)
+    for col in sorted(cols):
+        relatorio.append("   coluna %2d: PON %s = %s · uplink %s = %s" % (
+            col, nome(amostra_pon) if amostra_pon is not None else "-", cols[col].get(amostra_pon, "-"),
+            nome(amostra_up) if amostra_up is not None else "-", cols[col].get(amostra_up, "-")))
+
+    def separa(col, escala):
+        pon, up = {}, {}
+        for i, v in cols[col].items():
+            if abs(v) >= INVALIDO:
+                continue
+            t = tipos.get(nome(i))
+            if t == "pon":
+                pon[nome(i)] = v / escala
+            elif t == "up":
+                up[nome(i)] = v / escala
+        return pon, up
+
+    def mediana(xs):
+        xs = sorted(xs)
+        return xs[len(xs) // 2]
+
+    candidatos_tx = []
+    for escala in (1000.0, 100.0):
+        for col in cols:
+            pon, up = separa(col, escala)
+            if len(pon) < 3:
+                continue
+            vs = list(pon.values())
+            if not all(-1 <= x <= 10 for x in vs) or not (0.5 <= mediana(vs) <= 9):
+                continue
+            distintos = len({round(x, 2) for x in vs})
+            if distintos < 3:
+                continue
+            if up and not (-12 <= mediana(list(up.values())) <= 2.5):
+                continue
+            candidatos_tx.append(((bool(up), distintos, -col, escala), col, escala, pon, up))
+    if not candidatos_tx:
+        relatorio.append("TX das PONs: nenhuma coluna com valores de TX de GPON")
+        return {"tx": 0, "rx": 0, "escala": 1000.0}
+    candidatos_tx.sort(key=lambda c: c[0], reverse=True)
+    _, tx_col, escala, tx_pon, tx_up = candidatos_tx[0]
+
+    rx_col, rx_up = 0, {}
+    pons_total = sum(1 for t in tipos.values() if t == "pon")
+    for col in sorted(cols):
+        if col == tx_col:
+            continue
+        pon, up = separa(col, escala)
+        if not up or len(pon) > max(1, pons_total // 10):
+            continue
+        vs = list(up.values())
+        if not all(-30 <= x <= 5 for x in vs):
+            continue
+        if len(vs) >= 2 and len({round(x, 2) for x in vs}) < 2:
+            continue
+        rx_col, rx_up = col, up
+        break
+    relatorio.append("TX: coluna %d, escala %d · RX dos uplinks: coluna %d" % (tx_col, escala, rx_col))
+    return {"tx": tx_col, "rx": rx_col, "escala": escala, "tx_pon": tx_pon, "tx_up": tx_up, "rx_up": rx_up}
 
 
 # ---------------------------------------------------------------- Zabbix: utilidades
@@ -166,9 +408,7 @@ def get_or_create(api, obj, filtro, criar, idfield):
 def main():
     if os.geteuid() != 0:
         falha("Rode como root.")
-    print("\nMonitoramento das OLTs no Zabbix da UpDown\n")
-
-    # 1. Zabbix local
+    print("\nMonitoramento das OLTs no Zabbix da UpDown — versão 2\n")
     api = Api(LOCAL_URL)
     try:
         v = api.call("apiinfo.version", auth=False)
@@ -176,7 +416,7 @@ def main():
         falha("A API do Zabbix não respondeu em %s (%s). Se ela estiver em outro endereço, rode com ZBX_URL=http://…/api_jsonrpc.php" % (LOCAL_URL, e))
     ok("Zabbix %s respondendo em %s" % (v, LOCAL_URL))
     if versao(v) < (6, 4):
-        falha("Este Zabbix é anterior ao 6.4; o painel precisa do token no cabeçalho, que só existe a partir do 6.4.")
+        falha("Este Zabbix é anterior ao 6.4; o sinal óptico usa a coleta walk[], que só existe a partir do 6.4.")
     usuario = input("Usuário administrador do Zabbix [Admin]: ").strip() or "Admin"
     senha = getpass.getpass("Senha de %s (não aparece na tela): " % usuario)
     try:
@@ -185,7 +425,6 @@ def main():
         falha("Não entrou no Zabbix: " + str(e))
     senha = None
     ok("Entrou no Zabbix como " + usuario)
-
     try:
         executar(api, v)
     finally:
@@ -195,8 +434,24 @@ def main():
             pass
 
 
+def pedir_comunidade(o, snmp_ok):
+    for tentativa in range(3):
+        extra = ", Enter para pular" if tentativa else ""
+        c = getpass.getpass("Comunidade SNMP da %s (%s; não aparece na tela%s): " % (o["curto"], o["ip"], extra)).strip()
+        if not c:
+            return None
+        if not snmp_ok:
+            return c
+        resp = snmp("snmpget", c, o["ip"], SYSNAME, timeout=25, espera=8).strip()
+        if resp:
+            ok("%s respondeu (%s)" % (o["curto"], resp.split("=", 1)[-1].strip()))
+            return c
+        aviso("A %s não respondeu com essa comunidade. Confira maiúsculas, minúsculas e espaços." % o["curto"])
+    return None
+
+
 def executar(api, versao_zbx):
-    # 2. dados do Zabbix da LV (IP, comunidade, OID de temperatura)
+    v7 = versao(versao_zbx) >= (7, 0)
     estado = {}
     try:
         with open(os.path.join(STATE_DIR, "zabbix-olts.json"), encoding="utf-8") as f:
@@ -204,94 +459,61 @@ def executar(api, versao_zbx):
     except (OSError, ValueError):
         pass
     temp_base = estado.get("temp_base", TEMP_BASE_DEFAULT)
-    comunidade_lv = None
-    lv_token = None
-    try:
-        conf = open(NGINX_SITE, encoding="utf-8").read()
-        if "zbx7.lv.network" in conf:
-            m = re.search(r"Bearer ([A-Za-z0-9]{16,})", conf)
-            lv_token = m.group(1) if m else None
-    except OSError:
-        pass
-    if lv_token:
-        lv = Api(LV_URL, lv_token)
-        try:
-            hosts = lv.call("host.get", {"hostids": [o["lv_hostid"] for o in OLTS], "output": ["hostid", "name"], "selectInterfaces": "extend"})
-            for h in hosts or []:
-                olt = next((o for o in OLTS if o["lv_hostid"] == h["hostid"]), None)
-                snmpif = next((i for i in h.get("interfaces", []) if str(i.get("type")) == "2"), None)
-                if olt and snmpif:
-                    olt["ip"] = snmpif.get("ip") or olt["ip"]
-                    olt["port"] = snmpif.get("port") or "161"
-                    com = (snmpif.get("details") or {}).get("community", "")
-                    if com and not com.startswith("{$"):
-                        comunidade_lv = com
-            temps = lv.call("item.get", {"hostids": [OLTS[0]["lv_hostid"]], "output": ["name", "snmp_oid"],
-                                         "search": {"name": "Temperatura Placa"}, "limit": 5})
-            for it in temps or []:
-                m = re.search(r"(\d+\.\d+\.\d+)\s*$", it["name"])
-                oid = (it.get("snmp_oid") or "").lstrip(".")
-                if m and oid.endswith("." + m.group(1)):
-                    temp_base = oid[: -len(m.group(1)) - 1]
-                    break
-            ok("Copiado do Zabbix da LV: endereços SNMP das OLTs e o OID de temperatura")
-        except ZbxError as e:
-            aviso("Não consegui ler o Zabbix da LV (%s); sigo com os endereços conhecidos." % e)
     for o in OLTS:
         info("%s → %s:%s" % (o["nome"], o["ip"], o.get("port", "161")))
 
-    # 3. SNMP até as OLTs
-    comunidade = None
-    if comunidade_lv and pergunta("Usar a mesma comunidade SNMP que o Zabbix da LV usa?", "s"):
-        comunidade = comunidade_lv
-    if not comunidade:
-        comunidade = getpass.getpass("Comunidade SNMP das OLTs (não aparece na tela): ").strip()
-    if not comunidade:
-        falha("Sem comunidade SNMP não dá para monitorar as OLTs.")
+    # 1. comunidades e sondagem
+    snmp_ok = garantir_snmp()
+    relatorio = []
+    mem_ok = bool(estado.get("mem"))
+    for o in OLTS:
+        o["com"] = pedir_comunidade(o, snmp_ok)
+        if not o["com"]:
+            aviso("%s: sem comunidade confirmada; a macro atual do host fica como está e a sondagem é pulada." % o["curto"])
+            continue
+        if not snmp_ok:
+            continue
+        relatorio.append("== %s (%s)" % (o["nome"], o["ip"]))
+        cpu = valores(snmp("snmpbulkwalk", o["com"], o["ip"], CPU_BASE), CPU_BASE)
+        mem = valores(snmp("snmpbulkwalk", o["com"], o["ip"], MEM_BASE), MEM_BASE)
+        bons = [x for k, x in mem.items() if isinstance(x, float) and 0 <= x <= 100 and k in cpu]
+        relatorio.append("CPU: %d placas · memória: %d placas" % (len(cpu), len(bons)))
+        if cpu and len(bons) >= max(1, len(cpu) // 2):
+            mem_ok = True
+            ok("  memória por placa: %d placas" % len(bons))
+        else:
+            aviso("  memória por placa não respondeu no OID esperado")
 
-    mem_ok = False
-    sondagem = []
-    if garantir_snmp():
-        alcancadas = 0
-        for o in OLTS:
-            nome = snmp("snmpget", comunidade, o["ip"], "1.3.6.1.2.1.1.5.0", timeout=15).strip()
-            if not nome:
-                aviso("%s (%s) não respondeu ao SNMP a partir deste servidor." % (o["nome"], o["ip"]))
-                o["snmp"] = False
-                continue
-            o["snmp"] = True
-            alcancadas += 1
-            ok("%s respondeu ao SNMP (%s)" % (o["nome"], nome.split("=", 1)[-1].strip()))
-            cpu = valores(snmp("snmpbulkwalk", comunidade, o["ip"], CPU_BASE), CPU_BASE)
-            mem = valores(snmp("snmpbulkwalk", comunidade, o["ip"], MEM_BASE), MEM_BASE)
-            bons = [v for k, v in mem.items() if isinstance(v, float) and 0 <= v <= 100 and k in cpu]
-            if cpu and len(bons) >= max(1, len(cpu) // 2):
-                mem_ok = True
-                ok("  memória por placa encontrada (%d placas, ex.: %s%%)" % (len(bons), int(bons[0])))
-            else:
-                aviso("  a OLT não devolveu memória por placa no OID esperado")
-            sondagem.append("== %s (%s)" % (o["nome"], o["ip"]))
-            sondagem.append("CPU %s: %d placas %s" % (CPU_BASE, len(cpu), dict(list(cpu.items())[:6])))
-            sondagem.append("MEM %s: %d placas %s" % (MEM_BASE, len(mem), dict(list(mem.items())[:6])))
-            for rotulo, oid in OPT_CANDIDATES:
-                out = snmp("snmpbulkwalk", comunidade, o["ip"], oid, timeout=60)
-                linhas = [l for l in out.splitlines() if l.startswith(".") and not re.search(r"No Such|No more variables|No Such Instance", l)]
-                sondagem.append("%s %s: %d linhas" % (rotulo, oid, len(linhas)))
-                sondagem.extend("   " + l for l in linhas[:25])
-                if linhas:
-                    info("  sinal óptico: %s respondeu (%d valores)" % (rotulo.lower(), len(linhas)))
-        if sondagem:
-            with open(PROBE_FILE, "w", encoding="utf-8") as f:
-                f.write("\n".join(sondagem) + "\n")
-            os.chmod(PROBE_FILE, 0o600)
-            info("Resultado da sondagem SNMP salvo em " + PROBE_FILE)
-        if not alcancadas and not pergunta("Nenhuma OLT respondeu ao SNMP deste servidor. Criar os hosts mesmo assim?"):
-            falha("Parado antes de criar os hosts. Libere o SNMP (UDP 161) deste servidor até 172.16.255.1 e .3 e rode de novo.")
-    else:
-        aviso("Sem as ferramentas SNMP não deu para testar as OLTs; a memória entra no template e será validada pelo próprio Zabbix.")
-        mem_ok = True
+        info("  lendo o sinal das ONUs (pode levar 1 a 2 min)…")
+        o["onu"] = sondar_onu_rx(o["com"], o["ip"], relatorio)
+        if o["onu"]:
+            todos = [x for vs in o["onu"]["pons"].values() for x in vs]
+            pior_pon = min(o["onu"]["pons"], key=lambda k: min(o["onu"]["pons"][k]))
+            ok("  sinal RX de %d ONUs em %d PONs (pior: %s na PON %s; média %s)" % (
+                len(todos), len(o["onu"]["pons"]), dbm(min(todos)), pior_pon, dbm(sum(todos) / len(todos))))
+        else:
+            aviso("  a OLT não devolveu o sinal das ONUs nos OIDs conhecidos")
 
-    # 4. grupos e template
+        tipos = tipos_de_porta(o["com"], o["ip"])
+        o["mod"] = sondar_modulos(o["com"], o["ip"], tipos, relatorio)
+        mod = o["mod"]
+        if mod and mod["tx"]:
+            ex = list(mod["tx_pon"].items())[:4]
+            print("  TX das PONs (coluna %d): %s" % (mod["tx"], " · ".join("%s %s" % (k, dbm(x)) for k, x in ex)))
+            if mod["rx"]:
+                print("  RX dos uplinks (coluna %d): %s" % (mod["rx"], " · ".join("%s %s" % (k, dbm(x)) for k, x in list(mod["rx_up"].items())[:4])))
+            if not pergunta("  Esses valores de TX parecem certos? (GPON costuma ficar entre +1,5 e +7 dBm)", "s"):
+                mod["tx"] = mod["rx"] = 0
+                aviso("  TX desligado para a %s; mande o arquivo %s para revisar." % (o["curto"], PROBE_FILE))
+        else:
+            aviso("  TX das PONs não identificado na tabela óptica")
+    if relatorio:
+        with open(PROBE_FILE, "w", encoding="utf-8") as f:
+            f.write("\n".join(relatorio) + "\n")
+        os.chmod(PROBE_FILE, 0o600)
+        info("Detalhes da sondagem em " + PROBE_FILE)
+
+    # 2. grupos e template
     gid, novo = get_or_create(api, "hostgroup", {"name": [HOST_GROUP]}, {"name": HOST_GROUP}, "groupid")
     (ok if novo else info)("Grupo de hosts %s" % HOST_GROUP)
     if versao(versao_zbx) >= (6, 2):
@@ -300,9 +522,31 @@ def executar(api, versao_zbx):
         tgid, _ = get_or_create(api, "hostgroup", {"name": [TEMPLATE_GROUP]}, {"name": TEMPLATE_GROUP}, "groupid")
     tid, novo = get_or_create(api, "template", {"host": [TEMPLATE]},
                               {"host": TEMPLATE, "name": TEMPLATE, "groups": [{"groupid": tgid}],
-                               "description": "Tráfego das portas PON e uplinks, CPU, memória e temperatura das placas ZTE (C300/C350). Criado pelo provisionar-zabbix.py do Painel das OLTs."},
+                               "description": "Tráfego, saúde das placas e sinal óptico de OLTs ZTE (C300/C350). Criado pelo provisionar-zabbix.py do Painel das OLTs."},
                               "templateid")
     (ok if novo else info)("Template %s" % TEMPLATE)
+
+    def macro(hostid, nome, valor, descr="", secreta=False):
+        r = api.call("usermacro.get", {"hostids": [hostid], "filter": {"macro": [nome]}, "output": ["hostmacroid", "value"]})
+        p = {"value": str(valor), "type": 1 if secreta else 0}
+        if descr:
+            p["description"] = descr
+        if r:
+            api.call("usermacro.update", dict(p, hostmacroid=r[0]["hostmacroid"]))
+        else:
+            api.call("usermacro.create", dict(p, hostid=hostid, macro=nome))
+
+    def macro_padrao(nome, valor, descr):
+        r = api.call("usermacro.get", {"hostids": [tid], "filter": {"macro": [nome]}, "output": ["hostmacroid"]})
+        if not r:
+            api.call("usermacro.create", {"hostid": tid, "macro": nome, "value": str(valor), "description": descr})
+
+    macro_padrao("{$ONU.RX.OID}", ONU_RX_CANDIDATES[0][0], "OID do sinal RX das ONUs")
+    macro_padrao("{$ONU.RX.FMT}", "milli", "milli = milésimos de dBm; zte002 = valor*0,002-30")
+    macro_padrao("{$ONU.RX.LOW}", "-28", "ONU com RX igual ou abaixo deste valor conta como sinal baixo (dBm)")
+    macro_padrao("{$OPT.TX.COL}", "0", "Coluna de TX na tabela óptica (0 = não coletar)")
+    macro_padrao("{$OPT.RX.COL}", "0", "Coluna de RX na tabela óptica (0 = não coletar)")
+    macro_padrao("{$OPT.SCALE}", "1000", "Divisor dos valores da tabela óptica para chegar em dBm")
 
     def regra(key, nome, oid, filtro=None, delay="10m"):
         r = api.call("discoveryrule.get", {"templateids": [tid], "filter": {"key_": [key]}, "output": ["itemid"]})
@@ -313,11 +557,32 @@ def executar(api, versao_zbx):
             p["filter"] = filtro
         return api.call("discoveryrule.create", p)["itemids"][0]
 
-    def prototipos(ruleid, lista):
-        existentes = {x["key_"] for x in api.call("itemprototype.get", {"discoveryids": [ruleid], "output": ["key_"]}) or []}
+    def regra_dependente(key, nome, master, js):
+        p = {"name": nome, "type": 18, "master_itemid": master, "lifetime": "7d", "preprocessing": [prep_js(js)]}
+        r = api.call("discoveryrule.get", {"templateids": [tid], "filter": {"key_": [key]}, "output": ["itemid"]})
+        if r:
+            api.call("discoveryrule.update", dict(p, itemid=r[0]["itemid"]))
+            return r[0]["itemid"]
+        return api.call("discoveryrule.create", dict(p, hostid=tid, key_=key))["itemids"][0]
+
+    def item(p):
+        r = api.call("item.get", {"templateids": [tid], "filter": {"key_": [p["key_"]]}, "output": ["itemid"]})
+        if r:
+            upd = {k: x for k, x in p.items() if k not in ("key_", "type", "value_type")}
+            api.call("item.update", dict(upd, itemid=r[0]["itemid"]))
+            return r[0]["itemid"]
+        return api.call("item.create", dict(p, hostid=tid))["itemids"][0]
+
+    def prototipos(ruleid, lista, atualizar=False):
+        existentes = {x["key_"]: x["itemid"] for x in api.call("itemprototype.get", {"discoveryids": [ruleid], "output": ["key_", "itemid"]}) or []}
         novos = [dict(p, ruleid=ruleid, hostid=tid) for p in lista if p["key_"] not in existentes]
         if novos:
             api.call("itemprototype.create", novos)
+        if atualizar:
+            for p in lista:
+                if p["key_"] in existentes:
+                    upd = {k: x for k, x in p.items() if k not in ("key_", "type", "value_type", "master_itemid")}
+                    api.call("itemprototype.update", dict(upd, itemid=existentes[p["key_"]]))
         return len(novos)
 
     if_rule = regra("olt.if.discovery", "Portas da OLT (PON e uplinks)",
@@ -337,15 +602,15 @@ def executar(api, versao_zbx):
          "snmp_oid": "1.3.6.1.2.1.31.1.1.1.15.{#SNMPINDEX}", "value_type": 3, "units": "bps", "delay": "1h",
          "preprocessing": [prep_mult(1000000)]},
         {"name": base + "Inbound packets with errors", "key_": "net.if.in.errors[ifInErrors.{#SNMPINDEX}]", "type": 20,
-         "snmp_oid": "1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}", "value_type": 0, "delay": "5m", "preprocessing": [PREP_CHANGE]},
+         "snmp_oid": "1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}", "value_type": 0, "units": "/s", "delay": "5m", "preprocessing": [PREP_CHANGE]},
         {"name": base + "Outbound packets with errors", "key_": "net.if.out.errors[ifOutErrors.{#SNMPINDEX}]", "type": 20,
-         "snmp_oid": "1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}", "value_type": 0, "delay": "5m", "preprocessing": [PREP_CHANGE]},
+         "snmp_oid": "1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}", "value_type": 0, "units": "/s", "delay": "5m", "preprocessing": [PREP_CHANGE]},
         {"name": base + "Inbound packets discarded", "key_": "net.if.in.discards[ifInDiscards.{#SNMPINDEX}]", "type": 20,
-         "snmp_oid": "1.3.6.1.2.1.2.2.1.13.{#SNMPINDEX}", "value_type": 0, "delay": "5m", "preprocessing": [PREP_CHANGE]},
+         "snmp_oid": "1.3.6.1.2.1.2.2.1.13.{#SNMPINDEX}", "value_type": 0, "units": "/s", "delay": "5m", "preprocessing": [PREP_CHANGE]},
         {"name": base + "Outbound packets discarded", "key_": "net.if.out.discards[ifOutDiscards.{#SNMPINDEX}]", "type": 20,
-         "snmp_oid": "1.3.6.1.2.1.2.2.1.19.{#SNMPINDEX}", "value_type": 0, "delay": "5m", "preprocessing": [PREP_CHANGE]},
+         "snmp_oid": "1.3.6.1.2.1.2.2.1.19.{#SNMPINDEX}", "value_type": 0, "units": "/s", "delay": "5m", "preprocessing": [PREP_CHANGE]},
     ])
-    ok("Descoberta de portas: tráfego, estado, velocidade, erros e descartes" + (" (%d itens novos no template)" % n if n else ""))
+    ok("Portas: tráfego, estado, velocidade, erros e descartes" + (" (%d itens novos)" % n if n else ""))
 
     card_rule = regra("olt.card.discovery", "Placas da OLT", "discovery[{#CPU},%s]" % CPU_BASE)
     cards = [
@@ -358,43 +623,176 @@ def executar(api, versao_zbx):
         cards.append({"name": "Memória Placa {#SNMPINDEX}", "key_": "zte.card.mem[{#SNMPINDEX}]", "type": 20,
                       "snmp_oid": MEM_BASE + ".{#SNMPINDEX}", "value_type": 3, "units": "%", "delay": "1m"})
     n = prototipos(card_rule, cards)
-    ok("Descoberta de placas: CPU, temperatura%s" % (" e memória" if mem_ok else " (memória não respondeu)") + (" (%d itens novos)" % n if n else ""))
+    ok("Placas: CPU, temperatura%s" % (" e memória" if mem_ok else "") + (" (%d itens novos)" % n if n else ""))
 
-    # 5. hosts
+    # sinal RX das ONUs: uma coleta walk[] por OLT, resumida por PON no próprio Zabbix
+    walk_extra = {"timeout": "90s"} if v7 else {}
+    onu_walk = item(dict({"name": "Sinal RX das ONUs (coleta SNMP)", "key_": "zte.onu.rx.walk", "type": 20,
+                          "snmp_oid": "walk[{$ONU.RX.OID}]", "value_type": 4, "delay": "5m", "history": "0",
+                          "description": "Leitura bruta; os valores ficam nos itens por PON."}, **walk_extra))
+    onu_sum = item({"name": "Sinal RX das ONUs por PON (resumo)", "key_": "zte.onu.rx.summary", "type": 18,
+                    "master_itemid": onu_walk, "value_type": 4, "history": "0", "preprocessing": [prep_js(JS_ONU_RX)]})
+    onu_rule = regra_dependente("zte.onu.rx.discovery", "PONs com sinal de ONU", onu_sum, JS_LLD_PON)
+    pon = "{#PON}"
+    n = prototipos(onu_rule, [
+        {"name": "PON %s: RX da pior ONU" % pon, "key_": "zte.pon.rx.worst[%s]" % pon, "type": 18, "master_itemid": onu_sum,
+         "value_type": 0, "units": "dBm", "history": "30d", "trends": "365d", "preprocessing": [prep_jsonpath("$['%s'].min" % pon)]},
+        {"name": "PON %s: número da pior ONU" % pon, "key_": "zte.pon.rx.worstonu[%s]" % pon, "type": 18, "master_itemid": onu_sum,
+         "value_type": 3, "history": "7d", "trends": "0", "preprocessing": [prep_jsonpath("$['%s'].minOnu" % pon)]},
+        {"name": "PON %s: RX médio das ONUs" % pon, "key_": "zte.pon.rx.avg[%s]" % pon, "type": 18, "master_itemid": onu_sum,
+         "value_type": 0, "units": "dBm", "history": "30d", "trends": "365d", "preprocessing": [prep_jsonpath("$['%s'].avg" % pon)]},
+        {"name": "PON %s: ONUs com leitura de sinal" % pon, "key_": "zte.pon.rx.count[%s]" % pon, "type": 18, "master_itemid": onu_sum,
+         "value_type": 3, "history": "30d", "trends": "365d", "preprocessing": [prep_jsonpath("$['%s'].n" % pon)]},
+        {"name": "PON %s: ONUs com sinal baixo" % pon, "key_": "zte.pon.rx.low[%s]" % pon, "type": 18, "master_itemid": onu_sum,
+         "value_type": 3, "history": "30d", "trends": "365d", "preprocessing": [prep_jsonpath("$['%s'].low" % pon)]},
+        {"name": "PON %s: sinal de cada ONU" % pon, "key_": "zte.pon.rx.onus[%s]" % pon, "type": 18, "master_itemid": onu_sum,
+         "value_type": 4, "history": "1h", "preprocessing": [prep_jsonpath("$['%s'].onus" % pon)]},
+    ], atualizar=True)
+    ok("Sinal RX das ONUs por PON: pior, médio, quantidade, sinal baixo e lista" + (" (%d itens novos)" % n if n else ""))
+
+    # TX das PONs e RX/TX dos uplinks: tabela óptica, só as colunas identificadas
+    opt_walk = item(dict({"name": "Sinal óptico dos módulos (coleta SNMP)", "key_": "zte.opt.walk", "type": 20,
+                          "snmp_oid": "walk[%s.{$OPT.TX.COL},%s.{$OPT.RX.COL}]" % (OPT_TABLE, OPT_TABLE),
+                          "value_type": 4, "delay": "5m", "history": "0"}, **walk_extra))
+    opt_sum = item({"name": "Sinal óptico dos módulos (resumo)", "key_": "zte.opt.summary", "type": 18,
+                    "master_itemid": opt_walk, "value_type": 4, "history": "0", "preprocessing": [prep_js(JS_OPT)]})
+    opt_rule = regra_dependente("zte.opt.discovery", "Portas com módulo óptico", opt_sum, JS_LLD_PORT)
+    port = "{#PORT}"
+    n = prototipos(opt_rule, [
+        {"name": "Porta %s: TX do módulo" % port, "key_": "zte.opt.tx[%s]" % port, "type": 18, "master_itemid": opt_sum,
+         "value_type": 0, "units": "dBm", "history": "30d", "trends": "365d", "preprocessing": [prep_jsonpath("$['%s'].tx" % port, discard=True)]},
+        {"name": "Porta %s: RX do módulo" % port, "key_": "zte.opt.rx[%s]" % port, "type": 18, "master_itemid": opt_sum,
+         "value_type": 0, "units": "dBm", "history": "30d", "trends": "365d", "preprocessing": [prep_jsonpath("$['%s'].rx" % port, discard=True)]},
+    ], atualizar=True)
+    ok("TX das PONs e RX/TX dos uplinks" + (" (%d itens novos)" % n if n else ""))
+
+    # 3. hosts
     hostids = []
     for o in OLTS:
-        r = api.call("host.get", {"filter": {"host": [o["nome"]]}, "output": ["hostid"], "selectParentTemplates": ["templateid"]})
+        r = api.call("host.get", {"filter": {"host": [o["nome"]]}, "output": ["hostid"], "selectParentTemplates": ["templateid"],
+                                  "selectInterfaces": ["interfaceid", "type", "details"]})
+        novo_host = not r
         if r:
             hid = r[0]["hostid"]
             if tid not in [t["templateid"] for t in r[0].get("parentTemplates", [])]:
                 api.call("template.massadd", {"templates": [{"templateid": tid}], "hosts": [{"hostid": hid}]})
-            macros = api.call("usermacro.get", {"hostids": [hid], "filter": {"macro": ["{$SNMP_COMMUNITY}"]}, "output": ["hostmacroid"]})
-            if macros:
-                api.call("usermacro.update", {"hostmacroid": macros[0]["hostmacroid"], "value": comunidade, "type": 1})
-            else:
-                api.call("usermacro.create", {"hostid": hid, "macro": "{$SNMP_COMMUNITY}", "value": comunidade, "type": 1})
-            info("Host %s já existia: template e comunidade conferidos" % o["nome"])
+            if o.get("com"):
+                macro(hid, "{$SNMP_COMMUNITY}", o["com"], secreta=True)
+                ok("%s: comunidade SNMP atualizada" % o["curto"])
+            if v7:
+                for itf in r[0].get("interfaces", []):
+                    if str(itf.get("type")) == "2":
+                        try:
+                            det = {"version": 2, "bulk": 1, "community": "{$SNMP_COMMUNITY}", "max_repetitions": 25}
+                            api.call("hostinterface.update", {"interfaceid": itf["interfaceid"], "details": det})
+                        except ZbxError as e:
+                            aviso("%s: não ajustei a coleta em lote da interface (%s)" % (o["curto"], e))
         else:
+            if not o.get("com"):
+                aviso("%s não existe no Zabbix e ficou sem comunidade: host não criado." % o["nome"])
+                continue
+            det = {"version": 2, "bulk": 1, "community": "{$SNMP_COMMUNITY}"}
+            if v7:
+                det["max_repetitions"] = 25
             hid = api.call("host.create", {
                 "host": o["nome"], "name": o["nome"], "groups": [{"groupid": gid}], "templates": [{"templateid": tid}],
-                "interfaces": [{"type": 2, "main": 1, "useip": 1, "ip": o["ip"], "dns": "", "port": o.get("port", "161"),
-                                "details": {"version": 2, "bulk": 1, "community": "{$SNMP_COMMUNITY}"}}],
-                "macros": [{"macro": "{$SNMP_COMMUNITY}", "value": comunidade, "type": 1}],
+                "interfaces": [{"type": 2, "main": 1, "useip": 1, "ip": o["ip"], "dns": "", "port": o.get("port", "161"), "details": det}],
+                "macros": [{"macro": "{$SNMP_COMMUNITY}", "value": o["com"], "type": 1}],
                 "tags": [{"tag": "painel", "value": "olt"}],
             })["hostids"][0]
             ok("Host %s criado (%s)" % (o["nome"], o["ip"]))
+        o["hostid"] = hid
         hostids.append(hid)
-    comunidade = None
 
-    regras = api.call("discoveryrule.get", {"hostids": hostids, "output": ["itemid"]}) or []
-    if regras:
+        # macros do sinal conforme a sondagem desta OLT
+        onu, mod = o.get("onu"), o.get("mod")
+        if onu:
+            macro(hid, "{$ONU.RX.OID}", onu["oid"])
+            macro(hid, "{$ONU.RX.FMT}", onu["fmt"])
+        if mod is not None:
+            macro(hid, "{$OPT.TX.COL}", mod["tx"])
+            macro(hid, "{$OPT.RX.COL}", mod["rx"])
+            macro(hid, "{$OPT.SCALE}", int(mod["escala"]))
+        estados = {}
+        if "onu" in o:
+            estados["zte.onu.rx.walk"] = onu is not None
+        if "mod" in o:
+            estados["zte.opt.walk"] = bool(mod and (mod["tx"] or mod["rx"]))
+        elif novo_host:
+            estados["zte.opt.walk"] = False
+        for key, ligado in estados.items():
+            its = api.call("item.get", {"hostids": [hid], "filter": {"key_": [key]}, "output": ["itemid", "status"]}) or []
+            for it in its:
+                quero = "0" if ligado else "1"
+                if str(it.get("status")) != quero:
+                    api.call("item.update", {"itemid": it["itemid"], "status": int(quero)})
+                    motivo = "a OLT não respondeu nesse OID" if key == "zte.onu.rx.walk" else "nenhuma coluna de sinal confirmada"
+                    (info if ligado else aviso)("%s: coleta %s %s" % (o["curto"], key, "ligada" if ligado else "desligada (%s)" % motivo))
+    for o in OLTS:
+        o["com"] = None
+
+    # coleta agora: descoberta e leituras do sinal
+    regras = api.call("discoveryrule.get", {"hostids": hostids, "output": ["itemid", "type"]}) or []
+    walks = api.call("item.get", {"hostids": hostids, "filter": {"key_": ["zte.onu.rx.walk", "zte.opt.walk"], "status": 0}, "output": ["itemid"]}) or []
+    pedir = [x["itemid"] for x in regras if str(x.get("type")) != "18"] + [x["itemid"] for x in walks]
+    if pedir:
         try:
-            api.call("task.create", [{"type": 6, "request": {"itemid": r["itemid"]}} for r in regras])
-            ok("Descoberta de portas e placas disparada agora")
+            api.call("task.create", [{"type": 6, "request": {"itemid": i}} for i in pedir])
+            ok("Coleta disparada agora (descoberta e sinal óptico)")
         except ZbxError as e:
-            aviso("Não deu para disparar a descoberta agora (%s); ela roda sozinha em até 10 min." % e)
+            aviso("Não deu para disparar a coleta agora (%s); ela roda sozinha em até 10 min." % e)
 
-    # 6. usuário e token de leitura para o painel
+    # 4. usuário e token de leitura para o painel
+    token = token_do_painel(api, gid, versao_zbx)
+
+    # 5. primeiros dados
+    info("Esperando os primeiros dados (até 5 min)…")
+    fim = time.time() + 300
+    portas = sinal = 0
+    while time.time() < fim:
+        its = api.call("item.get", {"hostids": hostids, "search": {"key_": "net.if.in["}, "output": ["lastclock"]}) or []
+        portas = sum(1 for i in its if str(i.get("lastclock", "0")) not in ("0", ""))
+        rx = api.call("item.get", {"hostids": hostids, "search": {"key_": "zte.pon.rx.worst["}, "output": ["lastclock"]}) or []
+        sinal = sum(1 for i in rx if str(i.get("lastclock", "0")) not in ("0", ""))
+        print("\r  portas com tráfego: %d · PONs com sinal RX: %d   " % (portas, sinal), end="", flush=True)
+        if portas and sinal:
+            break
+        time.sleep(15)
+    print()
+    if sinal:
+        ok("Sinal RX das ONUs chegando no Zabbix")
+    else:
+        aviso("O sinal ainda não chegou. A primeira leitura completa pode levar até 10 min; veja Monitoramento → Dados recentes, item \"Sinal RX das ONUs\".")
+
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(os.path.join(STATE_DIR, "zabbix-olts.json"), "w", encoding="utf-8") as f:
+        json.dump({"temp_base": temp_base, "mem": mem_ok, "url": LOCAL_URL, "hosts": [o["nome"] for o in OLTS], "versao_script": 2}, f, indent=2)
+
+    print("\n" + "=" * 64)
+    print("URL da API:  %s" % LOCAL_URL)
+    print("Token:       %s" % token)
+    print("=" * 64)
+    print("O token já está no nginx do painel. Recarregue o painel com Ctrl+F5.")
+
+
+def token_do_painel(api, gid, versao_zbx):
+    """Reaproveita o token do nginx se ele ainda lê este Zabbix; senão cria outro e troca o nginx."""
+    atual = None
+    try:
+        conf = open(NGINX_SITE, encoding="utf-8").read()
+        m = re.search(r"location = /zbx-api \{.*?proxy_pass\s+(\S+);.*?Bearer ([A-Za-z0-9]+)", conf, re.S)
+        if m and "127.0.0.1" in m.group(1):
+            atual = m.group(2)
+    except OSError:
+        conf = ""
+    if atual:
+        try:
+            hs = Api(LOCAL_URL, atual).call("host.get", {"output": ["name"], "groupids": [gid]})
+            ok("Token atual do painel continua valendo (enxerga %d hosts)" % len(hs))
+            return atual
+        except ZbxError:
+            aviso("O token que está no nginx não vale mais; vou gerar outro.")
+
     if versao(versao_zbx) >= (6, 2):
         ug = {"name": PANEL_GROUP, "hostgroup_rights": [{"id": gid, "permission": 2}], "gui_access": 3}
     else:
@@ -418,50 +816,10 @@ def executar(api, versao_zbx):
         api.call("token.delete", [t["tokenid"] for t in antigos])
     tkid = api.call("token.create", {"name": TOKEN_NAME, "userid": uid, "description": "Leitura do Painel das OLTs (nginx /zbx-api)"})["tokenids"][0]
     token = api.call("token.generate", [tkid])[0]["token"]
-    ok("Usuário %s (somente leitura no grupo %s) com token de API novo" % (PANEL_USER, HOST_GROUP))
-
-    # confere o token como o painel vai usar
-    try:
-        teste = Api(LOCAL_URL, token).call("host.get", {"output": ["name"], "groupids": [gid]})
-        ok("Token testado: enxerga %d host(s) — %s" % (len(teste), ", ".join(h["name"] for h in teste)))
-    except ZbxError as e:
-        aviso("O token não conseguiu ler os hosts: %s" % e)
-
-    # 7. primeiros dados
-    info("Esperando os primeiros dados das portas (até 4 min)…")
-    fim = time.time() + 240
-    com_dados = 0
-    while time.time() < fim:
-        its = api.call("item.get", {"hostids": hostids, "search": {"key_": "net.if.in["}, "output": ["lastclock"]}) or []
-        com_dados = sum(1 for i in its if str(i.get("lastclock", "0")) not in ("0", ""))
-        print("\r  portas descobertas: %d · com dados: %d   " % (len(its), com_dados), end="", flush=True)
-        if its and com_dados >= len(its) * 0.8:
-            break
-        time.sleep(15)
-    print()
-    if com_dados:
-        ok("Dados chegando no Zabbix da UpDown")
-    else:
-        aviso("Ainda sem dados. Pode ser só a primeira coleta (até 10 min) ou o SNMP bloqueado; veja Monitoramento → Hosts.")
-
-    os.makedirs(STATE_DIR, exist_ok=True)
-    with open(os.path.join(STATE_DIR, "zabbix-olts.json"), "w", encoding="utf-8") as f:
-        json.dump({"temp_base": temp_base, "mem": mem_ok, "url": LOCAL_URL, "hosts": [o["nome"] for o in OLTS]}, f, indent=2)
-
-    # 8. troca do painel
-    url_painel = LOCAL_URL
-    if com_dados or pergunta("Trocar o painel para este Zabbix mesmo sem dados ainda?"):
-        if trocar_nginx(url_painel, token):
-            ok("Painel apontado para o Zabbix da UpDown")
-    else:
-        info("Painel continua no Zabbix da LV. Rode o script de novo quando os dados chegarem.")
-
-    print("\n" + "=" * 64)
-    print("URL da API:  %s" % url_painel)
-    print("Token:       %s" % token)
-    print("=" * 64)
-    print("O token já está no nginx do painel; guarde-o só se for usar em outro lugar.")
-    print("Sondagem SNMP (memória e sinal óptico): %s" % PROBE_FILE)
+    ok("Usuário %s (somente leitura) com token de API novo" % PANEL_USER)
+    if trocar_nginx(LOCAL_URL, token):
+        ok("Painel apontado para o Zabbix da UpDown")
+    return token
 
 
 def trocar_nginx(url, token):
@@ -477,14 +835,15 @@ def trocar_nginx(url, token):
         "        proxy_set_header Host 127.0.0.1;\n"
         "        proxy_set_header Authorization \"Bearer %s\";\n"
         "        proxy_set_header Cookie \"\";\n"
-        "        proxy_read_timeout 60s;\n"
+        "        proxy_read_timeout 120s;\n"
         "    }" % (url, token)
     )
     novo, n = re.subn(r"location = /zbx-api \{.*?\n\s*\}", bloco, conf, count=1, flags=re.S)
     if not n:
         aviso("Não achei o bloco /zbx-api no nginx; troque à mão.")
         return False
-    backup = NGINX_SITE + ".bak-lv-" + time.strftime("%Y%m%d-%H%M%S")
+    era_lv = "zbx7.lv.network" in conf
+    backup = NGINX_SITE + (".bak-lv-" if era_lv else ".bak-") + time.strftime("%Y%m%d-%H%M%S")
     shutil.copy2(NGINX_SITE, backup)
     with open(NGINX_SITE, "w", encoding="utf-8") as f:
         f.write(novo)
@@ -495,8 +854,7 @@ def trocar_nginx(url, token):
         aviso("O nginx recusou a configuração nova; voltei a anterior.\n" + t.stderr[-400:])
         return False
     subprocess.run(["systemctl", "reload", "nginx"], check=False)
-    info("Configuração anterior (Zabbix da LV) guardada em " + backup)
-    info("Para voltar para a LV: cp %s %s && systemctl reload nginx" % (backup, NGINX_SITE))
+    info("Configuração anterior guardada em " + backup)
     return True
 
 
