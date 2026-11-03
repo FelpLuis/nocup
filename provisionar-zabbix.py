@@ -57,9 +57,11 @@ CPU_BASE = "1.3.6.1.4.1.3902.1015.2.1.1.3.1.9"
 MEM_BASE = "1.3.6.1.4.1.3902.1015.2.1.1.3.1.11"
 TEMP_BASE_DEFAULT = "1.3.6.1.4.1.3902.1015.2.1.3.13.5.1.1"
 # Sinal das ONUs: (OID, formato). "milli" = milésimos de dBm; "zte002" = valor*0,002-30
+# 1012…10 = RX recebido pela ONU (o mesmo do "show pon power attenuation", linha down/ONU Rx)
+# 1015…2   = RX das ONUs medido na OLT (linha up/OLT Rx), só se a primeira não responder
 ONU_RX_CANDIDATES = [
-    ("1.3.6.1.4.1.3902.1015.1010.11.2.1.2", "milli"),
     ("1.3.6.1.4.1.3902.1012.3.50.12.1.1.10", "zte002"),
+    ("1.3.6.1.4.1.3902.1015.1010.11.2.1.2", "milli"),
 ]
 OPT_TABLE = "1.3.6.1.4.1.3902.1015.3.1.13.1"      # módulos ópticos das portas (colunas: RX, TX, …)
 INVALIDO = 2147483647
@@ -95,7 +97,7 @@ for (var i = 0; i < lines.length; i++) {
   if (!m || m[1].indexOf(BASE) !== 0) continue;
   var idx = m[1].substr(BASE.length).split('.');
   if (idx.length < 2) continue;
-  var p = parseInt(idx[0], 10), onu = parseInt(idx[idx.length - 1], 10), raw = parseFloat(m[2]), dbm;
+  var p = parseInt(idx[0], 10), onu = parseInt(idx[1], 10), raw = parseFloat(m[2]), dbm;
   if (isNaN(p) || isNaN(onu) || isNaN(raw)) continue;
   if (FMT === 'zte002') { if (raw <= 0 || raw >= 32768) continue; dbm = raw * 0.002 - 30; }
   else { if (raw <= -2147483647 || raw >= 2147483647) continue; dbm = raw / 1000; }
@@ -369,7 +371,11 @@ def sondar_modulos(com, ip, tipos, relatorio):
                 continue
             if up and not (-12 <= mediana(list(up.values())) <= 2.5):
                 continue
-            candidatos_tx.append(((bool(up), distintos, -col, escala), col, escala, pon, up))
+            # na tabela da ZTE o TX vem antes de temperatura, tensão e corrente: entre as colunas
+            # possíveis, a de menor número; tensão (~3,3) fica de fora pela faixa estreita
+            if max(vs) - min(vs) < 0.2 and 3.0 <= mediana(vs) <= 3.6:
+                continue
+            candidatos_tx.append(((bool(up), -col, escala), col, escala, pon, up))
     if not candidatos_tx:
         relatorio.append("TX das PONs: nenhuma coluna com valores de TX de GPON")
         return {"tx": 0, "rx": 0, "escala": 1000.0}
@@ -408,7 +414,7 @@ def get_or_create(api, obj, filtro, criar, idfield):
 def main():
     if os.geteuid() != 0:
         falha("Rode como root.")
-    print("\nMonitoramento das OLTs no Zabbix da UpDown — versão 2\n")
+    print("\nMonitoramento das OLTs no Zabbix da UpDown — versão 2.1\n")
     api = Api(LOCAL_URL)
     try:
         v = api.call("apiinfo.version", auth=False)
@@ -536,13 +542,15 @@ def executar(api, versao_zbx):
         else:
             api.call("usermacro.create", dict(p, hostid=hostid, macro=nome))
 
-    def macro_padrao(nome, valor, descr):
+    def macro_padrao(nome, valor, descr, forcar=False):
         r = api.call("usermacro.get", {"hostids": [tid], "filter": {"macro": [nome]}, "output": ["hostmacroid"]})
         if not r:
             api.call("usermacro.create", {"hostid": tid, "macro": nome, "value": str(valor), "description": descr})
+        elif forcar:
+            api.call("usermacro.update", {"hostmacroid": r[0]["hostmacroid"], "value": str(valor), "description": descr})
 
-    macro_padrao("{$ONU.RX.OID}", ONU_RX_CANDIDATES[0][0], "OID do sinal RX das ONUs")
-    macro_padrao("{$ONU.RX.FMT}", "milli", "milli = milésimos de dBm; zte002 = valor*0,002-30")
+    macro_padrao("{$ONU.RX.OID}", ONU_RX_CANDIDATES[0][0], "OID do sinal RX recebido pelas ONUs", forcar=True)
+    macro_padrao("{$ONU.RX.FMT}", ONU_RX_CANDIDATES[0][1], "milli = milésimos de dBm; zte002 = valor*0,002-30", forcar=True)
     macro_padrao("{$ONU.RX.LOW}", "-28", "ONU com RX igual ou abaixo deste valor conta como sinal baixo (dBm)")
     macro_padrao("{$OPT.TX.COL}", "0", "Coluna de TX na tabela óptica (0 = não coletar)")
     macro_padrao("{$OPT.RX.COL}", "0", "Coluna de RX na tabela óptica (0 = não coletar)")
@@ -626,9 +634,9 @@ def executar(api, versao_zbx):
     ok("Placas: CPU, temperatura%s" % (" e memória" if mem_ok else "") + (" (%d itens novos)" % n if n else ""))
 
     # sinal RX das ONUs: uma coleta walk[] por OLT, resumida por PON no próprio Zabbix
-    walk_extra = {"timeout": "90s"} if v7 else {}
+    walk_extra = {"timeout": "180s"} if v7 else {}
     onu_walk = item(dict({"name": "Sinal RX das ONUs (coleta SNMP)", "key_": "zte.onu.rx.walk", "type": 20,
-                          "snmp_oid": "walk[{$ONU.RX.OID}]", "value_type": 4, "delay": "5m", "history": "0",
+                          "snmp_oid": "walk[{$ONU.RX.OID}]", "value_type": 4, "delay": "10m", "history": "0",
                           "description": "Leitura bruta; os valores ficam nos itens por PON."}, **walk_extra))
     onu_sum = item({"name": "Sinal RX das ONUs por PON (resumo)", "key_": "zte.onu.rx.summary", "type": 18,
                     "master_itemid": onu_walk, "value_type": 4, "history": "0", "preprocessing": [prep_js(JS_ONU_RX)]})
