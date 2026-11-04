@@ -4,7 +4,7 @@
 #   bash instalar-links.sh
 #
 # O que faz:
-#   1. instala o serviço painel-links em /opt/painel-links: ele lê o Zabbix da LV
+#   1. instala o serviço painel-links em /opt/painel-links: ele lê o Zabbix UpDown
 #      e entrega ao painel só os números (o token nunca vai para o navegador)
 #   2. guarda o token do Zabbix em /etc/painel-links/token (só root e www-data leem)
 #   3. publica o painel em /var/www/painel-links
@@ -114,7 +114,7 @@ cat > "$APP/painel-links.py" <<'__PAINEL_LINKS_PY__'
 Monitoramento de Links - UpDown NOC
 
 Servico pequeno, so com a biblioteca padrao do Python 3, que consulta o Zabbix
-da LV Network e entrega ao painel um JSON compacto. O token do Zabbix fica
+UpDown e entrega ao painel um JSON compacto. O token do Zabbix fica
 neste servidor (/etc/painel-links/token) e nunca vai para o navegador; o nginx
 so deixa chegar aqui quem tem sessao valida no login do painel (painel-auth).
 
@@ -143,7 +143,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 DIR = os.environ.get("PAINEL_LINKS_DIR", "/etc/painel-links")
 TOKEN_FILE = os.path.join(DIR, "token")
 CONFIG_FILE = os.path.join(DIR, "links.json")
-ZABBIX_URL = os.environ.get("ZABBIX_URL", "https://zbx7.lv.network/api_jsonrpc.php")
+ZABBIX_URL = os.environ.get("ZABBIX_URL", "http://127.0.0.1:19090/api_jsonrpc.php")
 LISTEN = ("127.0.0.1", int(os.environ.get("PAINEL_LINKS_PORT", "8092")))
 TLS_VERIFY = os.environ.get("ZABBIX_TLS_VERIFY", "1") != "0"
 
@@ -170,14 +170,14 @@ DEFAULT_CONFIG = {
         "(estado, erros, RX/TX e capacidade). outra_ponta: o outro lado do enlace (estado, erros, RX/TX).",
         "capacidade_gbps: forca a capacidade. rx_alarme / rx_aviso: limite proprio de RX em dBm.",
     ],
-    "filtro_host": "UPT",
+    "filtro_host": "",
     "equipamentos": {
-        "S6750_ASC": {"zabbix": "SWITCH01 S6750 ASCENTY", "sigla": "ASC", "nome": "S6750 Ascenty"},
-        "S6730_ASC": {"zabbix": "SWITCH02 S6730 ASCENTY", "sigla": "ASC2", "nome": "S6730 Ascenty"},
+        "S6750_ASC": {"zabbix": "SWITCH S6750 ASCENTY", "sigla": "ASC", "nome": "S6750 Ascenty"},
+        "S6730_ASC": {"zabbix": "SWITCH S6730 ASCENTY", "sigla": "ASC2", "nome": "S6730 Ascenty"},
         "S6750_PG": {"zabbix": "SWITCH S6750 PRAIA GRANDE", "sigla": "PG", "nome": "S6750 Praia Grande"},
-        "S6730_PG2": {"zabbix": "SWITCH S6730 PRAIA GRANDE 2", "sigla": "PG2", "nome": "S6730 Praia Grande"},
+        "S6730_PG2": {"zabbix": "SWITCH S6730 PRAIA GRANDE", "sigla": "PG2", "nome": "S6730 Praia Grande"},
         "S6730_SANTOS": {"zabbix": "SWITCH S6730 SANTOS", "sigla": "STS", "nome": "S6730 Santos"},
-        "S6730_RB": {"zabbix": "SWITCH S6730 RIO BRANCO SV", "sigla": "RB", "nome": "S6730 Rio Branco"},
+        "S6730_RB": {"zabbix": "SWITCH S6730 RIO BRANCO", "sigla": "RB", "nome": "S6730 Rio Branco"},
         "NE8000_CUB": {"zabbix": "NE8000 F1A PPPOE BASE", "sigla": "CUB", "nome": "NE8000 Cubatão"},
         "NE8000_VS": {"zabbix": "NE8000 F1A VS BGP BASE", "sigla": "VS", "nome": "NE8000 VS BGP"},
     },
@@ -1440,6 +1440,23 @@ if [ -f "$CONF/links.json" ] && [ "${ATUALIZAR_LINKS:-0}" = "1" ]; then
   cp "$CONF/links.json" "$CONF/links.json.bak-$(date +%Y%m%d-%H%M%S)"; rm -f "$CONF/links.json"
   info "links.json antigo guardado como cópia; gravando a lista padrão."
 fi
+if [ -f "$CONF/links.json" ] && grep -qE '"filtro_host": *"UPT"|SWITCH01 S6750 ASCENTY|SWITCH02 S6730 ASCENTY|PRAIA GRANDE 2"|RIO BRANCO SV"' "$CONF/links.json"; then
+  cp -p "$CONF/links.json" "$CONF/links.json.bak-$(date +%Y%m%d-%H%M%S)"
+  "$PY" - "$CONF/links.json" <<'__MIGRA__' && info "links.json: nomes dos equipamentos trocados para os do Zabbix UpDown (cópia do antigo guardada)."
+import json, sys
+p = sys.argv[1]
+c = json.load(open(p, encoding="utf-8"))
+novo = {"SWITCH01 S6750 ASCENTY": "SWITCH S6750 ASCENTY", "SWITCH02 S6730 ASCENTY": "SWITCH S6730 ASCENTY",
+        "SWITCH S6730 PRAIA GRANDE 2": "SWITCH S6730 PRAIA GRANDE", "SWITCH S6730 RIO BRANCO SV": "SWITCH S6730 RIO BRANCO"}
+if str(c.get("filtro_host", "")).strip().upper() == "UPT":
+    c["filtro_host"] = ""
+for e in (c.get("equipamentos") or {}).values():
+    e["zabbix"] = novo.get(str(e.get("zabbix", "")).strip().upper(), e.get("zabbix"))
+with open(p, "w", encoding="utf-8") as f:
+    json.dump(c, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+__MIGRA__
+fi
 PAINEL_LINKS_DIR="$CONF" "$PY" "$APP/painel-links.py" init || erro "O links.json atual tem erro. Corrija ou rode com ATUALIZAR_LINKS=1 para voltar ao padrão."
 chown root:www-data "$CONF/links.json"; chmod 640 "$CONF/links.json"
 
@@ -1864,7 +1881,7 @@ footer.fonte{margin-top:var(--s-6);text-align:center;font-size:var(--fs-12);colo
     <section class="resumo" id="resumo" aria-label="Resumo"></section>
     <nav class="filtros" id="filtros" aria-label="Filtrar links"></nav>
     <div id="lista" aria-live="off"></div>
-    <footer class="fonte" id="fonte">Fonte: Zabbix da LV Network</footer>
+    <footer class="fonte" id="fonte">Fonte: Zabbix UpDown</footer>
   </div>
 </main>
 
@@ -2009,7 +2026,7 @@ footer.fonte{margin-top:var(--s-6);text-align:center;font-size:var(--fs-12);colo
     var a = $('#aviso'), msg = null, tipo = 'aviso';
     if (S.falhou) { msg = 'Sem conexão com o servidor. Tentando de novo…' + (S.snap ? ' Os números abaixo são de ' + hora(S.snap.gerado) + '.' : ''); tipo = 'erro'; }
     else if (S.snap && S.snap.zabbix && !S.snap.zabbix.ok) {
-      msg = 'O Zabbix da LV não está respondendo' + (S.snap.zabbix.ultimo_ok ? ' desde ' + hora(S.snap.zabbix.ultimo_ok) + '. Mostrando os últimos dados lidos.' : '.');
+      msg = 'O Zabbix UpDown não está respondendo' + (S.snap.zabbix.ultimo_ok ? ' desde ' + hora(S.snap.zabbix.ultimo_ok) + '. Mostrando os últimos dados lidos.' : '.');
       tipo = 'erro';
     } else if (S.snap && S.snap.config_erro) { msg = S.snap.config_erro + '. O painel está usando a última lista válida.'; }
     a.hidden = !msg;
@@ -2120,7 +2137,7 @@ footer.fonte{margin-top:var(--s-6);text-align:center;font-size:var(--fs-12);colo
       lista.appendChild(sec);
     });
     var fonte = $('#fonte');
-    fonte.textContent = 'Fonte: Zabbix da LV Network' + (S.snap.zabbix && S.snap.zabbix.versao ? ' ' + S.snap.zabbix.versao : '') + ' · dados de ' + hora(S.snap.gerado);
+    fonte.textContent = 'Fonte: Zabbix UpDown' + (S.snap.zabbix && S.snap.zabbix.versao ? ' ' + S.snap.zabbix.versao : '') + ' · dados de ' + hora(S.snap.gerado);
   }
 
   function subtitulo(l) {
@@ -2668,7 +2685,7 @@ button.entrar[disabled]{opacity:.6;cursor:wait}
     <label class="lembrar"><input type="checkbox" id="remember" name="remember" value="1"> Manter conectado neste aparelho (30 dias)</label>
     <button type="submit" class="entrar" id="btn">Entrar</button>
   </form>
-  <p class="rodape">Dados do Zabbix da LV Network</p>
+  <p class="rodape">Dados do Zabbix UpDown</p>
 </main>
 <script>
 (function () {
