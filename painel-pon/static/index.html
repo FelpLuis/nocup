@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UpDown NOC — Alertas GPON</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%230BBBEF'/%3E%3C/svg%3E">
+<link rel="icon" href="monograma.svg" type="image/svg+xml">
 <style>
   :root{
     --azul:#0B0FEE; --marinho:#140075; --ciano:#0BBBEF; --roxo:#9B00FF; --preto:#1A1818;
@@ -25,15 +25,17 @@
       radial-gradient(900px 600px at -10% 110%, rgba(155,0,255,.16), transparent 60%),
       var(--bg)}
   .mono{font-family:"JetBrains Mono","Consolas",ui-monospace,monospace}
-  #app{height:100vh;display:grid;grid-template-rows:auto auto 1fr;gap:calc(1.2*var(--u));padding:calc(1.6*var(--u)) calc(2*var(--u))}
+  #app{height:100vh;width:100vw;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr;gap:calc(1.2*var(--u));padding:calc(1.6*var(--u)) calc(2*var(--u))}
 
   /* header */
   header{display:flex;align-items:center;gap:calc(2*var(--u));white-space:nowrap}
   .htitle h1,.pill,.clock .d{white-space:nowrap}
-  .brand{display:flex;align-items:baseline;gap:calc(.5*var(--u))}
-  .brand b{font-size:calc(3*var(--u));font-weight:800;letter-spacing:-.02em;
-    background:linear-gradient(90deg,var(--ciano),#5b6cff 55%,var(--roxo));-webkit-background-clip:text;background-clip:text;color:transparent}
-  .brand span{font-size:calc(1.05*var(--u));color:var(--mut);letter-spacing:.12em}
+  .brand{height:calc(3.9*var(--u));width:auto;display:block;flex:0 0 auto}
+  .htitle{min-width:0;overflow:hidden}
+  .htitle h1{overflow:hidden;text-overflow:ellipsis}
+  .who{font-size:calc(.9*var(--u));color:var(--mut);text-decoration:none;border:1px solid var(--line);border-radius:calc(.6*var(--u));padding:calc(.5*var(--u)) calc(.9*var(--u))}
+  .who:hover{color:var(--txt);border-color:var(--ciano)}
+  .who:empty{display:none}
   .htitle{border-left:1px solid var(--line);padding-left:calc(2*var(--u))}
   .htitle small{display:block;font-size:calc(.9*var(--u));letter-spacing:.2em;color:var(--ciano);font-weight:700}
   .htitle h1{font-size:calc(2.1*var(--u));font-weight:700;letter-spacing:-.01em}
@@ -61,7 +63,7 @@
   .banner.erro{background:rgba(255,176,32,.12);border:1px solid rgba(255,176,32,.5);color:var(--warn);font-size:calc(1.15*var(--u));font-weight:600}
 
   /* layout principal */
-  main{display:grid;grid-template-columns:1fr calc(34*var(--u));gap:calc(1.6*var(--u));min-height:0}
+  main{display:grid;grid-template-columns:minmax(0,1fr) calc(34*var(--u));gap:calc(1.6*var(--u));min-height:0}
   .panel{background:linear-gradient(180deg,rgba(13,24,56,.92),rgba(9,17,42,.92));border:1px solid var(--line);
     border-radius:calc(1.2*var(--u));padding:calc(1.4*var(--u));min-height:0;display:flex;flex-direction:column}
   .ptitle{display:flex;align-items:center;gap:calc(1*var(--u));margin-bottom:calc(1.1*var(--u))}
@@ -103,9 +105,15 @@
   .alert .cli{margin-top:calc(.9*var(--u));font-size:calc(1.6*var(--u));font-weight:800}
   .alert .cli small{display:block;font-size:calc(.8*var(--u));color:var(--dim);letter-spacing:.12em;font-weight:600}
   /* modos compactos (muitos alertas) */
-  #alerts.c2 .alert h3{font-size:calc(1.9*var(--u))}
-  #alerts.c2 .alert .ico{width:calc(3.8*var(--u));height:calc(3.8*var(--u))}
-  #alerts.c2 .alert .timer{font-size:calc(1.9*var(--u))}
+  #alerts.c2 .alert{grid-template-columns:minmax(0,1fr) auto;gap:calc(1*var(--u));padding:calc(1.1*var(--u)) calc(1.3*var(--u)) calc(1.1*var(--u)) calc(1.7*var(--u))}
+  #alerts.c2 .alert .ico{display:none}
+  #alerts.c2 .alert h3{font-size:calc(2.1*var(--u))}
+  #alerts.c2 .alert .meta{font-size:calc(1.02*var(--u))}
+  #alerts.c2 .alert .causa{font-size:calc(1*var(--u));display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  #alerts.c2 .alert .right{min-width:0}
+  #alerts.c2 .alert .timer{font-size:calc(2*var(--u))}
+  #alerts.c2 .alert .cli{font-size:calc(1.35*var(--u));margin-top:calc(.6*var(--u))}
+  #alerts.c2 .chip{font-size:calc(.85*var(--u))}
   #alerts.c3 .alert{grid-template-columns:1fr auto;padding:calc(.9*var(--u)) calc(1.1*var(--u)) calc(.9*var(--u)) calc(1.5*var(--u));gap:calc(.8*var(--u))}
   #alerts.c3 .alert .ico{display:none}
   #alerts.c3 .alert h3{font-size:calc(1.55*var(--u))}
@@ -179,12 +187,13 @@
 <body>
 <div id="app">
   <header>
-    <div class="brand"><b>updown</b><span>INTERNET</span></div>
-    <div class="htitle"><small>UPDOWN NOC</small><h1>Alertas GPON · PON e CTO</h1></div>
+    <img class="brand" src="logo-updown.png" alt="UpDown Internet" width="360" height="107">
+    <div class="htitle"><small>UPDOWN NOC</small><h1>Alertas GPON</h1></div>
     <div class="spacer"></div>
     <div id="pill" class="pill stale"><i></i><span>CONECTANDO…</span></div>
     <button id="snd" class="icon-btn" title="Som de alerta">🔇 Som</button>
     <button id="fs" class="icon-btn" title="Tela cheia">⛶</button>
+    <a id="who" class="who" href="/logout" title="Sair"></a>
     <div class="clock"><div class="t mono" id="clock">--:--:--</div><div class="d" id="date"></div></div>
   </header>
 
@@ -298,8 +307,8 @@
   function renderAlerts(list) {
     const box = $('#alerts');
     const n = list.length;
-    box.className = n > 8 ? 'c3' : n > 4 ? 'c2' : '';
-    const max = n > 8 ? 18 : n > 4 ? 8 : 4;
+    box.className = n > 8 ? 'c3' : n > 3 ? 'c2' : '';
+    const max = n > 8 ? 18 : n > 3 ? 8 : 3;
     const shown = list.slice(0, max);
     const ids = new Set(shown.map(a => a.id));
     // remove os que saíram (com animação)
@@ -327,8 +336,18 @@
       }
       prev = el;
     });
-    // esconde os cards que não cabem na tela e mostra "+N"
-    requestAnimationFrame(() => {
+    lastN = n;
+    requestAnimationFrame(fitAlerts);
+    $('#allok').classList.toggle('show', n === 0);
+    box.style.display = n ? '' : 'none';
+    const ac = $('#acount'); ac.textContent = n; ac.classList.toggle('zero', n === 0);
+  }
+
+  // esconde os cards que não cabem na tela e mostra "+N"
+  let lastN = 0;
+  function fitAlerts() {
+      const box = $('#alerts'), n = lastN;
+      {
       box.querySelector('.more')?.remove();
       const cards = [...box.querySelectorAll('.alert:not(.leaving)')];
       cards.forEach(c => c.style.visibility = '');
@@ -340,14 +359,12 @@
       const hidden = n - visible;
       if (hidden > 0) {
         const m = document.createElement('div'); m.className = 'more';
-        m.textContent = `+ ${hidden} alertas além dos exibidos (veja o Zabbix)`; box.append(m);
+        m.textContent = `+ ${hidden} ${hidden > 1 ? 'alertas' : 'alerta'} além dos exibidos (veja o Zabbix)`; box.append(m);
         m.style.position = 'absolute'; m.style.left = '0'; m.style.right = '0'; m.style.bottom = '0';
       }
-    });
-    $('#allok').classList.toggle('show', n === 0);
-    box.style.display = n ? '' : 'none';
-    const ac = $('#acount'); ac.textContent = n; ac.classList.toggle('zero', n === 0);
+      }
   }
+  window.addEventListener('resize', () => requestAnimationFrame(fitAlerts));
 
   function kpi(id, v, cls, extra) {
     const el = $(id); el.className = 'kpi ' + (cls || '');
@@ -426,7 +443,10 @@
 
   async function poll() {
     try {
-      const st = DEMO ? demoState() : await fetch('api/state', {cache: 'no-store'}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+      const st = DEMO ? demoState() : await fetch('api/state', {cache: 'no-store', credentials: 'same-origin'}).then(r => {
+        if (r.status === 401) { location.replace('/login?next=' + encodeURIComponent(location.pathname + location.search)); throw new Error('login'); }
+        if (!r.ok) throw new Error(r.status); return r.json(); });
+      $('#who').textContent = st.login && st.user ? st.user + ' · Sair' : '';
       if (st.updated && !DEMO) offset = 0;
       const newOnes = (st.alerts || []).filter(a => !known.has(a.id));
       if (!first && newOnes.length) beep(newOnes.some(a => a.kind === 'pon'));

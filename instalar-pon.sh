@@ -10,6 +10,7 @@
 #   4. se houver certificado de monitoramento.updown.com.br, publica em HTTPS na porta 8446
 #   5. confere se a tela respondeu; se algo falhar, desfaz e volta como estava
 #
+# Login: usa os mesmos usuários do Painel das OLTs (/etc/painel-olt/users.json).
 # Pode rodar de novo para atualizar: token e configurações são preservados.
 set -euo pipefail
 
@@ -51,7 +52,9 @@ desfazer() {
 # 1. Arquivos -----------------------------------------------------------------
 install -d -m 755 "$DEST" "$DEST/static"
 install -m 755 "$AQUI/painel-pon/server.py" "$DEST/server.py"
-install -m 644 "$AQUI/painel-pon/static/index.html" "$DEST/static/index.html"
+for f in index.html login.html logo-updown.png monograma.svg; do
+  install -m 644 "$AQUI/painel-pon/static/$f" "$DEST/static/$f"
+done
 install -m 644 "$AQUI/painel-pon/config.env.example" "$DEST/config.env.example"
 install -m 644 "$AQUI/painel-pon/cto_map.example.json" "$DEST/cto_map.example.json"
 python3 -m py_compile "$DEST/server.py" || desfazer "server.py não compilou"
@@ -66,8 +69,6 @@ if [ ! -f "$DEST/config.env" ]; then
   read -rsp "Token da API do Zabbix próprio (Usuários > Tokens de API; não aparece na tela): " TOKEN; echo
   [[ "$TOKEN" =~ ^[A-Za-z0-9]{16,}$ ]] || desfazer "Token inválido: esperava só letras e números"
   sed -i "s#^ZABBIX_TOKEN=.*#ZABBIX_TOKEN=$TOKEN#" "$DEST/config.env"
-  read -rp "Usuário e senha para abrir a tela (ex.: noc:senha; Enter = sem login): " BA
-  [ -n "$BA" ] && sed -i "s#^BASIC_AUTH=.*#BASIC_AUTH=$BA#" "$DEST/config.env"
   ok "config.env criado"
 else
   ok "Mantido o config.env que já existia"
@@ -127,6 +128,8 @@ server {
     location / {
         proxy_pass http://127.0.0.1:$PORTA_APP;
         proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
         proxy_set_header Authorization \$http_authorization;
         proxy_read_timeout 60s;
     }
@@ -140,6 +143,17 @@ EOF
 else
   info "Sem nginx/certificado de $DOMINIO: a tela fica direto na porta $PORTA_APP (HTTP)."
   ENDERECO="http://$(hostname -I | awk '{print $1}'):$PORTA_APP"
+fi
+
+# Login: mesmos usuários do Painel das OLTs
+if [ -f /etc/painel-olt/users.json ]; then
+  if sudo -u www-data test -r /etc/painel-olt/users.json; then
+    ok "Login com os usuários do Painel das OLTs (python3 /opt/painel-olt/painel-auth.py adduser NOME)"
+  else
+    info "Atenção: www-data não consegue ler /etc/painel-olt/users.json — a tela vai abrir sem login"
+  fi
+else
+  info "Atenção: não achei /etc/painel-olt/users.json (rode o instalar-login.sh) — a tela vai abrir sem login"
 fi
 
 # 5. Confere a primeira coleta -------------------------------------------------

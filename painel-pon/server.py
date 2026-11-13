@@ -32,6 +32,10 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent
 
 
+def log(*a):
+    print(time.strftime("%Y-%m-%d %H:%M:%S"), *a, flush=True)
+
+
 # ----------------------------------------------------------------- config ---
 def load_env(path):
     if not path.exists():
@@ -41,20 +45,24 @@ def load_env(path):
         if not line or line.startswith("#") or "=" not in line:
             continue
         k, v = line.split("=", 1)
-        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+        v = re.sub(r"\s+#.*$", "", v).strip().strip('"').strip("'")
+        os.environ.setdefault(k.strip(), v)
 
 
 load_env(BASE / "config.env")
 
 
 def env(name, default=None, cast=str):
-    v = os.environ.get(name, default)
+    v = os.environ.get(name)
+    if v is None or str(v).strip() == "":
+        v = default
     if v is None:
         return None
     try:
         return cast(v)
     except Exception:
-        return default
+        log(f"config: valor inválido em {name}={v!r}; usando {default!r}")
+        return cast(default)
 
 
 ZBX_URL = env("ZABBIX_URL", "http://127.0.0.1:19090").rstrip("/")
@@ -78,8 +86,13 @@ RECOVERED_KEEP = env("RECOVERED_KEEP", "180", int)
 # Quantas coletas seguidas a CTO precisa estar com 0 sessões para virar alerta.
 CONFIRM_POLLS = env("CONFIRM_POLLS", "1", int)
 MASSIVE_MIN = env("MASSIVE_MIN", "5", int)
-# Basic auth opcional para a tela (ex.: analistas:senha)
+# Login: por padrão usa os mesmos usuários do Painel das OLTs (painel-auth).
+# LOGIN=0 desliga. BASIC_AUTH=usuario:senha[,usuario2:senha2] adiciona contas locais.
+LOGIN = env("LOGIN", "1") == "1"
+USERS_FILE = Path(env("USERS_FILE", "/etc/painel-olt/users.json"))
 BASIC_AUTH = env("BASIC_AUTH", "")
+SESSION_HOURS = env("SESSION_HOURS", "12", int)          # sem "manter conectado"
+SESSION_TV_DAYS = env("SESSION_TV_DAYS", "90", int)      # com "manter conectado nesta TV"
 OLT_NAMES = {
     "casqueiro": "C300 Casqueiro",
     "vilanatal": "C350 Vila Natal",
@@ -94,10 +107,6 @@ CTO_MAP_FILE = BASE / "cto_map.json"   # opcional: {"012": {"olt": "vilanatal", 
 
 PON_RE = re.compile(r"(\d+/\d+/\d+)")
 CTO_KEY_RE = re.compile(r"^(sessoes|clientes|causa)CTO\[(.+)\]$")
-
-
-def log(*a):
-    print(time.strftime("%Y-%m-%d %H:%M:%S"), *a, flush=True)
 
 
 # ------------------------------------------------------------- zabbix api ---
@@ -545,7 +554,162 @@ class Engine:
 ENGINE = None
 
 
+# ------------------------------------------------------------------ login ---
+import base64
+import hashlib
+import hmac
+import secrets
+from urllib.parse import parse_qs, urlparse, quote
+
+COOKIE = "painel_pon"
+SECRET_FILE = BASE / "secret.key"
+
+
+def _secret():
+    try:
+        return SECRET_FILE.read_bytes()
+    except FileNotFoundError:
+        k = secrets.token_bytes(32)
+        SECRET_FILE.write_bytes(k)
+        os.chmod(SECRET_FILE, 0o600)
+        return k
+
+
+def _b64e(b):
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def _b64d(t):
+    return base64.urlsafe_b64decode(t + "=" * (-len(t) % 4))
+
+
+def _check_pbkdf2(pw, stored):
+    try:
+        algo, it, salt, dk = stored.split("$")
+        if algo != "pbkdf2_sha256":
+            return False
+        calc = hashlib.pbkdf2_hmac("sha256", pw.encode(), _b64d(salt), int(it))
+        return hmac.compare_digest(calc, _b64d(dk))
+    except Exception:
+        return False
+
+
+_DUMMY = "pbkdf2_sha256$200000$" + _b64e(b"x" * 16) + "$" + _b64e(b"y" * 32)
+
+
+class Users:
+    """Usuários do painel-auth (users.json, recarrega quando muda) + contas do BASIC_AUTH."""
+
+    def __init__(self):
+        self.mtime, self.data = None, {}
+        self.local = {}
+        for part in BASIC_AUTH.split(","):
+            if ":" in part:
+                u, pw = part.split(":", 1)
+                self.local[u.strip().lower()] = pw
+
+    def get(self):
+        try:
+            m = USERS_FILE.stat().st_mtime_ns
+            if m != self.mtime:
+                self.data, self.mtime = json.loads(USERS_FILE.read_text(encoding="utf-8")), m
+        except FileNotFoundError:
+            self.data, self.mtime = {}, None
+        except (OSError, ValueError) as e:
+            log(f"login: não consegui ler {USERS_FILE}: {e}")
+        return self.data
+
+    def any(self):
+        return bool(self.get() or self.local)
+
+    def check(self, user, pw):
+        user = (user or "").strip().lower()
+        if user in self.local:
+            return hmac.compare_digest(self.local[user].encode(), (pw or "").encode())
+        info = self.get().get(user)
+        ok = _check_pbkdf2(pw or "", info["hash"] if info else _DUMMY)
+        return ok and bool(info)
+
+    def sv(self, user):
+        if user in self.local:
+            return 0
+        info = self.get().get(user)
+        return None if info is None else int(info.get("sv", 0))
+
+
+USERS = Users()
+
+
+class Limiter:
+    """5 senhas erradas em 15 min bloqueiam o IP e o usuário por 15 min."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.fails = {}
+
+    def wait(self, *keys):
+        now = time.time()
+        with self.lock:
+            w = 0
+            for k in keys:
+                lst = [t for t in self.fails.get(k, []) if now - t < 900]
+                self.fails[k] = lst
+                if len(lst) >= 5:
+                    w = max(w, int(900 - (now - lst[0])))
+            return w
+
+    def fail(self, *keys):
+        with self.lock:
+            for k in keys:
+                self.fails.setdefault(k, []).append(time.time())
+
+    def clear(self, *keys):
+        with self.lock:
+            for k in keys:
+                self.fails.pop(k, None)
+
+
+LIMIT = Limiter()
+
+
+def make_session(user, keep):
+    exp = int(time.time()) + (SESSION_TV_DAYS * 86400 if keep else SESSION_HOURS * 3600)
+    body = f"{user}|{exp}|{USERS.sv(user) or 0}|{1 if keep else 0}"
+    sig = hmac.new(_secret(), body.encode(), hashlib.sha256).digest()
+    return _b64e(body.encode()) + "." + _b64e(sig), exp, keep
+
+
+def read_session(cookie_header):
+    for part in (cookie_header or "").split(";"):
+        name, _, value = part.strip().partition("=")
+        if name != COOKIE or "." not in value:
+            continue
+        try:
+            b, sig = value.split(".", 1)
+            body = _b64d(b)
+            if not hmac.compare_digest(hmac.new(_secret(), body, hashlib.sha256).digest(), _b64d(sig)):
+                return None
+            user, exp, sv, keep = body.decode().split("|")
+            if int(exp) < time.time():
+                return None
+            cur = USERS.sv(user)
+            if cur is None or cur != int(sv):   # usuário removido ou senha trocada
+                return None
+            return {"user": user, "exp": int(exp), "keep": keep == "1"}
+        except Exception:
+            return None
+    return None
+
+
+def safe_next(n):
+    n = n or "/"
+    return n if n.startswith("/") and not n.startswith("//") and not n.startswith("/login") else "/"
+
+
 # ------------------------------------------------------------------- http ---
+PUBLIC = {"/login", "/login.html", "/logo-updown.png", "/monograma.svg", "/healthz"}
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(BASE / "static"), **kw)
@@ -553,40 +717,119 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
-    def _auth_ok(self):
-        if not BASIC_AUTH or self.path == "/healthz":
-            return True
-        import base64
-        h = self.headers.get("Authorization", "")
-        if h.startswith("Basic "):
-            try:
-                return base64.b64decode(h[6:]).decode() == BASIC_AUTH
-            except Exception:
-                return False
-        return False
+    def end_headers(self):
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "same-origin")
+        super().end_headers()
 
+    # ---- util ----
+    def ip(self):
+        return self.headers.get("X-Real-IP") or self.client_address[0]
+
+    def secure(self):
+        return self.headers.get("X-Forwarded-Proto", "") == "https"
+
+    def send_json(self, code, obj, headers=()):
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        for k, v in headers:
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def redirect(self, to, headers=()):
+        self.send_response(303)
+        self.send_header("Location", to)
+        for k, v in headers:
+            self.send_header(k, v)
+        self.end_headers()
+
+    def login_on(self):
+        return LOGIN and USERS.any()
+
+    def session(self):
+        return read_session(self.headers.get("Cookie")) if self.login_on() else {"user": None}
+
+    # ---- GET ----
     def do_GET(self):
-        if not self._auth_ok():
-            self.send_response(401)
-            self.send_header("WWW-Authenticate", 'Basic realm="UpDown NOC"')
-            self.end_headers()
-            return
-        if self.path.startswith("/api/state"):
-            with ENGINE.lock:
-                body = json.dumps(ENGINE.state, ensure_ascii=False).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
-        if self.path == "/healthz":
+        url = urlparse(self.path)
+        path = url.path
+        if path == "/healthz":
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"ok")
             return
+        if path == "/logout":
+            return self.redirect("/login", [("Set-Cookie", f"{COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+                                             + ("; Secure" if self.secure() else ""))])
+        sess = self.session()
+        if path in ("/login", "/login.html"):
+            if not self.login_on() or sess:
+                return self.redirect(safe_next(parse_qs(url.query).get("next", ["/"])[0]))
+            self.path = "/login.html"
+            return super().do_GET()
+        if path not in PUBLIC and not sess:
+            if path.startswith("/api/"):
+                return self.send_json(401, {"error": "login"})
+            return self.redirect("/login?next=" + quote(self.path, safe="/?=&"))
+        if path == "/api/state":
+            with ENGINE.lock:
+                st = dict(ENGINE.state)
+            st["user"] = sess.get("user")
+            st["login"] = self.login_on()
+            return self.send_json(200, st)
+        if path == "/api/me":
+            return self.send_json(200, {"user": sess.get("user"), "login": self.login_on()})
         return super().do_GET()
+
+    # ---- POST /login ----
+    def do_POST(self):
+        if urlparse(self.path).path != "/login":
+            return self.send_json(404, {"error": "não encontrado"})
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > 4096:
+            return self.send_json(413, {"error": "requisição grande demais"})
+        raw = self.rfile.read(n).decode("utf-8", "replace")
+        if "json" in (self.headers.get("Content-Type") or ""):
+            try:
+                f = json.loads(raw or "{}")
+            except ValueError:
+                f = {}
+        else:
+            f = {k: v[0] for k, v in parse_qs(raw).items()}
+        user = str(f.get("usuario", "")).strip().lower()
+        pw = str(f.get("senha", ""))
+        keep = str(f.get("manter", "")).lower() in ("1", "true", "on", "sim")
+        nxt = safe_next(str(f.get("next", "/")))
+        keys = ("ip:" + self.ip(), "u:" + user)
+        wait = LIMIT.wait(*keys)
+        if wait:
+            return self.send_json(429, {"error": f"Muitas tentativas. Tente de novo em {max(1, wait // 60)} min.",
+                                        "wait": wait})
+        if not user or not pw:
+            return self.send_json(400, {"error": "Informe usuário e senha.", "field": "usuario" if not user else "senha"})
+        if not USERS.check(user, pw):
+            LIMIT.fail(*keys)
+            left = 5 - max(len(LIMIT.fails.get(k, [])) for k in keys)
+            if left <= 0:
+                return self.send_json(429, {"error": "Senha incorreta 5 vezes. Acesso bloqueado por 15 min.",
+                                            "wait": 900})
+            msg = "Usuário ou senha incorretos."
+            if 0 < left <= 2:
+                msg += f" Mais {left} tentativa{'s' if left > 1 else ''} antes de bloquear por 15 min."
+            log(f"login: falhou para '{user}' de {self.ip()}")
+            return self.send_json(401, {"error": msg, "field": "senha"})
+        LIMIT.clear(*keys)
+        token, exp, keep = make_session(user, keep)
+        cookie = f"{COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax" + ("; Secure" if self.secure() else "")
+        if keep:
+            cookie += f"; Max-Age={exp - int(time.time())}"
+        log(f"login: '{user}' entrou de {self.ip()}{' (manter conectado)' if keep else ''}")
+        return self.send_json(200, {"ok": True, "user": user, "next": nxt}, [("Set-Cookie", cookie)])
 
 
 def main():
@@ -595,6 +838,10 @@ def main():
         print("Defina ZABBIX_TOKEN no config.env", file=sys.stderr)
         sys.exit(1)
     ENGINE = Engine()
+    if LOGIN and not USERS.any():
+        log(f"login: nenhum usuário em {USERS_FILE} nem em BASIC_AUTH — tela ABERTA sem login")
+    elif LOGIN:
+        log(f"login: usando usuários de {USERS_FILE}" + (" + BASIC_AUTH" if USERS.local else ""))
     threading.Thread(target=ENGINE.loop, daemon=True).start()
     srv = ThreadingHTTPServer((LISTEN, PORT), Handler)
     log(f"Painel PON/CTO em http://{LISTEN}:{PORT}  (Zabbix {ZBX_URL})")

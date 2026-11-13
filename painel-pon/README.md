@@ -32,9 +32,22 @@ Para atualizar depois: `git pull && sudo bash instalar-pon.sh`. O `config.env` (
 
 **Token:** crie em Zabbix → Usuários → Tokens de API, com um usuário que tenha **leitura** nos grupos `IXC`, `GPON/ONUs` e `OLTs UpDown`. O token fica só em `/opt/painel-pon/config.env` (fora do Git, permissão 600).
 
+## Login
+
+A tela usa **os mesmos usuários do Painel das OLTs** (`/etc/painel-olt/users.json`). Para criar um usuário ou trocar a senha:
+
+```bash
+sudo python3 /opt/painel-olt/painel-auth.py adduser NOME
+```
+
+- **Manter conectado nesta TV** vem marcado e vale por 90 dias (`SESSION_TV_DAYS`). Sem ele, a sessão dura 12 h (`SESSION_HOURS`).
+- Depois de 5 senhas erradas em 15 min, o IP e o usuário ficam bloqueados por 15 min. A tela mostra a contagem regressiva.
+- Trocar a senha ou remover o usuário derruba as sessões abertas dele, inclusive a da TV.
+- Contas só desta tela: `BASIC_AUTH=usuario:senha` no `config.env`. Para desligar o login: `LOGIN=0`.
+
 ## Na TV
 
-- Abra a página, clique em **⛶** (tela cheia) e em **🔇 Som** para ligar o bipe (o navegador só libera som depois de um clique; a escolha fica salva).
+- Entre com o usuário do NOC, clique em **⛶** (tela cheia) e em **🔇 Som** para ligar o bipe (o navegador só libera som depois de um clique; a escolha fica salva).
 - Para ver a tela sem Zabbix: `http://IP:8445/?demo`.
 - Se o servidor ou o Zabbix pararem de responder, a pílula do topo fica amarela "SEM DADOS RECENTES" e aparece a faixa de erro, para a TV nunca mostrar "tudo OK" com dado velho.
 
