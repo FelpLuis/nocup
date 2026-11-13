@@ -235,6 +235,19 @@ def cto_ignored(*texts):
     return False
 
 
+def cto_has_onu_down(clientes, causa):
+    """False se a CTO não tem cliente ou se a OLT não tem nenhuma ONU dela fora do ar."""
+    if (clientes or 0) <= 0:
+        return False
+    t = _norm_txt(causa)
+    if not t:
+        return True                      # sem causa informada: confia no problema do Zabbix
+    if re.search(r"NENHUMA ONU", t):
+        return False
+    n = [int(x) for x in re.findall(r"(\d+)\s*ONU", t)]
+    return not n or sum(n) > 0
+
+
 def norm_cto(c, known):
     """Casa '12', 'CTO 012', '012' com a chave usada no Zabbix."""
     c = str(c).strip()
@@ -584,6 +597,9 @@ class Engine:
             c = ctos.get(cto, {})
             cli = to_int(c.get("clientes"), 0) or 0
             ses = to_int(c.get("sessoes"), 0) or 0
+            # Só alerta CTO que tem cliente e tem ONU fora do ar na OLT
+            if not cto_has_onu_down(cli, c.get("causa")):
+                continue
             loc = cto_map.get(cto, {})
             base = {"cto": cto, "title": f"CTO {cto}", "olt": loc.get("olt"),
                     "olt_name": olt_name(loc["olt"]) if loc.get("olt") else None,
