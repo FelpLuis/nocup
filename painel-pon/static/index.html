@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UpDown NOC — Alertas GPON</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%230BBBEF'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --azul:#0B0FEE; --marinho:#140075; --ciano:#0BBBEF; --roxo:#9B00FF; --preto:#1A1818;
+    --bg:#050b1f; --bg2:#0a1430; --card:#0d1838; --line:rgba(11,187,239,.16);
+    --txt:#e8f1ff; --mut:#8ea3c7; --dim:#566a90;
+    --ok:#1fd68a; --warn:#ffb020; --crit:#ff3b5c; --crit2:#ff7a45;
+    --u: min(1vw, 1.78vh); /* unidade que escala com a TV */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+    font-family:"Inter","Segoe UI",Roboto,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  body{background:
+      radial-gradient(1200px 700px at 85% -10%, rgba(11,15,238,.28), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(155,0,255,.16), transparent 60%),
+      var(--bg)}
+  body.alarm{background:
+      radial-gradient(1200px 700px at 85% -10%, rgba(255,59,92,.22), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(155,0,255,.16), transparent 60%),
+      var(--bg)}
+  .mono{font-family:"JetBrains Mono","Consolas",ui-monospace,monospace}
+  #app{height:100vh;display:grid;grid-template-rows:auto auto 1fr;gap:calc(1.2*var(--u));padding:calc(1.6*var(--u)) calc(2*var(--u))}
+
+  /* header */
+  header{display:flex;align-items:center;gap:calc(2*var(--u));white-space:nowrap}
+  .htitle h1,.pill,.clock .d{white-space:nowrap}
+  .brand{display:flex;align-items:baseline;gap:calc(.5*var(--u))}
+  .brand b{font-size:calc(3*var(--u));font-weight:800;letter-spacing:-.02em;
+    background:linear-gradient(90deg,var(--ciano),#5b6cff 55%,var(--roxo));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand span{font-size:calc(1.05*var(--u));color:var(--mut);letter-spacing:.12em}
+  .htitle{border-left:1px solid var(--line);padding-left:calc(2*var(--u))}
+  .htitle small{display:block;font-size:calc(.9*var(--u));letter-spacing:.2em;color:var(--ciano);font-weight:700}
+  .htitle h1{font-size:calc(2.1*var(--u));font-weight:700;letter-spacing:-.01em}
+  .spacer{flex:1}
+  .pill{display:flex;align-items:center;gap:calc(.8*var(--u));padding:calc(.7*var(--u)) calc(1.6*var(--u));
+    border-radius:999px;font-weight:800;font-size:calc(1.4*var(--u));letter-spacing:.04em;border:1px solid}
+  .pill i{width:calc(1*var(--u));height:calc(1*var(--u));border-radius:50%;background:currentColor;box-shadow:0 0 calc(1*var(--u)) currentColor}
+  .pill.ok{color:var(--ok);border-color:rgba(31,214,138,.4);background:rgba(31,214,138,.08)}
+  .pill.bad{color:var(--crit);border-color:rgba(255,59,92,.5);background:rgba(255,59,92,.1)}
+  .pill.bad i{animation:blink 1s infinite}
+  .pill.stale{color:var(--warn);border-color:rgba(255,176,32,.5);background:rgba(255,176,32,.1)}
+  .clock{text-align:right}
+  .clock .t{font-size:calc(2.6*var(--u));font-weight:700;line-height:1}
+  .clock .d{font-size:calc(.95*var(--u));color:var(--mut);margin-top:calc(.3*var(--u))}
+  .icon-btn{background:transparent;border:1px solid var(--line);color:var(--mut);border-radius:calc(.6*var(--u));
+    padding:calc(.5*var(--u)) calc(.9*var(--u));font-size:calc(.95*var(--u));cursor:pointer}
+  .icon-btn:hover{color:var(--txt);border-color:var(--ciano)}
+  .icon-btn.on{color:var(--ciano);border-color:var(--ciano)}
+
+  /* banner queda massiva / erro */
+  .banner{display:none;align-items:center;gap:calc(1.4*var(--u));padding:calc(1*var(--u)) calc(1.8*var(--u));
+    border-radius:calc(1*var(--u));font-weight:800;font-size:calc(1.6*var(--u))}
+  .banner.show{display:flex}
+  .banner.massiva{background:linear-gradient(90deg,rgba(255,59,92,.95),rgba(155,0,255,.85));animation:pulseBg 1.6s infinite}
+  .banner.erro{background:rgba(255,176,32,.12);border:1px solid rgba(255,176,32,.5);color:var(--warn);font-size:calc(1.15*var(--u));font-weight:600}
+
+  /* layout principal */
+  main{display:grid;grid-template-columns:1fr calc(34*var(--u));gap:calc(1.6*var(--u));min-height:0}
+  .panel{background:linear-gradient(180deg,rgba(13,24,56,.92),rgba(9,17,42,.92));border:1px solid var(--line);
+    border-radius:calc(1.2*var(--u));padding:calc(1.4*var(--u));min-height:0;display:flex;flex-direction:column}
+  .ptitle{display:flex;align-items:center;gap:calc(1*var(--u));margin-bottom:calc(1.1*var(--u))}
+  .ptitle h2{font-size:calc(1.05*var(--u));letter-spacing:.18em;color:var(--mut);font-weight:700;text-transform:uppercase}
+  .ptitle .count{font-size:calc(1.05*var(--u));font-weight:800;padding:calc(.15*var(--u)) calc(.8*var(--u));border-radius:999px;background:rgba(255,59,92,.15);color:var(--crit)}
+  .ptitle .count.zero{background:rgba(31,214,138,.12);color:var(--ok)}
+
+  /* alertas */
+  #alerts{position:relative;flex:1;min-height:0;display:grid;gap:calc(1*var(--u));align-content:start;overflow:hidden;grid-auto-rows:max-content;
+    grid-template-columns:1fr}
+  #alerts.c2{grid-template-columns:1fr 1fr}
+  #alerts.c3{grid-template-columns:1fr 1fr 1fr}
+  .alert{position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:calc(1.6*var(--u));align-items:center;
+    background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);border-radius:calc(1*var(--u));
+    padding:calc(1.2*var(--u)) calc(1.6*var(--u)) calc(1.2*var(--u)) calc(2*var(--u));overflow:hidden;
+    animation:enter .55s cubic-bezier(.2,.9,.3,1.2)}
+  .alert::before{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(.55*var(--u));background:var(--k)}
+  .alert.pon{--k:var(--crit);background:linear-gradient(90deg,rgba(255,59,92,.2),rgba(255,59,92,.04) 60%);border-color:rgba(255,59,92,.45);animation:enter .55s cubic-bezier(.2,.9,.3,1.2),glow 2s infinite .6s}
+  .alert.cto{--k:var(--crit2);background:linear-gradient(90deg,rgba(255,122,69,.14),rgba(255,122,69,.03) 60%);border-color:rgba(255,122,69,.35)}
+  .alert.parcial{--k:var(--warn);background:linear-gradient(90deg,rgba(255,176,32,.09),transparent 60%);border-color:rgba(255,176,32,.25)}
+  .alert.new{box-shadow:0 0 0 2px var(--k), 0 0 calc(3*var(--u)) var(--k)}
+  .alert.leaving{animation:leave .7s ease forwards}
+  .badge{display:inline-block;white-space:nowrap;font-size:calc(.85*var(--u));font-weight:800;letter-spacing:.14em;padding:calc(.25*var(--u)) calc(.7*var(--u));
+    border-radius:calc(.4*var(--u));background:var(--k);color:#14051a}
+  .alert .ico{width:calc(5.2*var(--u));height:calc(5.2*var(--u));border-radius:50%;display:grid;place-items:center;
+    background:color-mix(in srgb,var(--k) 18%,transparent);border:2px solid var(--k);color:var(--k)}
+  .alert .ico svg{width:55%;height:55%}
+  .alert.pon .ico{animation:ring 1.4s infinite}
+  .alert h3{font-size:calc(2.6*var(--u));font-weight:800;letter-spacing:-.01em;line-height:1.05;margin:calc(.35*var(--u)) 0}
+  .alert .meta{font-size:calc(1.15*var(--u));color:var(--mut);display:flex;flex-wrap:wrap;gap:calc(.4*var(--u)) calc(1.2*var(--u))}
+  .alert .meta b{color:var(--txt);font-weight:700}
+  .alert .causa{margin-top:calc(.5*var(--u));font-size:calc(1.1*var(--u));color:#cfe0ff}
+  .chips{display:flex;flex-wrap:wrap;gap:calc(.4*var(--u));margin-top:calc(.6*var(--u))}
+  .chip{font-size:calc(.95*var(--u));font-weight:700;padding:calc(.2*var(--u)) calc(.7*var(--u));border-radius:calc(.4*var(--u));
+    background:rgba(255,59,92,.18);border:1px solid rgba(255,59,92,.4)}
+  .alert .right{text-align:right;min-width:calc(11*var(--u))}
+  .alert .timer{font-size:calc(2.6*var(--u));font-weight:800;line-height:1;color:var(--k)}
+  .alert .tl{font-size:calc(.85*var(--u));color:var(--dim);letter-spacing:.12em;margin-top:calc(.25*var(--u))}
+  .alert .cli{margin-top:calc(.9*var(--u));font-size:calc(1.6*var(--u));font-weight:800}
+  .alert .cli small{display:block;font-size:calc(.8*var(--u));color:var(--dim);letter-spacing:.12em;font-weight:600}
+  /* modos compactos (muitos alertas) */
+  #alerts.c2 .alert h3{font-size:calc(1.9*var(--u))}
+  #alerts.c2 .alert .ico{width:calc(3.8*var(--u));height:calc(3.8*var(--u))}
+  #alerts.c2 .alert .timer{font-size:calc(1.9*var(--u))}
+  #alerts.c3 .alert{grid-template-columns:1fr auto;padding:calc(.9*var(--u)) calc(1.1*var(--u)) calc(.9*var(--u)) calc(1.5*var(--u));gap:calc(.8*var(--u))}
+  #alerts.c3 .alert .ico{display:none}
+  #alerts.c3 .alert h3{font-size:calc(1.55*var(--u))}
+  #alerts.c3 .alert .meta,#alerts.c3 .alert .causa{font-size:calc(.95*var(--u))}
+  #alerts.c3 .alert .timer{font-size:calc(1.5*var(--u))}
+  #alerts.c3 .alert .cli{font-size:calc(1.2*var(--u));margin-top:calc(.3*var(--u))}
+  #alerts.c3 .alert .tl,#alerts.c3 .chips{display:none}
+  #alerts.c3 .alert .right{min-width:0}
+  #alerts.c3 .alert h3{margin:calc(.2*var(--u)) 0}
+  #alerts.c3 .alert .badge{font-size:calc(.7*var(--u))}
+  #alerts.c3 .alert .meta,#alerts.c3 .alert .causa{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-wrap:nowrap}
+  #alerts.c3 .alert>div:nth-child(2){min-width:0}
+  #alerts.c2 .alert>div:nth-child(2){min-width:0}
+  .more{grid-column:1/-1;text-align:center;color:var(--txt);font-weight:700;font-size:calc(1.1*var(--u));padding:calc(.6*var(--u));background:rgba(255,59,92,.15);border-radius:calc(.6*var(--u))}
+
+  /* tudo ok */
+  .allok{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:calc(1.4*var(--u));text-align:center}
+  .allok.show{display:flex}
+  .allok .big{width:calc(13*var(--u));height:calc(13*var(--u));border-radius:50%;display:grid;place-items:center;
+    border:3px solid var(--ok);color:var(--ok);background:rgba(31,214,138,.07);animation:breathe 4s ease-in-out infinite}
+  .allok .big svg{width:50%;height:50%}
+  .allok h2{font-size:calc(3*var(--u));font-weight:800}
+  .allok p{font-size:calc(1.3*var(--u));color:var(--mut)}
+
+  /* coluna direita */
+  .side{display:grid;grid-template-rows:auto 1fr auto;gap:calc(1.1*var(--u));min-height:0}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:calc(.9*var(--u))}
+  .kpi{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:calc(.9*var(--u));padding:calc(.8*var(--u)) calc(1.2*var(--u))}
+  .kpi small{font-size:calc(.8*var(--u));letter-spacing:.14em;color:var(--mut);font-weight:700;text-transform:uppercase}
+  .kpi div{font-size:calc(2.6*var(--u));font-weight:800;line-height:1.1;margin-top:calc(.3*var(--u))}
+  .kpi div em{font-style:normal;font-size:calc(1.2*var(--u));color:var(--dim);font-weight:600}
+  .kpi.hot div{color:var(--crit)}
+  .kpi.warm div{color:var(--crit2)}
+  .kpi.okk div{color:var(--ok)}
+
+  .olts{display:flex;flex-direction:column;gap:calc(.8*var(--u));min-height:0;overflow:hidden}
+  .olt h4{display:flex;justify-content:space-between;font-size:calc(1*var(--u));letter-spacing:.12em;color:var(--txt);margin-bottom:calc(.5*var(--u));text-transform:uppercase}
+  .olt h4 span{color:var(--mut);letter-spacing:0;font-weight:500;text-transform:none}
+  .slots{display:flex;flex-direction:column;gap:calc(.3*var(--u))}
+  .slot{display:grid;grid-template-columns:calc(2.6*var(--u)) repeat(16,1fr);gap:calc(.25*var(--u));align-items:center}
+  .slot>b{font-size:calc(.75*var(--u));color:var(--dim);font-weight:700}
+  .ptile{height:calc(1.5*var(--u));border-radius:calc(.3*var(--u));display:grid;place-items:center;
+    font-size:calc(.68*var(--u));font-weight:700;color:rgba(232,241,255,.75);background:rgba(31,214,138,.13);border:1px solid rgba(31,214,138,.28)}
+  .ptile.none{background:transparent;border:1px dashed rgba(255,255,255,.06);color:transparent}
+  .ptile.parcial{background:rgba(255,176,32,.25);border-color:rgba(255,176,32,.7);color:#fff}
+  .ptile.cto{background:rgba(255,122,69,.45);border-color:var(--crit2);color:#fff}
+  .ptile.down{background:var(--crit);border-color:#ff8aa0;color:#fff;animation:blinkTile 1s infinite}
+  .legend{display:flex;gap:calc(1*var(--u));font-size:calc(.8*var(--u));color:var(--mut);margin-top:calc(.2*var(--u))}
+  .legend i{display:inline-block;width:calc(.8*var(--u));height:calc(.8*var(--u));border-radius:2px;margin-right:calc(.35*var(--u));vertical-align:middle}
+
+  .rec{display:flex;flex-direction:column;gap:calc(.45*var(--u))}
+  .recitem{display:flex;align-items:center;white-space:nowrap;overflow:hidden;gap:calc(.8*var(--u));font-size:calc(1*var(--u));padding:calc(.5*var(--u)) calc(.8*var(--u));
+    border-radius:calc(.5*var(--u));background:rgba(31,214,138,.07);border:1px solid rgba(31,214,138,.2);animation:enter .5s ease}
+  .recitem b{color:var(--ok)}
+  .recitem .sp{flex:1}
+  .recitem span{color:var(--mut)}
+  .empty{font-size:calc(.95*var(--u));color:var(--dim)}
+
+  footer{position:fixed;right:calc(2*var(--u));bottom:calc(.6*var(--u));font-size:calc(.75*var(--u));color:var(--dim)}
+
+  @keyframes enter{from{opacity:0;transform:translateX(-30px) scale(.98)}to{opacity:1;transform:none}}
+  @keyframes leave{to{opacity:0;transform:translateX(40px);filter:saturate(0)}}
+  @keyframes blink{50%{opacity:.25}}
+  @keyframes blinkTile{50%{background:rgba(255,59,92,.45)}}
+  @keyframes glow{50%{box-shadow:0 0 calc(2.4*var(--u)) rgba(255,59,92,.45)}}
+  @keyframes ring{0%{box-shadow:0 0 0 0 rgba(255,59,92,.6)}100%{box-shadow:0 0 0 calc(1.6*var(--u)) rgba(255,59,92,0)}}
+  @keyframes pulseBg{50%{filter:brightness(1.25)}}
+  @keyframes breathe{50%{box-shadow:0 0 calc(4*var(--u)) rgba(31,214,138,.35)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand"><b>updown</b><span>INTERNET</span></div>
+    <div class="htitle"><small>UPDOWN NOC</small><h1>Alertas GPON · PON e CTO</h1></div>
+    <div class="spacer"></div>
+    <div id="pill" class="pill stale"><i></i><span>CONECTANDO…</span></div>
+    <button id="snd" class="icon-btn" title="Som de alerta">🔇 Som</button>
+    <button id="fs" class="icon-btn" title="Tela cheia">⛶</button>
+    <div class="clock"><div class="t mono" id="clock">--:--:--</div><div class="d" id="date"></div></div>
+  </header>
+
+  <div>
+    <div id="massiva" class="banner massiva">⚠ QUEDA MASSIVA EM ANDAMENTO <span id="massivaTxt" style="font-weight:600"></span></div>
+    <div id="erro" class="banner erro"></div>
+  </div>
+
+  <main>
+    <section class="panel">
+      <div class="ptitle"><h2>Alertas ativos agora</h2><span id="acount" class="count zero">0</span></div>
+      <div id="alerts"></div>
+      <div id="allok" class="allok">
+        <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+        <h2>Rede GPON operando normalmente</h2>
+        <p id="okline">Nenhuma PON ou CTO fora do ar neste momento.</p>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="kpis">
+        <div class="kpi" id="k1"><small>PONs down</small><div>–</div></div>
+        <div class="kpi" id="k2"><small>CTOs down</small><div>–</div></div>
+        <div class="kpi" id="k3"><small>Clientes afetados</small><div>–</div></div>
+        <div class="kpi" id="k4"><small>Queda parcial</small><div>–</div></div>
+      </div>
+      <div class="panel olts" id="olts">
+        <div class="ptitle" style="margin-bottom:0"><h2>Portas PON</h2></div>
+      </div>
+      <div class="panel" style="padding-bottom:calc(1.1*var(--u))">
+        <div class="ptitle"><h2>Normalizadas recentemente</h2></div>
+        <div class="rec" id="rec"><div class="empty">Nada normalizado nos últimos minutos.</div></div>
+      </div>
+    </aside>
+  </main>
+</div>
+<footer id="foot">—</footer>
+
+<script>
+(() => {
+  const DEMO = new URLSearchParams(location.search).has('demo');
+  const POLL = 10000;
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  let state = null, offset = 0, known = new Set(), first = true, sound = false;
+  try { sound = localStorage.getItem('pon-sound') === '1'; } catch(e) {}
+
+  const ICON = {
+    pon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v10"/><path d="M5.6 7.5a8.5 8.5 0 1 0 12.8 0"/></svg>',
+    cto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9l6 6M15 9l-6 6"/></svg>',
+    parcial: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".6" fill="currentColor"/><path d="M10.3 3.8L2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z"/></svg>'
+  };
+  const LABEL = { pon: 'PON DOWN', cto: 'CTO DOWN', parcial: 'QUEDA PARCIAL' };
+
+  const nowS = () => Math.floor(Date.now() / 1000) + offset;
+  function dur(s) {
+    s = Math.max(0, s);
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    return h ? `${h}h${String(m).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`;
+  }
+  const hhmm = t => new Date(t * 1000).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+
+  // ---------- som ----------
+  let ac;
+  function beep(crit) {
+    if (!sound) return;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const seq = crit ? [880, 660, 880, 660] : [740, 990];
+      seq.forEach((f, i) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'square'; o.frequency.value = f; o.connect(g); g.connect(ac.destination);
+        const t = ac.currentTime + i * 0.22;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2); o.start(t); o.stop(t + 0.21);
+      });
+    } catch (e) {}
+  }
+  function paintSnd() { $('#snd').textContent = sound ? '🔊 Som' : '🔇 Som'; $('#snd').classList.toggle('on', sound); }
+  $('#snd').onclick = () => { sound = !sound; try { localStorage.setItem('pon-sound', sound ? '1' : '0'); } catch(e) {} paintSnd(); beep(false); };
+  $('#fs').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(()=>{});
+  paintSnd();
+
+  // ---------- render ----------
+  function cardHTML(a) {
+    const where = [
+      a.olt_name ? `OLT <b>${esc(a.olt_name)}</b>` : '',
+      a.pon && a.kind !== 'pon' ? `PON <b>${esc(a.pon)}</b>` : (a.kind !== 'pon' ? '<span style="color:var(--dim)">PON não mapeada</span>' : ''),
+      a.kind === 'pon' && a.onus ? `ONUs monitoradas <b>${a.onus_online}/${a.onus}</b> online` : '',
+      a.kind === 'parcial' ? `Sessões <b>${a.sessoes}/${a.clientes}</b>` : ''
+    ].filter(Boolean).join('<span style="color:var(--dim)">·</span>');
+    const chips = a.kind === 'pon' && a.ctos && a.ctos.length
+      ? `<div class="chips">${a.ctos.map(c => `<span class="chip">CTO ${esc(c)}</span>`).join('')}</div>` : '';
+    const cli = a.kind === 'parcial' ? (a.clientes - a.sessoes) : a.clientes;
+    return `
+      <div class="ico">${ICON[a.kind]}</div>
+      <div>
+        <span class="badge">${LABEL[a.kind]}</span>
+        <h3>${esc(a.title)}</h3>
+        <div class="meta">${where}</div>
+        ${a.causa ? `<div class="causa">${esc(a.causa)}</div>` : ''}
+        ${chips}
+      </div>
+      <div class="right">
+        <div class="timer mono" data-since="${a.since}">${dur(nowS() - a.since)}</div>
+        <div class="tl">DESDE ${hhmm(a.since)}</div>
+        ${cli ? `<div class="cli">${cli}<small>${a.kind === 'parcial' ? 'OFFLINE' : 'CLIENTES'}</small></div>` : ''}
+      </div>`;
+  }
+
+  function renderAlerts(list) {
+    const box = $('#alerts');
+    const n = list.length;
+    box.className = n > 8 ? 'c3' : n > 4 ? 'c2' : '';
+    const max = n > 8 ? 18 : n > 4 ? 8 : 4;
+    const shown = list.slice(0, max);
+    const ids = new Set(shown.map(a => a.id));
+    // remove os que saíram (com animação)
+    box.querySelectorAll('.alert').forEach(el => {
+      if (!ids.has(el.dataset.id) && !el.classList.contains('leaving')) {
+        el.classList.add('leaving'); setTimeout(() => el.remove(), 700);
+      }
+    });
+    box.querySelector('.more')?.remove();
+    let prev = null;
+    shown.forEach(a => {
+      let el = box.querySelector(`.alert[data-id="${CSS.escape(a.id)}"]:not(.leaving)`);
+      const html = cardHTML(a);
+      if (!el) {
+        el = document.createElement('div');
+        el.dataset.id = a.id;
+        el.className = `alert ${a.kind}` + (first ? '' : ' new');
+        if (!first) setTimeout(() => el.classList.remove('new'), 8000);
+      } else {
+        el.className = el.className.replace(/\b(pon|cto|parcial)\b/, a.kind);
+      }
+      if (el._h !== html) { el.innerHTML = html; el._h = html; }
+      if (prev ? prev.nextSibling !== el : box.firstChild !== el) {
+        prev ? prev.after(el) : box.prepend(el);
+      }
+      prev = el;
+    });
+    // esconde os cards que não cabem na tela e mostra "+N"
+    requestAnimationFrame(() => {
+      box.querySelector('.more')?.remove();
+      const cards = [...box.querySelectorAll('.alert:not(.leaving)')];
+      cards.forEach(c => c.style.visibility = '');
+      const bottom = c => c.offsetTop + c.offsetHeight;
+      const over = cards.some(c => bottom(c) > box.clientHeight) || n > cards.length;
+      const cut = box.clientHeight - (over ? 46 : 0);
+      let visible = 0;
+      cards.forEach(c => { if (bottom(c) > cut) c.style.visibility = 'hidden'; else visible++; });
+      const hidden = n - visible;
+      if (hidden > 0) {
+        const m = document.createElement('div'); m.className = 'more';
+        m.textContent = `+ ${hidden} alertas além dos exibidos (veja o Zabbix)`; box.append(m);
+        m.style.position = 'absolute'; m.style.left = '0'; m.style.right = '0'; m.style.bottom = '0';
+      }
+    });
+    $('#allok').classList.toggle('show', n === 0);
+    box.style.display = n ? '' : 'none';
+    const ac = $('#acount'); ac.textContent = n; ac.classList.toggle('zero', n === 0);
+  }
+
+  function kpi(id, v, cls, extra) {
+    const el = $(id); el.className = 'kpi ' + (cls || '');
+    el.querySelector('div').innerHTML = v + (extra ? ` <em>${extra}</em>` : '');
+  }
+
+  function slotRows(pons) {
+    const by = {};
+    pons.forEach(p => { const [r, sl, n] = p.pon.split('/').map(Number); (by[`${r}/${sl}`] ||= {})[n] = p; });
+    return Object.keys(by).sort((a, b) => a.split('/')[1] - b.split('/')[1]).map(k => {
+      const row = by[k], max = Math.max(16, ...Object.keys(row).map(Number));
+      let h = `<div class="slot" style="grid-template-columns:calc(2.6*var(--u)) repeat(${max},1fr)"><b>${k}</b>`;
+      for (let i = 1; i <= max; i++) {
+        const p = row[i];
+        h += p ? `<div class="ptile ${p.status}" title="PON ${p.pon} · ${p.online}/${p.onus} ONUs online · ${p.ctos} CTOs">${i}</div>` : '<div class="ptile none"></div>';
+      }
+      return h + '</div>';
+    }).join('');
+  }
+
+  function render() {
+    if (!state) return;
+    const s = state.summary || {};
+    const alerts = state.alerts || [];
+    const crit = alerts.some(a => a.kind !== 'parcial');
+
+    // pill
+    const pill = $('#pill');
+    const stale = !state.ok || (state.updated && nowS() - state.updated > (state.poll_seconds || 30) * 4);
+    pill.className = 'pill ' + (stale ? 'stale' : crit ? 'bad' : 'ok');
+    pill.querySelector('span').textContent = stale ? 'SEM DADOS RECENTES'
+      : crit ? `${alerts.filter(a => a.kind !== 'parcial').length} FORA DO AR` : 'TUDO OPERANDO';
+    document.body.classList.toggle('alarm', crit);
+
+    $('#massiva').classList.toggle('show', !!s.massiva);
+    $('#massivaTxt').textContent = s.massiva ? `— ${s.ctos_down} CTOs sem clientes online · ${s.clientes_afetados} clientes` : '';
+    const er = $('#erro'); er.classList.toggle('show', !!state.error); er.textContent = state.error || '';
+
+    renderAlerts(alerts);
+    kpi('#k1', s.pons_down ?? '–', s.pons_down ? 'hot' : 'okk', s.pons_total ? `/ ${s.pons_total}` : '');
+    kpi('#k2', s.ctos_down ?? '–', s.ctos_down ? 'warm' : 'okk', s.ctos_total ? `/ ${s.ctos_total}` : '');
+    kpi('#k3', s.clientes_afetados ?? '–', s.clientes_afetados ? 'warm' : 'okk');
+    kpi('#k4', s.ctos_parcial ?? '–', s.ctos_parcial ? '' : 'okk', 'CTOs');
+    $('#okline').textContent = `${s.ctos_total ?? 0} CTOs e ${s.pons_total ?? 0} PONs monitoradas · nenhuma fora do ar neste momento.`;
+
+    // OLTs
+    const olts = $('#olts');
+    olts.querySelectorAll('.olt,.legend,.empty').forEach(e => e.remove());
+    (state.olts || []).forEach(o => {
+      const bad = o.pons.filter(p => p.status !== 'ok').length;
+      const d = document.createElement('div'); d.className = 'olt';
+      d.innerHTML = `<h4>${esc(o.name)}<span>${o.pons.length} PONs${bad ? ` · <b style="color:var(--crit)">${bad} com alerta</b>` : ''}</span></h4>
+        <div class="slots">${slotRows(o.pons)}</div></div>`;
+      olts.append(d);
+    });
+    if (!(state.olts || []).length) olts.insertAdjacentHTML('beforeend', '<div class="empty">Sem dados de PON ainda.</div>');
+    olts.insertAdjacentHTML('beforeend', `<div class="legend"><span><i style="background:rgba(31,214,138,.5)"></i>OK</span><span><i style="background:var(--warn)"></i>Parcial</span><span><i style="background:var(--crit2)"></i>CTO down</span><span><i style="background:var(--crit)"></i>PON down</span></div>`);
+
+    // normalizadas
+    const rec = (state.recovered || []).slice(0, 3);
+    $('#rec').innerHTML = rec.length ? rec.map(r => `
+      <div class="recitem"><b>✓</b><strong>${esc(r.title)}</strong>${r.pon && r.kind !== 'pon' ? `<span>PON ${esc(r.pon)}</span>` : ''}
+      <div class="sp"></div><span>voltou ${hhmm(r.until)} · ficou ${dur(r.until - r.since)} fora</span></div>`).join('')
+      : '<div class="empty">Nada normalizado nos últimos minutos.</div>';
+
+    $('#foot').textContent = state.updated
+      ? `Fonte: Zabbix UpDown · coleta ${hhmm(state.updated)}${s.cto_map === 0 ? ' · CTO→PON sem mapa (veja cto_map.json)' : ''}` : '';
+  }
+
+  function tick() {
+    const d = new Date();
+    $('#clock').textContent = d.toLocaleTimeString('pt-BR');
+    $('#date').textContent = d.toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long'});
+    document.querySelectorAll('.timer[data-since]').forEach(el => el.textContent = dur(nowS() - +el.dataset.since));
+  }
+
+  async function poll() {
+    try {
+      const st = DEMO ? demoState() : await fetch('api/state', {cache: 'no-store'}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+      if (st.updated && !DEMO) offset = 0;
+      const newOnes = (st.alerts || []).filter(a => !known.has(a.id));
+      if (!first && newOnes.length) beep(newOnes.some(a => a.kind === 'pon'));
+      known = new Set((st.alerts || []).map(a => a.id));
+      state = st; render(); first = false;
+    } catch (e) {
+      state = state ? {...state, ok: false, error: 'Sem conexão com o servidor do painel (' + e.message + ')'} : {ok:false, error:'Sem conexão com o servidor do painel', summary:{}, alerts:[], olts:[]};
+      render();
+    }
+  }
+
+  // ---------- modo demonstração (?demo) ----------
+  let demoT0 = Math.floor(Date.now()/1000), demoRec = [];
+  function demoState() {
+    const now = Math.floor(Date.now()/1000), k = Math.floor((now - demoT0) / 20) % 4;
+    const mk = (olt, n) => { const out = []; for (let s = 1; s <= (olt === 'vilanatal' ? 4 : 3); s++) for (let p = 1; p <= 16; p++) out.push({pon:`1/${olt==='vilanatal'?s+8:s+1}/${p}`, status:'ok', onus:8, online:8, ctos:4}); return out; };
+    const olts = [{key:'casqueiro', name:'C300 Casqueiro', pons:mk('casqueiro')}, {key:'vilanatal', name:'C350 Vila Natal', pons:mk('vilanatal')}];
+    const alerts = [];
+    if (k !== 3) alerts.push({id:'pon:vilanatal:1/10/13', kind:'pon', title:'PON 1/10/13', olt:'vilanatal', olt_name:'C350 Vila Natal', pon:'1/10/13', ctos:['012','013','017','022'], clientes:61, onus:9, onus_online:0, causa:'Todas as 9 ONUs monitoradas fora · Todas as 4 CTOs da PON sem clientes online', since: demoT0 - 754});
+    alerts.push({id:'cto:041', kind:'cto', cto:'041', title:'CTO 041', olt:'casqueiro', olt_name:'C300 Casqueiro', pon:'1/3/7', clientes:14, sessoes:0, causa:'Queda de energia: 9 ONUs', since: demoT0 - 302});
+    if (k >= 1) alerts.push({id:'cto:108', kind:'cto', cto:'108', title:'CTO 108', olt:'vilanatal', olt_name:'C350 Vila Natal', pon:'1/11/2', clientes:11, sessoes:0, causa:'Rompimento de fibra (LOS): 11 ONUs', since: demoT0 + 20});
+    alerts.push({id:'parcial:077', kind:'parcial', cto:'077', title:'CTO 077', olt:'casqueiro', olt_name:'C300 Casqueiro', pon:'1/2/12', clientes:16, sessoes:9, causa:'Queda de energia: 5 ONUs · Offline sem causa informada: 2 ONUs', problema:'Queda parcial', since: demoT0 - 95});
+    const paint = (o, p, st) => { const x = olts.find(a => a.key === o).pons.find(q => q.pon === p); if (x) x.status = st; };
+    alerts.forEach(a => paint(a.olt, a.pon, a.kind === 'pon' ? 'down' : a.kind));
+    if (k === 3 && !demoRec.length) demoRec = [{id:'pon:vilanatal:1/10/13', kind:'pon', title:'PON 1/10/13', pon:'1/10/13', since: demoT0 - 754, until: now}];
+    if (k !== 3) demoRec = [];
+    const down = alerts.filter(a => a.kind !== 'parcial');
+    return {updated: now, ok: true, error: null, poll_seconds: 30,
+      summary: {ctos_total: 482, ctos_down: down.reduce((n,a)=>n+(a.kind==='pon'?a.ctos.length:1),0), ctos_parcial: 1,
+        clientes_afetados: down.reduce((n,a)=>n+a.clientes,0), pons_total: 112, pons_down: alerts.filter(a=>a.kind==='pon').length,
+        massiva: false, cto_map: 482},
+      alerts, recovered: demoRec, olts};
+  }
+
+  tick(); setInterval(tick, 1000);
+  poll(); setInterval(poll, DEMO ? 2500 : POLL);
+})();
+</script>
+</body>
+</html>
