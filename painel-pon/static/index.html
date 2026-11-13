@@ -287,7 +287,7 @@
   function cardHTML(a) {
     const where = [
       a.olt_name ? `OLT <b>${esc(a.olt_name)}</b>` : '',
-      a.pon && a.kind !== 'pon' ? `PON <b>${esc(a.pon)}</b>` : (a.kind !== 'pon' ? '<span style="color:var(--dim)">PON não mapeada</span>' : ''),
+      a.pon && a.kind !== 'pon' ? `PON <b>${esc(a.pon)}</b>` : '',
       a.kind === 'pon' && a.onus ? `ONUs monitoradas <b>${a.onus_online}/${a.onus}</b> online` : '',
       a.kind === 'parcial' ? `Sessões <b>${a.sessoes}/${a.clientes}</b>` : ''
     ].filter(Boolean).join('<span style="color:var(--dim)">·</span>');
