@@ -86,6 +86,8 @@ RECOVERED_KEEP = env("RECOVERED_KEEP", "180", int)
 # Quantas coletas seguidas a CTO precisa estar com 0 sessões para virar alerta.
 CONFIRM_POLLS = env("CONFIRM_POLLS", "1", int)
 MASSIVE_MIN = env("MASSIVE_MIN", "5", int)
+# "CTOs" do IXC que não são caixa de verdade: ficam fora da tela (lista separada por vírgula)
+CTO_IGNORAR = env("CTO_IGNORAR", "ERRO,CLIENTES FUSIONADOS,EQUIPAMENTO COM CLIENTE")
 # Mesmo critério do WhatsApp: só entra o que as ações desta mídia enviariam
 WPP_MEDIA = env("WPP_MEDIA", "Wpp PON")
 # Login: por padrão usa os mesmos usuários do Painel das OLTs (painel-auth).
@@ -213,6 +215,24 @@ def find_cto_pon_pairs(obj, out):
                     if p:
                         out[str(k)] = {"pon": p, "olt": olt_key(str(lower.get("olt", ""))) if lower.get("olt") else None}
                         break
+
+
+def _norm_txt(t):
+    import unicodedata
+    t = unicodedata.normalize("NFKD", str(t or "")).encode("ascii", "ignore").decode()
+    return re.sub(r"[\s_\-]+", " ", t).strip().upper()
+
+
+IGNORE_CTOS = [_norm_txt(x) for x in CTO_IGNORAR.split(",") if x.strip()]
+
+
+def cto_ignored(*texts):
+    """True se a CTO (ou o nome do problema) for uma das 'CTOs' que não são caixa."""
+    for t in texts:
+        n = _norm_txt(t)
+        if n and any(ig == n or re.search(r"(^|\W)" + re.escape(ig) + r"($|\W)", n) for ig in IGNORE_CTOS):
+            return True
+    return False
 
 
 def norm_cto(c, known):
@@ -409,6 +429,8 @@ class Engine:
                 if not m:
                     continue
                 kind, cto = m.group(1), m.group(2)
+                if cto_ignored(cto):
+                    continue
                 c = ctos.setdefault(cto, {"cto": cto})
                 c[kind] = it["lastvalue"]
                 c["clock"] = max(c.get("clock", 0), to_int(it["lastclock"], 0))
@@ -428,7 +450,7 @@ class Engine:
             for line in re.split(r"[\n;|]+", lista):
                 m = CTO_NAME_RE.search(line)
                 pn = pon_of(line)
-                if m and pn:
+                if m and pn and not cto_ignored(m.group(1), line):
                     k = olt_key(line)
                     cto_map.setdefault(m.group(1), {"pon": pn, "olt": k if k in OLT_NAMES else None})
             self.debug["lista"] = lista[:3000]
@@ -480,7 +502,7 @@ class Engine:
             if not cto:
                 m = CTO_NAME_RE.search(name)
                 cto = m.group(1) if m else None
-            if not cto:
+            if not cto or cto_ignored(cto, name):
                 continue
             cto = norm_cto(cto, ctos)
             dest = parcial_by_cto if re.search(r"parcial", name, re.I) else prob_by_cto
@@ -490,7 +512,7 @@ class Engine:
             mclock = min(to_int(p["clock"], now) for p in massive)
             for line in re.split(r"[\n;|,]+", global_items.get("ixc.cto.quedas.lista", "") or ""):
                 m = CTO_NAME_RE.search(line)
-                if m:
+                if m and not cto_ignored(m.group(1), line):
                     c = norm_cto(m.group(1), ctos)
                     prob_by_cto.setdefault(c, [{"clock": str(mclock), "name": "Queda massiva"}])
 

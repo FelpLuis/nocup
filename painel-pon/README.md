@@ -12,6 +12,7 @@ A tela não tem regra própria para CTO: ela lê no Zabbix **as ações que envi
 | **Queda massiva** | o trigger "Queda massiva" ativo acende a faixa; as CTOs da `ixc.cto.quedas.lista` entram como cards, com a PON de cada uma |
 | **Queda parcial** | desligada por padrão (`SHOW_PARTIAL=0`): a tela é só para CTO ou PON **inteira** fora |
 | **PON down** | PON **inteira** fora: a OLT informa a porta DOWN **e** a PON tem cliente, ou **todas** as CTOs com cliente dela estão fora. Algumas ONUs desconectadas não bastam: as ONUs monitoradas no grupo `GPON/ONUs` são só uma amostra dos clientes |
+| **CTOs ignoradas** | ERRO, CLIENTES FUSIONADOS e EQUIPAMENTO COM CLIENTE nunca aparecem (`CTO_IGNORAR` no `config.env`) |
 | **PON sem cliente** | nunca é alerta, mesmo com a porta down na OLT; aparece apagada na grade |
 
 Se o token não puder ler as ações (`action.get`), a tela usa os problemas ativos do host `IXC - CTO`. Para usar exatamente as ações, dê ao usuário do token o papel **Admin** (leitura).
