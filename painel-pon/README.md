@@ -2,20 +2,21 @@
 
 Tela para o telão do NOC: mostra **só o que está fora do ar agora**. Quando uma PON ou CTO cai, o card aparece (com som opcional). Quando ela volta, o card sai da tela e passa alguns minutos na lista "Normalizadas recentemente".
 
-## De onde vêm os dados (Zabbix próprio 190.111.110.13:19090)
+## Critério dos alertas (o mesmo do WhatsApp "Wpp PON")
 
-| O que | Fonte no Zabbix | Regra |
-|---|---|---|
-| **CTO down** | host `IXC - CTO`: `clientesCTO[NNN]` e `sessoesCTO[NNN]` | clientes > 0 e **0 sessões online** |
-| **Queda parcial** | problemas ativos no host `IXC - CTO` com tag `cto` | trigger "Queda parcial no número de sessões" ativo |
-| **Causa** | `causaCTO[NNN]` | ex.: "Queda de energia: 9 ONUs" |
-| **PON down** | grupo `GPON/ONUs` (`onu.olt`, `onu.porta`, `onu.estado`) | todas as ONUs monitoradas da PON fora (mín. 2) |
-| | grupo `OLTs UpDown`, status operacional da interface `gpon-olt_x/y/z` | se o template coletar: status 2/7 = down |
-| | CTO → PON (JSON do IXC ou `cto_map.json`) | todas as CTOs da PON sem cliente online |
-| **Queda massiva** | contagem de CTOs down / `ixc.cto.quedas` | ≥ `MASSIVE_MIN` acende a faixa |
-| **Desde quando** | horário do problema no Zabbix; se não houver, a 1ª coleta em que apareceu | |
+A tela não tem regra própria para CTO: ela lê no Zabbix **as ações que enviam para a mídia `Wpp PON`** e aplica as mesmas condições (host, grupo, nome do trigger, severidade, tags…) aos problemas ativos. O que iria para o WhatsApp aparece na TV. Quando o problema é resolvido no Zabbix, o card sai.
 
-Quando uma PON está down, as CTOs dela ficam **agrupadas dentro do card da PON**, sem repetir um card por CTO.
+| O que | Regra |
+|---|---|
+| **CTO down** | problema ativo que passa nas condições das ações da `Wpp PON` e cita a CTO (tag `cto` ou "CTO 012" no nome) |
+| **Queda massiva** | o trigger "Queda massiva" ativo acende a faixa; as CTOs da `ixc.cto.quedas.lista` entram como cards, com a PON de cada uma |
+| **Queda parcial** | só aparece se as ações da `Wpp PON` também enviam esse trigger |
+| **PON down** | a PON **tem cliente** e **todos os clientes monitorados estão desconectados** (`onu.motivo_desconexao` preenchido, igual ao trigger "Cliente desconectado"), ou todas as CTOs com cliente dela estão fora |
+| **PON sem cliente** | nunca é alerta, mesmo com a porta down na OLT; aparece apagada na grade |
+
+O rodapé da tela mostra qual critério está valendo. Se o token não puder ler as ações (`action.get`), a tela avisa e usa os problemas ativos do host `IXC - CTO`. Para usar exatamente as ações, dê ao usuário do token o papel **Admin** (leitura).
+
+**Conferir o critério:** com login, abra `/api/debug`. Mostra as ações encontradas, as condições, os problemas que passaram no filtro e o texto da lista de queda massiva.
 
 ## Instalação (UPT-UBUNTU02)
 
@@ -57,6 +58,5 @@ O painel tenta tirar a PON de cada CTO do JSON que o template do IXC já coleta 
 
 ## Ajustes (config.env)
 
-- `CONFIRM_POLLS=2` para exigir duas coletas seguidas antes de mostrar uma CTO (menos falso positivo).
 - `SHOW_PARTIAL=0` para mostrar só quedas totais.
 - `PON_MIN_ONUS` / `PON_MIN_CTOS` controlam quando uma PON é considerada down.

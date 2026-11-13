@@ -158,6 +158,7 @@
   .ptile{height:calc(1.5*var(--u));border-radius:calc(.3*var(--u));display:grid;place-items:center;
     font-size:calc(.68*var(--u));font-weight:700;color:rgba(232,241,255,.75);background:rgba(31,214,138,.13);border:1px solid rgba(31,214,138,.28)}
   .ptile.none{background:transparent;border:1px dashed rgba(255,255,255,.06);color:transparent}
+  .ptile.vaga{background:transparent;border:1px solid rgba(255,255,255,.07);color:var(--dim)}
   .ptile.parcial{background:rgba(255,176,32,.25);border-color:rgba(255,176,32,.7);color:#fff}
   .ptile.cto{background:rgba(255,122,69,.45);border-color:var(--crit2);color:#fff}
   .ptile.down{background:var(--crit);border-color:#ff8aa0;color:#fff;animation:blinkTile 1s infinite}
@@ -379,7 +380,7 @@
       let h = `<div class="slot" style="grid-template-columns:calc(2.6*var(--u)) repeat(${max},1fr)"><b>${k}</b>`;
       for (let i = 1; i <= max; i++) {
         const p = row[i];
-        h += p ? `<div class="ptile ${p.status}" title="PON ${p.pon} · ${p.online}/${p.onus} ONUs online · ${p.ctos} CTOs">${i}</div>` : '<div class="ptile none"></div>';
+        h += p ? `<div class="ptile ${p.status}" title="PON ${p.pon} · ${p.status === 'vaga' ? 'sem cliente' : p.online + '/' + p.onus + ' ONUs online · ' + p.ctos + ' CTOs'}">${i}</div>` : '<div class="ptile none"></div>';
       }
       return h + '</div>';
     }).join('');
@@ -400,7 +401,7 @@
     document.body.classList.toggle('alarm', crit);
 
     $('#massiva').classList.toggle('show', !!s.massiva);
-    $('#massivaTxt').textContent = s.massiva ? `— ${s.ctos_down} CTOs sem clientes online · ${s.clientes_afetados} clientes` : '';
+    $('#massivaTxt').textContent = s.massiva ? `— ${s.ctos_down} CTOs fora do ar · ${s.clientes_afetados} clientes desconectados` : '';
     const er = $('#erro'); er.classList.toggle('show', !!state.error); er.textContent = state.error || '';
 
     renderAlerts(alerts);
@@ -414,14 +415,15 @@
     const olts = $('#olts');
     olts.querySelectorAll('.olt,.legend,.empty').forEach(e => e.remove());
     (state.olts || []).forEach(o => {
-      const bad = o.pons.filter(p => p.status !== 'ok').length;
+      const bad = o.pons.filter(p => !['ok', 'vaga'].includes(p.status)).length;
+      const used = o.pons.filter(p => p.status !== 'vaga').length;
       const d = document.createElement('div'); d.className = 'olt';
-      d.innerHTML = `<h4>${esc(o.name)}<span>${o.pons.length} PONs${bad ? ` · <b style="color:var(--crit)">${bad} com alerta</b>` : ''}</span></h4>
+      d.innerHTML = `<h4>${esc(o.name)}<span>${used} PONs em uso${bad ? ` · <b style="color:var(--crit)">${bad} com alerta</b>` : ''}</span></h4>
         <div class="slots">${slotRows(o.pons)}</div></div>`;
       olts.append(d);
     });
     if (!(state.olts || []).length) olts.insertAdjacentHTML('beforeend', '<div class="empty">Sem dados de PON ainda.</div>');
-    olts.insertAdjacentHTML('beforeend', `<div class="legend"><span><i style="background:rgba(31,214,138,.5)"></i>OK</span><span><i style="background:var(--warn)"></i>Parcial</span><span><i style="background:var(--crit2)"></i>CTO down</span><span><i style="background:var(--crit)"></i>PON down</span></div>`);
+    olts.insertAdjacentHTML('beforeend', `<div class="legend"><span><i style="background:rgba(31,214,138,.5)"></i>OK</span><span><i style="background:transparent;border:1px solid rgba(255,255,255,.25)"></i>Sem cliente</span><span><i style="background:var(--warn)"></i>Parcial</span><span><i style="background:var(--crit2)"></i>CTO down</span><span><i style="background:var(--crit)"></i>PON down</span></div>`);
 
     // normalizadas
     const rec = (state.recovered || []).slice(0, 3);
@@ -431,7 +433,7 @@
       : '<div class="empty">Nada normalizado nos últimos minutos.</div>';
 
     $('#foot').textContent = state.updated
-      ? `Fonte: Zabbix UpDown · coleta ${hhmm(state.updated)}${s.cto_map === 0 ? ' · CTO→PON sem mapa (veja cto_map.json)' : ''}` : '';
+      ? `Fonte: Zabbix UpDown · coleta ${hhmm(state.updated)}${s.criterio ? ' · Critério: ' + s.criterio : ''}${s.cto_map === 0 ? ' · CTO→PON sem mapa' : ''}` : '';
   }
 
   function tick() {

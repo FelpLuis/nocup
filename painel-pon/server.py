@@ -86,6 +86,8 @@ RECOVERED_KEEP = env("RECOVERED_KEEP", "180", int)
 # Quantas coletas seguidas a CTO precisa estar com 0 sessões para virar alerta.
 CONFIRM_POLLS = env("CONFIRM_POLLS", "1", int)
 MASSIVE_MIN = env("MASSIVE_MIN", "5", int)
+# Mesmo critério do WhatsApp: só entra o que as ações desta mídia enviariam
+WPP_MEDIA = env("WPP_MEDIA", "Wpp PON")
 # Login: por padrão usa os mesmos usuários do Painel das OLTs (painel-auth).
 # LOGIN=0 desliga. BASIC_AUTH=usuario:senha[,usuario2:senha2] adiciona contas locais.
 LOGIN = env("LOGIN", "1") == "1"
@@ -227,6 +229,71 @@ def norm_cto(c, known):
     return c
 
 
+# ------------------------------------------------- critério da mídia Wpp ---
+CTO_NAME_RE = re.compile(r"\bCTO\s*[:#\-]?\s*([0-9][\w\-.]*|[A-Z][\w\-.]*\d[\w\-.]*)", re.I)
+
+
+def _cmp_text(op, have, want):
+    have, want = (have or "").lower(), (want or "").lower()
+    return {0: have == want, 1: have != want, 2: want in have, 3: want not in have}.get(op, True)
+
+
+def _cmp_num(op, have, want):
+    return {0: have == want, 1: have != want, 5: have >= want, 6: have <= want}.get(op, True)
+
+
+def condition_ok(c, prob, ctx):
+    """Avalia uma condição de ação do Zabbix (eventsource 0 = triggers) para um problema."""
+    t, op, val = int(c["conditiontype"]), int(c["operator"]), c.get("value", "")
+    tags = prob.get("tags", [])
+    if t == 3:                                    # nome do evento / trigger
+        return _cmp_text(op, prob["name"], val)
+    if t == 4:                                    # severidade
+        return _cmp_num(op, int(prob["severity"]), int(val))
+    if t == 2:                                    # trigger
+        return (prob["objectid"] == val) == (op == 0)
+    if t == 25:                                   # nome da tag
+        hit = any(_cmp_text(0 if op in (0, 1) else 2, x["tag"], val) for x in tags)
+        return hit if op in (0, 2) else not hit
+    if t == 26:                                   # valor da tag (value2 = nome da tag)
+        vals = [x["value"] for x in tags if x["tag"] == c.get("value2", "")]
+        hit = any(_cmp_text(0 if op in (0, 1) else 2, v, val) for v in vals)
+        return hit if op in (0, 2) else not hit
+    if t == 16:                                   # problema suprimido
+        sup = str(prob.get("suppressed", "0")) == "1"
+        return sup if op == 10 else not sup
+    if t in (0, 1, 13):                           # grupo, host, template
+        h = ctx.get(prob["objectid"], {})
+        pool = {0: h.get("groups", set()), 1: h.get("hosts", set()), 13: h.get("templates", set())}[t]
+        return (val in pool) == (op == 0)
+    return True                                   # janela de tempo etc.: não restringe
+
+
+def filter_ok(flt, prob, ctx):
+    conds = flt.get("conditions", []) or []
+    if not conds:
+        return True
+    res = {c.get("formulaid") or str(i): condition_ok(c, prob, ctx) for i, c in enumerate(conds)}
+    ev = int(flt.get("evaltype", 0))
+    if ev == 1:
+        return all(res.values())
+    if ev == 2:
+        return any(res.values())
+    if ev == 3 and flt.get("formula"):
+        expr = re.sub(r"\b([A-Z]{1,3})\b", lambda m: str(res.get(m.group(1), True)), flt["formula"])
+        expr = expr.replace("and", " and ").replace("or", " or ").replace("not", " not ")
+        if re.fullmatch(r"[\sTrueFalsandotr()]*", expr):
+            try:
+                return bool(eval(expr, {"__builtins__": {}}, {}))
+            except Exception:
+                pass
+        return all(res.values())
+    by_type = {}                                  # 0 = e/ou: mesmo tipo OU, tipos diferentes E
+    for i, c in enumerate(conds):
+        by_type.setdefault(c["conditiontype"], []).append(res[c.get("formulaid") or str(i)])
+    return all(any(v) for v in by_type.values())
+
+
 # ----------------------------------------------------------------- engine ---
 class Engine:
     def __init__(self):
@@ -236,6 +303,8 @@ class Engine:
                       "summary": {}, "alerts": [], "recovered": [], "olts": []}
         self.persist = {"first_seen": {}, "down_streak": {}, "recovered": []}
         self.ids = {}
+        self.wpp, self.wpp_t = None, 0
+        self.debug = {}
         try:
             self.persist.update(json.loads(STATE_FILE.read_text()))
         except Exception:
@@ -259,6 +328,64 @@ class Engine:
         log("ids:", self.ids)
         return self.ids
 
+    # ---- ações do Zabbix que mandam para a mídia Wpp PON (cache de 10 min) ----
+    def wpp_rules(self):
+        if self.wpp is not None and time.time() - self.wpp_t < 600:
+            return self.wpp
+        z = self.zbx
+        r = {"ok": False, "actions": [], "err": None}
+        try:
+            mts = z.call("mediatype.get", {"output": ["mediatypeid", "name"]})
+            mt = [m for m in mts if m["name"].strip().lower() == WPP_MEDIA.strip().lower()]
+            if not mt:
+                raise RuntimeError(f"mídia '{WPP_MEDIA}' não encontrada (ou o token não pode ler mídias)")
+            mid = mt[0]["mediatypeid"]
+            acts = z.call("action.get", {
+                "output": ["actionid", "name", "status", "eventsource"],
+                "filter": {"eventsource": 0, "status": 0},
+                "selectFilter": "extend", "selectOperations": "extend",
+            })
+            for a in acts:
+                if any(str((op.get("opmessage") or {}).get("mediatypeid")) == str(mid)
+                       for op in a.get("operations", [])):
+                    r["actions"].append({"name": a["name"], "filter": a.get("filter") or {}})
+            r["ok"] = bool(r["actions"])
+            if not r["ok"]:
+                r["err"] = f"nenhuma ação ativa envia para a mídia '{WPP_MEDIA}' (ou o token não pode ler ações)"
+        except Exception as e:
+            r["err"] = str(e)
+        if r["ok"]:
+            log("critério Wpp PON: " + ", ".join(a["name"] for a in r["actions"]))
+        else:
+            log("critério Wpp PON indisponível (" + str(r["err"]) + ") — usando os problemas do host " + CTO_HOST)
+        self.wpp, self.wpp_t = r, time.time()
+        return r
+
+    def host_ctx(self, problems, need):
+        """triggerid -> {hosts, groups, templates} só se alguma condição usa host/grupo/template."""
+        if not need or not problems:
+            return {}
+        z = self.zbx
+        trg = z.call("trigger.get", {"triggerids": list({p["objectid"] for p in problems}),
+                                     "output": ["triggerid"], "selectHosts": ["hostid"]})
+        hostids = list({h["hostid"] for t in trg for h in t["hosts"]})
+        try:
+            hosts = z.call("host.get", {"hostids": hostids, "output": ["hostid"],
+                                        "selectHostGroups": ["groupid"], "selectParentTemplates": ["templateid"]})
+        except Exception:
+            hosts = z.call("host.get", {"hostids": hostids, "output": ["hostid"],
+                                        "selectGroups": ["groupid"], "selectParentTemplates": ["templateid"]})
+        hinfo = {h["hostid"]: h for h in hosts}
+        ctx = {}
+        for t in trg:
+            c = ctx.setdefault(t["triggerid"], {"hosts": set(), "groups": set(), "templates": set()})
+            for h in t["hosts"]:
+                c["hosts"].add(h["hostid"])
+                hi = hinfo.get(h["hostid"], {})
+                c["groups"].update(g["groupid"] for g in hi.get("hostgroups", hi.get("groups", [])))
+                c["templates"].update(x["templateid"] for x in hi.get("parentTemplates", []))
+        return ctx
+
     # ---- coleta ----
     def collect(self):
         ids = self.resolve_ids()
@@ -270,6 +397,7 @@ class Engine:
         global_items = {}
         cto_map = {}
         problems = []
+        criterio = ""
         if ids["cto_host"]:
             items = z.call("item.get", {
                 "hostids": ids["cto_host"],
@@ -297,18 +425,38 @@ class Engine:
                     except Exception:
                         pass
             lista = global_items.get("ixc.cto.quedas.lista", "") or ""
-            for m in re.finditer(r"CTO\s*([\w\-]+)[^\n]*?(\d+/\d+/\d+)", lista, re.I):
-                cto_map.setdefault(m.group(1), {"pon": m.group(2), "olt": None})
-                # tenta pegar a OLT na mesma linha
-                line = lista[m.start():lista.find("\n", m.start()) if "\n" in lista[m.start():] else None]
-                k = olt_key(line)
-                if k in OLT_NAMES:
-                    cto_map[m.group(1)]["olt"] = k
+            for line in re.split(r"[\n;|]+", lista):
+                m = CTO_NAME_RE.search(line)
+                pn = pon_of(line)
+                if m and pn:
+                    k = olt_key(line)
+                    cto_map.setdefault(m.group(1), {"pon": pn, "olt": k if k in OLT_NAMES else None})
+            self.debug["lista"] = lista[:3000]
+            self.debug["itens_ixc"] = {k: (v[:1500] if isinstance(v, str) else v) for k, v in global_items.items()}
 
+        # Problemas ativos no Zabbix: o que a mídia Wpp PON enviaria
+        rules = self.wpp_rules()
+        if rules["ok"]:
             problems = z.call("problem.get", {
-                "hostids": ids["cto_host"], "output": ["eventid", "name", "clock", "severity"],
-                "selectTags": "extend", "recent": False, "sortfield": ["eventid"], "sortorder": "DESC",
+                "output": ["eventid", "objectid", "name", "clock", "severity", "suppressed"],
+                "selectTags": "extend", "recent": False,
             })
+            need = any(int(c["conditiontype"]) in (0, 1, 13)
+                       for a in rules["actions"] for c in a["filter"].get("conditions", []))
+            ctx = self.host_ctx(problems, need)
+            problems = [p for p in problems if any(filter_ok(a["filter"], p, ctx) for a in rules["actions"])]
+            criterio = "Ações da mídia " + WPP_MEDIA + ": " + ", ".join(a["name"] for a in rules["actions"])
+        elif ids["cto_host"]:
+            problems = z.call("problem.get", {
+                "hostids": ids["cto_host"], "output": ["eventid", "objectid", "name", "clock", "severity"],
+                "selectTags": "extend", "recent": False,
+            })
+            criterio = f"Problemas ativos do host {CTO_HOST} (sem acesso às ações da mídia {WPP_MEDIA})"
+        self.debug["criterio"] = criterio
+        self.debug["wpp"] = {"ok": rules["ok"], "erro": rules["err"],
+                             "acoes": [{"nome": a["name"], "filtro": a["filter"]} for a in rules["actions"]]}
+        self.debug["problemas_no_criterio"] = [{"nome": p["name"], "desde": p["clock"],
+                                                "tags": p.get("tags", [])} for p in problems[:80]]
 
         # mapa manual tem prioridade
         if CTO_MAP_FILE.exists():
@@ -319,18 +467,39 @@ class Engine:
                 log("cto_map.json inválido:", e)
         cto_map = {norm_cto(k, ctos): v for k, v in cto_map.items()}
 
-        prob_by_cto = {}
+        prob_by_cto = {}       # cto -> problemas de CTO fora do ar
+        parcial_by_cto = {}    # cto -> problemas de queda parcial
+        massive = []
         for p in problems:
             tags = {t["tag"]: t["value"] for t in p.get("tags", [])}
-            if "cto" in tags:
-                prob_by_cto.setdefault(norm_cto(tags["cto"], ctos), []).append(p)
+            name = p["name"]
+            if re.search(r"massiva", name, re.I):
+                massive.append(p)
+                continue
+            cto = tags.get("cto")
+            if not cto:
+                m = CTO_NAME_RE.search(name)
+                cto = m.group(1) if m else None
+            if not cto:
+                continue
+            cto = norm_cto(cto, ctos)
+            dest = parcial_by_cto if re.search(r"parcial", name, re.I) else prob_by_cto
+            dest.setdefault(cto, []).append(p)
+        # Na queda massiva o Zabbix manda uma mensagem só com a lista: as CTOs dela também entram
+        if massive:
+            mclock = min(to_int(p["clock"], now) for p in massive)
+            for line in re.split(r"[\n;|,]+", global_items.get("ixc.cto.quedas.lista", "") or ""):
+                m = CTO_NAME_RE.search(line)
+                if m:
+                    c = norm_cto(m.group(1), ctos)
+                    prob_by_cto.setdefault(c, [{"clock": str(mclock), "name": "Queda massiva"}])
 
         # 2) ONUs -> PONs ----------------------------------------------------
         pons = {}   # (olt, pon) -> {"onus": n, "online": n}
         if ids["onu_group"]:
             items = z.call("item.get", {
                 "groupids": ids["onu_group"], "output": ["hostid", "key_", "lastvalue"],
-                "filter": {"key_": ["onu.olt", "onu.porta", "onu.estado", "pppoe.status"]},
+                "filter": {"key_": ["onu.olt", "onu.porta", "onu.estado", "pppoe.status", "onu.motivo_desconexao"]},
                 "monitored": True,
             })
             per_host = {}
@@ -341,7 +510,11 @@ class Engine:
                 if not pon:
                     continue
                 key = (olt_key(hv.get("onu.olt")), pon)
-                st = onu_online(hv.get("onu.estado"))
+                if "onu.motivo_desconexao" in hv:
+                    # igual ao trigger "Cliente {HOST.NAME} desconectado": motivo preenchido = desconectado
+                    st = len((hv.get("onu.motivo_desconexao") or "").strip()) == 0
+                else:
+                    st = onu_online(hv.get("onu.estado"))
                 if st is None:
                     ps = hv.get("pppoe.status")
                     st = None if ps in (None, "") else ps == "1"
@@ -385,34 +558,24 @@ class Engine:
                 fs[aid] = min(fs.get(aid, t), t)
             return fs.setdefault(aid, now)
 
-        for cto, c in ctos.items():
+        for cto in sorted(set(prob_by_cto) | set(parcial_by_cto)):
+            c = ctos.get(cto, {})
             cli = to_int(c.get("clientes"), 0) or 0
-            ses = to_int(c.get("sessoes"))
-            if ses is None:
-                continue
-            plist = prob_by_cto.get(cto, [])
-            down = cli > 0 and ses == 0
-            streak[cto] = (streak.get(cto, 0) + 1) if down else 0
+            ses = to_int(c.get("sessoes"), 0) or 0
             loc = cto_map.get(cto, {})
-            if down and streak[cto] >= CONFIRM_POLLS:
+            base = {"cto": cto, "title": f"CTO {cto}", "olt": loc.get("olt"),
+                    "olt_name": olt_name(loc["olt"]) if loc.get("olt") else None,
+                    "pon": loc.get("pon"), "clientes": cli, "causa": (c.get("causa") or "").strip()}
+            if cto in prob_by_cto:
                 aid = f"cto:{cto}"
-                alerts[aid] = {
-                    "id": aid, "kind": "cto", "cto": cto, "title": f"CTO {cto}",
-                    "olt": loc.get("olt"), "olt_name": olt_name(loc["olt"]) if loc.get("olt") else None,
-                    "pon": loc.get("pon"), "clientes": cli, "sessoes": 0,
-                    "causa": (c.get("causa") or "").strip(), "since": since_for(aid, plist),
-                }
+                alerts[aid] = {**base, "id": aid, "kind": "cto", "sessoes": ses,
+                               "since": since_for(aid, prob_by_cto[cto]), "problema": prob_by_cto[cto][0]["name"]}
                 cto_down[cto] = alerts[aid]
-                clientes_afetados += cli
-            elif SHOW_PARTIAL and plist and not down:
+                clientes_afetados += max(cli - ses, 0)
+            elif SHOW_PARTIAL:
                 aid = f"parcial:{cto}"
-                alerts[aid] = {
-                    "id": aid, "kind": "parcial", "cto": cto, "title": f"CTO {cto}",
-                    "olt": loc.get("olt"), "olt_name": olt_name(loc["olt"]) if loc.get("olt") else None,
-                    "pon": loc.get("pon"), "clientes": cli, "sessoes": ses,
-                    "causa": (c.get("causa") or "").strip(), "since": since_for(aid, plist),
-                    "problema": plist[0]["name"],
-                }
+                alerts[aid] = {**base, "id": aid, "kind": "parcial", "sessoes": ses,
+                               "since": since_for(aid, parcial_by_cto[cto]), "problema": parcial_by_cto[cto][0]["name"]}
 
         # CTO mapeada sem OLT: se só uma OLT tem essa PON, assume ela
         olts_by_pon = {}
@@ -438,22 +601,26 @@ class Engine:
 
         pon_alerts = {}
         for (o, p), info in pons.items():
+            # PON só é alerta se tem cliente e os clientes estão com status de desconexão.
+            # Porta down na OLT sem cliente (PON vaga) NÃO é alerta.
             reasons = []
-            if info["oper"] in (2, 7):
-                reasons.append("Porta PON operacionalmente DOWN na OLT")
             if info["onus"] >= PON_MIN_ONUS and info["online"] == 0:
-                reasons.append(f"Todas as {info['onus']} ONUs monitoradas fora")
-            pcs = sorted(set(ctos_by_pon.get((o, p), [])))
+                reasons.append(f"Todos os {info['onus']} clientes monitorados da PON desconectados")
+            pcs = sorted(x for x in set(ctos_by_pon.get((o, p), []))
+                         if (to_int(ctos.get(x, {}).get("clientes"), 0) or 0) > 0)
             if len(pcs) >= PON_MIN_CTOS and all(x in cto_down for x in pcs):
-                reasons.append(f"Todas as {len(pcs)} CTOs da PON sem clientes online")
+                reasons.append(f"Todas as {len(pcs)} CTOs da PON fora do ar")
+            if reasons and info["oper"] in (2, 7):
+                reasons.append("porta DOWN na OLT")
             info["ctos"] = pcs
+            info["clientes"] = info["onus"] + sum(to_int(ctos.get(x, {}).get("clientes"), 0) or 0 for x in pcs)
             if reasons:
                 aid = f"pon:{o}:{p}"
                 affected = [x for x in pcs if x in cto_down]
                 pon_alerts[aid] = {
                     "id": aid, "kind": "pon", "title": f"PON {p}", "olt": o, "olt_name": olt_name(o),
                     "pon": p, "ctos": affected,
-                    "clientes": sum(cto_down[x]["clientes"] for x in affected),
+                    "clientes": sum(cto_down[x]["clientes"] for x in affected) or info["onus"],
                     "onus": info["onus"], "onus_online": info["online"],
                     "causa": " · ".join(reasons), "since": since_for(aid, []),
                 }
@@ -489,8 +656,8 @@ class Engine:
                 st = "cto"
             elif (o, p) in partial_pons:
                 st = "parcial"
-            elif info["onus"] and info["online"] < info["onus"]:
-                st = "ok"  # ONUs isoladas fora não pintam a PON
+            elif not info.get("clientes"):
+                st = "vaga"  # sem cliente: nunca é alerta
             olts.setdefault(o, []).append({
                 "pon": p, "status": st, "onus": info["onus"], "online": info["online"],
                 "ctos": len(info.get("ctos", [])),
@@ -515,10 +682,12 @@ class Engine:
                 "ctos_down": ncto_down,
                 "ctos_parcial": sum(1 for a in alerts.values() if a["kind"] == "parcial"),
                 "clientes_afetados": clientes_afetados,
-                "pons_total": len(pons),
+                "pons_total": sum(1 for v in pons.values() if v.get("clientes")),
                 "pons_down": len(pon_alerts),
                 "onus_monitoradas": sum(p["onus"] for p in pons.values()),
-                "massiva": max(ncto_down, quedas or 0) >= MASSIVE_MIN,
+                "massiva": bool(massive),
+                "massiva_nome": massive[0]["name"] if massive else None,
+                "criterio": criterio,
                 "quedas_ixc": quedas,
                 "cto_map": len(cto_map),
             },
@@ -782,6 +951,14 @@ class Handler(SimpleHTTPRequestHandler):
             st["user"] = sess.get("user")
             st["login"] = self.login_on()
             return self.send_json(200, st)
+        if path == "/api/debug":
+            with ENGINE.lock:
+                d = {"criterio": ENGINE.debug.get("criterio"), "wpp": ENGINE.debug.get("wpp"),
+                     "problemas_no_criterio": ENGINE.debug.get("problemas_no_criterio"),
+                     "lista_queda_massiva": ENGINE.debug.get("lista"),
+                     "itens_ixc": ENGINE.debug.get("itens_ixc"),
+                     "resumo": ENGINE.state.get("summary")}
+            return self.send_json(200, d)
         if path == "/api/me":
             return self.send_json(200, {"user": sess.get("user"), "login": self.login_on()})
         return super().do_GET()
