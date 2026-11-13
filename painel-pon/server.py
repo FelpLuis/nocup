@@ -76,11 +76,11 @@ LISTEN = env("LISTEN", "0.0.0.0")
 PORT = env("PORT", "8445", int)
 # PON é considerada DOWN quando todas as ONUs monitoradas nela estão fora
 # e há pelo menos PON_MIN_ONUS ONUs monitoradas.
-PON_MIN_ONUS = env("PON_MIN_ONUS", "2", int)
+PON_MIN_ONUS = env("PON_MIN_ONUS", "2", int)   # (não usado: amostra de ONUs não define PON down)
 # PON também é DOWN quando TODAS as CTOs conhecidas dela estão down
 # (com pelo menos PON_MIN_CTOS CTOs mapeadas).
 PON_MIN_CTOS = env("PON_MIN_CTOS", "2", int)
-SHOW_PARTIAL = env("SHOW_PARTIAL", "1") == "1"
+SHOW_PARTIAL = env("SHOW_PARTIAL", "0") == "1"
 # Quantos segundos uma alerta resolvida fica na faixa "Normalizadas".
 RECOVERED_KEEP = env("RECOVERED_KEEP", "180", int)
 # Quantas coletas seguidas a CTO precisa estar com 0 sessões para virar alerta.
@@ -601,26 +601,29 @@ class Engine:
 
         pon_alerts = {}
         for (o, p), info in pons.items():
-            # PON só é alerta se tem cliente e os clientes estão com status de desconexão.
-            # Porta down na OLT sem cliente (PON vaga) NÃO é alerta.
-            reasons = []
-            if info["onus"] >= PON_MIN_ONUS and info["online"] == 0:
-                reasons.append(f"Todos os {info['onus']} clientes monitorados da PON desconectados")
+            # Só PON INTEIRA fora: a OLT diz que a porta caiu e a PON tem cliente,
+            # ou todas as CTOs com cliente desta PON estão fora do ar.
+            # Algumas ONUs monitoradas desconectadas NÃO bastam (são só uma amostra dos clientes).
             pcs = sorted(x for x in set(ctos_by_pon.get((o, p), []))
                          if (to_int(ctos.get(x, {}).get("clientes"), 0) or 0) > 0)
+            cli_pon = sum(to_int(ctos.get(x, {}).get("clientes"), 0) or 0 for x in pcs)
+            has_clients = cli_pon > 0 or info["onus"] > 0
+            reasons = []
+            if info["oper"] in (2, 7) and has_clients:
+                reasons.append("Porta PON DOWN na OLT")
             if len(pcs) >= PON_MIN_CTOS and all(x in cto_down for x in pcs):
                 reasons.append(f"Todas as {len(pcs)} CTOs da PON fora do ar")
-            if reasons and info["oper"] in (2, 7):
-                reasons.append("porta DOWN na OLT")
+            if reasons and info["onus"]:
+                reasons.append(f"{info['onus'] - info['online']}/{info['onus']} clientes monitorados desconectados")
             info["ctos"] = pcs
-            info["clientes"] = info["onus"] + sum(to_int(ctos.get(x, {}).get("clientes"), 0) or 0 for x in pcs)
+            info["clientes"] = cli_pon or info["onus"]
             if reasons:
                 aid = f"pon:{o}:{p}"
                 affected = [x for x in pcs if x in cto_down]
                 pon_alerts[aid] = {
                     "id": aid, "kind": "pon", "title": f"PON {p}", "olt": o, "olt_name": olt_name(o),
                     "pon": p, "ctos": affected,
-                    "clientes": sum(cto_down[x]["clientes"] for x in affected) or info["onus"],
+                    "clientes": cli_pon or None, "clientes_monitorados": info["onus"],
                     "onus": info["onus"], "onus_online": info["online"],
                     "causa": " · ".join(reasons), "since": since_for(aid, []),
                 }

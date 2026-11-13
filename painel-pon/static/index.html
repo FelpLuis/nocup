@@ -150,13 +150,14 @@
   .kpi.okk div{color:var(--ok)}
 
   .olts{display:flex;flex-direction:column;gap:calc(.8*var(--u));min-height:0;overflow:hidden}
-  .olt h4{display:flex;justify-content:space-between;font-size:calc(1*var(--u));letter-spacing:.12em;color:var(--txt);margin-bottom:calc(.5*var(--u));text-transform:uppercase}
+  .olt h4{display:flex;justify-content:space-between;font-size:calc(.95*var(--u));letter-spacing:.12em;color:var(--txt);margin-bottom:calc(.5*var(--u));text-transform:uppercase}
   .olt h4 span{color:var(--mut);letter-spacing:0;font-weight:500;text-transform:none}
-  .slots{display:flex;flex-direction:column;gap:calc(.3*var(--u))}
-  .slot{display:grid;grid-template-columns:calc(2.6*var(--u)) repeat(16,1fr);gap:calc(.25*var(--u));align-items:center}
-  .slot>b{font-size:calc(.75*var(--u));color:var(--dim);font-weight:700}
-  .ptile{height:calc(1.5*var(--u));border-radius:calc(.3*var(--u));display:grid;place-items:center;
-    font-size:calc(.68*var(--u));font-weight:700;color:rgba(232,241,255,.75);background:rgba(31,214,138,.13);border:1px solid rgba(31,214,138,.28)}
+  .olts{--th:calc(1.5*var(--u));--tg:calc(.3*var(--u))}
+  .slots{display:flex;flex-direction:column;gap:var(--tg)}
+  .slot{display:grid;grid-template-columns:calc(2.6*var(--u)) repeat(16,1fr);gap:var(--tg);align-items:center}
+  .slot>b{font-size:min(calc(.75*var(--u)),calc(var(--th)*.6));color:var(--dim);font-weight:700;line-height:1}
+  .ptile{height:var(--th);border-radius:calc(.3*var(--u));display:grid;place-items:center;
+    font-size:min(calc(.68*var(--u)),calc(var(--th)*.55));line-height:1;font-weight:700;color:rgba(232,241,255,.75);background:rgba(31,214,138,.13);border:1px solid rgba(31,214,138,.28)}
   .ptile.none{background:transparent;border:1px dashed rgba(255,255,255,.06);color:transparent}
   .ptile.vaga{background:transparent;border:1px solid rgba(255,255,255,.07);color:var(--dim)}
   .ptile.parcial{background:rgba(255,176,32,.25);border-color:rgba(255,176,32,.7);color:#fff}
@@ -172,6 +173,11 @@
   .recitem .sp{flex:1}
   .recitem span{color:var(--mut)}
   .empty{font-size:calc(.95*var(--u));color:var(--dim)}
+  #recPanel.compact{padding:calc(.8*var(--u)) calc(1.4*var(--u))}
+  #recPanel.compact .ptitle{margin:0}
+  #recPanel.compact .rec{display:none}
+  #recPanel.compact .ptitle h2::after{content:' · nenhuma';letter-spacing:.02em;text-transform:none;font-weight:500;color:var(--dim)}
+  .olts{overflow:hidden}
 
   footer{position:fixed;right:calc(2*var(--u));bottom:calc(.6*var(--u));font-size:calc(.75*var(--u));color:var(--dim)}
 
@@ -189,7 +195,7 @@
 <div id="app">
   <header>
     <img class="brand" src="logo-updown.png" alt="UpDown Internet" width="360" height="107">
-    <div class="htitle"><small>UPDOWN NOC</small><h1>Alertas GPON</h1></div>
+    <div class="htitle"><h1>Alertas GPON</h1></div>
     <div class="spacer"></div>
     <div id="pill" class="pill stale"><i></i><span>CONECTANDO…</span></div>
     <button id="snd" class="icon-btn" title="Som de alerta">🔇 Som</button>
@@ -224,14 +230,13 @@
       <div class="panel olts" id="olts">
         <div class="ptitle" style="margin-bottom:0"><h2>Portas PON</h2></div>
       </div>
-      <div class="panel" style="padding-bottom:calc(1.1*var(--u))">
+      <div class="panel" id="recPanel" style="padding-bottom:calc(1.1*var(--u))">
         <div class="ptitle"><h2>Normalizadas recentemente</h2></div>
         <div class="rec" id="rec"><div class="empty">Nada normalizado nos últimos minutos.</div></div>
       </div>
     </aside>
   </main>
 </div>
-<footer id="foot">—</footer>
 
 <script>
 (() => {
@@ -365,7 +370,23 @@
       }
       }
   }
-  window.addEventListener('resize', () => requestAnimationFrame(fitAlerts));
+  window.addEventListener('resize', () => requestAnimationFrame(() => { fitAlerts(); fitOlts(); }));
+
+  // diminui os quadradinhos das PONs até todos os slots das OLTs caberem no quadro
+  function fitOlts() {
+    const box = $('#olts');
+    if (!box) return;
+    const u = Math.min(innerWidth / 100, innerHeight * 1.78 / 100);
+    let th = 1.5 * u;
+    const min = 0.55 * u;
+    box.style.setProperty('--th', th + 'px'); box.style.setProperty('--tg', (0.3 * u) + 'px');
+    let guard = 0;
+    while (box.scrollHeight > box.clientHeight + 1 && th > min && guard++ < 40) {
+      th = Math.max(min, th - 0.06 * u);
+      box.style.setProperty('--th', th + 'px');
+      box.style.setProperty('--tg', Math.max(1, th * 0.16) + 'px');
+    }
+  }
 
   function kpi(id, v, cls, extra) {
     const el = $(id); el.className = 'kpi ' + (cls || '');
@@ -431,9 +452,9 @@
       <div class="recitem"><b>✓</b><strong>${esc(r.title)}</strong>${r.pon && r.kind !== 'pon' ? `<span>PON ${esc(r.pon)}</span>` : ''}
       <div class="sp"></div><span>voltou ${hhmm(r.until)} · ficou ${dur(r.until - r.since)} fora</span></div>`).join('')
       : '<div class="empty">Nada normalizado nos últimos minutos.</div>';
+    $('#recPanel').classList.toggle('compact', !rec.length);
+    requestAnimationFrame(fitOlts);
 
-    $('#foot').textContent = state.updated
-      ? `Fonte: Zabbix UpDown · coleta ${hhmm(state.updated)}${s.criterio ? ' · Critério: ' + s.criterio : ''}${s.cto_map === 0 ? ' · CTO→PON sem mapa' : ''}` : '';
   }
 
   function tick() {

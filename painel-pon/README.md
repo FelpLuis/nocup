@@ -10,11 +10,11 @@ A tela não tem regra própria para CTO: ela lê no Zabbix **as ações que envi
 |---|---|
 | **CTO down** | problema ativo que passa nas condições das ações da `Wpp PON` e cita a CTO (tag `cto` ou "CTO 012" no nome) |
 | **Queda massiva** | o trigger "Queda massiva" ativo acende a faixa; as CTOs da `ixc.cto.quedas.lista` entram como cards, com a PON de cada uma |
-| **Queda parcial** | só aparece se as ações da `Wpp PON` também enviam esse trigger |
-| **PON down** | a PON **tem cliente** e **todos os clientes monitorados estão desconectados** (`onu.motivo_desconexao` preenchido, igual ao trigger "Cliente desconectado"), ou todas as CTOs com cliente dela estão fora |
+| **Queda parcial** | desligada por padrão (`SHOW_PARTIAL=0`): a tela é só para CTO ou PON **inteira** fora |
+| **PON down** | PON **inteira** fora: a OLT informa a porta DOWN **e** a PON tem cliente, ou **todas** as CTOs com cliente dela estão fora. Algumas ONUs desconectadas não bastam: as ONUs monitoradas no grupo `GPON/ONUs` são só uma amostra dos clientes |
 | **PON sem cliente** | nunca é alerta, mesmo com a porta down na OLT; aparece apagada na grade |
 
-O rodapé da tela mostra qual critério está valendo. Se o token não puder ler as ações (`action.get`), a tela avisa e usa os problemas ativos do host `IXC - CTO`. Para usar exatamente as ações, dê ao usuário do token o papel **Admin** (leitura).
+Se o token não puder ler as ações (`action.get`), a tela usa os problemas ativos do host `IXC - CTO`. Para usar exatamente as ações, dê ao usuário do token o papel **Admin** (leitura).
 
 **Conferir o critério:** com login, abra `/api/debug`. Mostra as ações encontradas, as condições, os problemas que passaram no filtro e o texto da lista de queda massiva.
 
