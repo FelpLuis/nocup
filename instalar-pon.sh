@@ -72,6 +72,36 @@ if [ ! -f "$DEST/config.env" ]; then
   ok "config.env criado"
 else
   ok "Mantido o config.env que já existia"
+  # acrescenta opções novas que ainda não existem no config.env (sem mexer nas existentes)
+  NOVAS=0
+  while IFS= read -r linha; do
+    case "$linha" in ''|'#'*) continue ;; esac
+    chave="${linha%%=*}"
+    if ! grep -q "^${chave}=" "$DEST/config.env"; then echo "$linha" >> "$DEST/config.env"; NOVAS=$((NOVAS+1)); fi
+  done < "$DEST/config.env.example"
+  [ "$NOVAS" -gt 0 ] && ok "$NOVAS opção(ões) nova(s) acrescentada(s) ao config.env"
+fi
+
+# Token do IXC (endereço das CTOs): pede só se estiver vazio
+if ! grep -qP '^IXC_TOKEN=\S+' "$DEST/config.env"; then
+  echo "Endereço das CTOs: cole o token da API do IXC (o mesmo da macro {\$IXC_TOKEN} do host 'IXC - CTO',"
+  read -rsp "formato ID:token; Enter = pular, a tela fica sem endereço): " ITK; echo
+  if [ -n "$ITK" ]; then
+    [[ "$ITK" =~ ^[0-9]+:[A-Za-z0-9]+$ ]] || desfazer "Token do IXC inválido: esperava ID:token"
+    sed -i "s#^IXC_TOKEN=.*#IXC_TOKEN=$ITK#" "$DEST/config.env"
+  fi
+fi
+IXU="$(grep -oP '^IXC_URL=\K.*' "$DEST/config.env" || echo https://ixc.updown.com.br)"
+IXT="$(grep -oP '^IXC_TOKEN=\K.*' "$DEST/config.env" || true)"
+if [ -n "$IXT" ]; then
+  R="$(curl -s -m 20 -X POST -H 'Content-Type: application/json' -H 'ixcsoft: listar' \
+    -H "Authorization: Basic $(printf '%s' "$IXT" | base64 -w0)" \
+    -d '{"qtype":"rad_caixa_ftth.id","query":"0","oper":">","page":"1","rp":"1","sortname":"rad_caixa_ftth.id","sortorder":"asc"}' \
+    "$IXU/webservice/v1/rad_caixa_ftth" || true)"
+  case "$R" in
+    *'"registros"'*) ok "IXC respondeu: endereço das CTOs ativado" ;;
+    *) info "Atenção: o IXC não aceitou o token (${R:0:120}). A tela funciona, só sem o endereço." ;;
+  esac
 fi
 sed -i "s#^PORT=.*#PORT=$PORTA_APP#" "$DEST/config.env"
 if [ "$USA_NGINX" = 1 ]; then sed -i "s#^LISTEN=.*#LISTEN=127.0.0.1#" "$DEST/config.env"; fi

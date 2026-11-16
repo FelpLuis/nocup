@@ -17,6 +17,7 @@ Fontes no Zabbix:
 
 Só usa a biblioteca padrão do Python 3.8+.
 """
+import base64
 import json
 import os
 import re
@@ -106,6 +107,19 @@ for part in env("OLT_NAMES", "").split(","):
         k, v = part.split("=", 1)
         OLT_NAMES[k.strip().lower()] = v.strip()
 
+# Outros nomes da mesma OLT (IXC, Zabbix): apelido=chave
+OLT_ALIASES = {"central": "vilanatal", "c350": "vilanatal", "c300": "casqueiro"}
+for part in env("OLT_ALIASES", "").split(","):
+    if "=" in part:
+        k, v = part.split("=", 1)
+        OLT_ALIASES[re.sub(r"[^a-z0-9]", "", k.lower())] = v.strip().lower()
+
+# IXC: endereço das CTOs (cadastro da caixa FTTH). Mesmo token do script do Zabbix ({$IXC_TOKEN}).
+IXC_URL = env("IXC_URL", "https://ixc.updown.com.br").rstrip("/")
+IXC_TOKEN = env("IXC_TOKEN", "")
+IXC_VERIFY_TLS = env("IXC_VERIFY_TLS", "1") == "1"
+IXC_CACHE_MIN = env("IXC_CACHE_MIN", "60", int)
+
 STATE_FILE = BASE / "state.json"
 CTO_MAP_FILE = BASE / "cto_map.json"   # opcional: {"012": {"olt": "vilanatal", "pon": "1/10/13"}}
 
@@ -146,12 +160,61 @@ class Zabbix:
 
 # --------------------------------------------------------------- helpers ---
 def olt_key(text):
-    """'OLT C350 VILA NATAL' / 'vilanatal' -> 'vilanatal'."""
+    """'OLT C350 VILA NATAL' / 'OLT C350 CENTRAL' / 'vilanatal' -> 'vilanatal'."""
     t = re.sub(r"[^a-z0-9]", "", (text or "").lower())
     for k in OLT_NAMES:
         if k in t:
             return k
+    for a, k in OLT_ALIASES.items():
+        if a and a in t:
+            return k
     return t or "?"
+
+
+LISTA_OLT_RE = re.compile(r"\bOLT\b", re.I)
+LISTA_CTOS_RE = re.compile(r"\bCTOs?\b\s*[:#\-]?\s*(.+)$", re.I)
+
+
+def parse_lista(text):
+    """Lê as listas do script do IXC (ixc.cto.em_queda.lista / ixc.cto.quedas.lista):
+
+        *OLT C300 CASQUEIRO*
+        PON 1/16/12 · Queda de energia: CTOs 1216, 1217, 1219 e 1223 (PON inteira fora)
+        *OLT C350 CENTRAL*
+        PON 1/8/2 · Rompimento de fibra: CTO 893
+
+    Devolve [{olt, pon, ctos[], inteira, causa}]."""
+    out, olt = [], None
+    for raw in re.split(r"[\n\r]+", text or ""):
+        line = raw.replace("*", " ").strip()
+        if not line:
+            continue
+        pon = pon_of(line)
+        if LISTA_OLT_RE.search(line) and not pon:
+            k = olt_key(line)
+            olt = k if k in OLT_NAMES else olt
+            continue
+        line_olt = olt
+        if LISTA_OLT_RE.search(line):
+            k = olt_key(line)
+            if k in OLT_NAMES:
+                line_olt = k
+        m = LISTA_CTOS_RE.search(line)
+        ctos = []
+        if m:
+            seg = re.sub(r"\(.*?\)", " ", m.group(1))
+            for tok in re.split(r"\s*(?:,|;|\s+e\s+|/\s)\s*", seg):
+                tok = tok.strip().split(" ")[0].strip(".·:-") if tok.strip() else ""
+                if tok and re.search(r"\d", tok) and not PON_RE.fullmatch(tok):
+                    ctos.append(tok)
+        causa = ""
+        mc = re.search(r"·\s*([^:·]+):", line)
+        if mc:
+            causa = mc.group(1).strip()
+        if ctos or pon:
+            out.append({"olt": line_olt, "pon": pon, "ctos": ctos, "causa": causa,
+                        "inteira": bool(re.search(r"inteira", line, re.I))})
+    return out
 
 
 def olt_name(key):
@@ -327,6 +390,98 @@ def filter_ok(flt, prob, ctx):
     return all(any(v) for v in by_type.values())
 
 
+# -------------------------------------------------------------------- ixc ---
+ADDR_KEYS = [("endereco", "logradouro", "rua"), ("numero",), ("complemento",), ("bairro",),
+             ("referencia", "ponto_referencia")]
+
+
+class IxcCtos:
+    """Cadastro das caixas FTTH (rad_caixa_ftth) do IXC, recarregado a cada IXC_CACHE_MIN minutos
+    numa thread própria (não atrasa a tela). Usado só para o endereço da CTO."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.addr, self.t, self.err, self.keys, self.loading = {}, 0, None, [], False
+        self.ctx = None if IXC_VERIFY_TLS else ssl._create_unverified_context()
+
+    def _page(self, pg):
+        body = {"qtype": "rad_caixa_ftth.id", "query": "0", "oper": ">", "page": str(pg), "rp": "1000",
+                "sortname": "rad_caixa_ftth.id", "sortorder": "asc"}
+        req = urllib.request.Request(IXC_URL + "/webservice/v1/rad_caixa_ftth", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json", "ixcsoft": "listar",
+                                              "Authorization": "Basic " + base64.b64encode(IXC_TOKEN.encode()).decode()})
+        with urllib.request.urlopen(req, timeout=60, context=self.ctx) as r:
+            j = json.loads(r.read().decode("utf-8"))
+        if j.get("type") == "error":
+            raise RuntimeError(j.get("message"))
+        return j
+
+    @staticmethod
+    def _addr(c):
+        parts = []
+        for keys in ADDR_KEYS:
+            for k in keys:
+                v = str(c.get(k) or "").strip()
+                if v and v not in ("0", "null", "None"):
+                    parts.append(v)
+                    break
+        if not parts:
+            return ""
+        txt = parts[0] + (", " + parts[1] if len(parts) > 1 and parts[1].isdigit() else "")
+        rest = [x for x in parts[1:] if not (x.isdigit() and x == parts[1])]
+        return " · ".join([txt] + rest) if rest else txt
+
+    def _load(self):
+        try:
+            addr, pg, got, keys = {}, 1, 0, []
+            while True:
+                j = self._page(pg)
+                regs = j.get("registros") or []
+                if regs and not keys:
+                    keys = sorted(regs[0].keys())
+                for c in regs:
+                    nome = str(c.get("descricao") or "").strip()
+                    a = self._addr(c)
+                    if nome and a:
+                        addr[nome] = a
+                got += len(regs)
+                if len(regs) < 1000 or got >= int(j.get("total") or 0) or pg > 50:
+                    break
+                pg += 1
+            with self.lock:
+                self.addr, self.err, self.keys = addr, None, keys
+            log(f"IXC: {got} caixas lidas, {len(addr)} com endereço")
+        except Exception as e:
+            with self.lock:
+                self.err = str(e)
+            log("IXC: não consegui ler as caixas FTTH:", e)
+        finally:
+            with self.lock:
+                self.t, self.loading = time.time(), False
+
+    def refresh(self):
+        if not IXC_TOKEN:
+            return
+        with self.lock:
+            if self.loading or time.time() - self.t < IXC_CACHE_MIN * 60:
+                return
+            self.loading = True
+        threading.Thread(target=self._load, daemon=True).start()
+
+    def endereco(self, cto):
+        with self.lock:
+            a = self.addr
+        if not a:
+            return None
+        for cand in (str(cto), str(cto).lstrip("0"), str(cto).zfill(3)):
+            if cand in a:
+                return a[cand]
+        return None
+
+
+IXC_CTOS = IxcCtos()
+
+
 # ----------------------------------------------------------------- engine ---
 class Engine:
     def __init__(self):
@@ -421,6 +576,7 @@ class Engine:
 
     # ---- coleta ----
     def collect(self):
+        IXC_CTOS.refresh()
         ids = self.resolve_ids()
         z = self.zbx
         now = int(time.time())
@@ -429,6 +585,7 @@ class Engine:
         ctos = {}
         global_items = {}
         cto_map = {}
+        pon_inteira = set()   # (olt, pon) que o script do IXC marcou como "PON inteira fora"
         problems = []
         criterio = ""
         if ids["cto_host"]:
@@ -460,13 +617,16 @@ class Engine:
                     except Exception:
                         pass
             lista = global_items.get("ixc.cto.quedas.lista", "") or ""
-            for line in re.split(r"[\n;|]+", lista):
-                m = CTO_NAME_RE.search(line)
-                pn = pon_of(line)
-                if m and pn and not cto_ignored(m.group(1), line):
-                    k = olt_key(line)
-                    cto_map.setdefault(m.group(1), {"pon": pn, "olt": k if k in OLT_NAMES else None})
+            em_queda = global_items.get("ixc.cto.em_queda.lista", "") or ""
+            for entry in parse_lista(em_queda) + parse_lista(lista):
+                if entry["pon"]:
+                    if entry["inteira"]:
+                        pon_inteira.add((entry["olt"], entry["pon"]))
+                    for c in entry["ctos"]:
+                        if not cto_ignored(c):
+                            cto_map.setdefault(c, {"pon": entry["pon"], "olt": entry["olt"]})
             self.debug["lista"] = lista[:3000]
+            self.debug["em_queda"] = em_queda[:3000]
             self.debug["itens_ixc"] = {k: (v[:1500] if isinstance(v, str) else v) for k, v in global_items.items()}
 
         # Problemas ativos no Zabbix: o que a mídia Wpp PON enviaria
@@ -523,11 +683,10 @@ class Engine:
         # Na queda massiva o Zabbix manda uma mensagem só com a lista: as CTOs dela também entram
         if massive:
             mclock = min(to_int(p["clock"], now) for p in massive)
-            for line in re.split(r"[\n;|,]+", global_items.get("ixc.cto.quedas.lista", "") or ""):
-                m = CTO_NAME_RE.search(line)
-                if m and not cto_ignored(m.group(1), line):
-                    c = norm_cto(m.group(1), ctos)
-                    prob_by_cto.setdefault(c, [{"clock": str(mclock), "name": "Queda massiva"}])
+            for entry in parse_lista(global_items.get("ixc.cto.quedas.lista", "") or ""):
+                for c in entry["ctos"]:
+                    if not cto_ignored(c):
+                        prob_by_cto.setdefault(norm_cto(c, ctos), [{"clock": str(mclock), "name": "Queda massiva"}])
 
         # 2) ONUs -> PONs ----------------------------------------------------
         pons = {}   # (olt, pon) -> {"onus": n, "online": n}
@@ -603,7 +762,8 @@ class Engine:
             loc = cto_map.get(cto, {})
             base = {"cto": cto, "title": f"CTO {cto}", "olt": loc.get("olt"),
                     "olt_name": olt_name(loc["olt"]) if loc.get("olt") else None,
-                    "pon": loc.get("pon"), "clientes": cli, "causa": (c.get("causa") or "").strip()}
+                    "pon": loc.get("pon"), "clientes": cli, "causa": (c.get("causa") or "").strip(),
+                    "endereco": IXC_CTOS.endereco(cto)}
             if cto in prob_by_cto:
                 aid = f"cto:{cto}"
                 alerts[aid] = {**base, "id": aid, "kind": "cto", "sessoes": ses,
@@ -632,6 +792,9 @@ class Engine:
         for cto, loc in cto_map.items():
             if loc.get("pon") and cto in ctos:
                 ctos_by_pon.setdefault((loc.get("olt"), loc["pon"]), []).append(cto)
+        for (o, p) in pon_inteira:
+            if o:
+                pons.setdefault((o, p), {"onus": 0, "online": 0, "oper": None})
         # garante que PONs com CTO mapeada apareçam no grid
         for (o, p) in ctos_by_pon:
             if o:
@@ -639,18 +802,20 @@ class Engine:
 
         pon_alerts = {}
         for (o, p), info in pons.items():
-            # Só PON INTEIRA fora: a OLT diz que a porta caiu e a PON tem cliente,
-            # ou todas as CTOs com cliente desta PON estão fora do ar.
+            # Só PON INTEIRA fora: o script do IXC marcou "(PON inteira fora)" (ele lê todas as
+            # ONUs da PON na OLT) ou a OLT diz que a porta caiu e a PON tem cliente.
             # Algumas ONUs monitoradas desconectadas NÃO bastam (são só uma amostra dos clientes).
             pcs = sorted(x for x in set(ctos_by_pon.get((o, p), []))
                          if (to_int(ctos.get(x, {}).get("clientes"), 0) or 0) > 0)
             cli_pon = sum(to_int(ctos.get(x, {}).get("clientes"), 0) or 0 for x in pcs)
             has_clients = cli_pon > 0 or info["onus"] > 0
             reasons = []
+            if (o, p) in pon_inteira:
+                reasons.append("Todas as ONUs da PON fora (leitura da OLT)")
             if info["oper"] in (2, 7) and has_clients:
                 reasons.append("Porta PON DOWN na OLT")
-            if len(pcs) >= PON_MIN_CTOS and all(x in cto_down for x in pcs):
-                reasons.append(f"Todas as {len(pcs)} CTOs da PON fora do ar")
+            # (Não usamos "todas as CTOs conhecidas da PON fora": a lista do IXC só traz as CTOs
+            #  caídas, então isso daria PON down sempre que 2 CTOs da mesma PON caíssem.)
             if reasons and info["onus"]:
                 reasons.append(f"{info['onus'] - info['online']}/{info['onus']} clientes monitorados desconectados")
             info["ctos"] = pcs
@@ -997,6 +1162,10 @@ class Handler(SimpleHTTPRequestHandler):
                 d = {"criterio": ENGINE.debug.get("criterio"), "wpp": ENGINE.debug.get("wpp"),
                      "problemas_no_criterio": ENGINE.debug.get("problemas_no_criterio"),
                      "lista_queda_massiva": ENGINE.debug.get("lista"),
+                     "lista_em_queda": ENGINE.debug.get("em_queda"),
+                     "ixc_caixas": {"token": bool(IXC_TOKEN), "erro": IXC_CTOS.err,
+                                    "com_endereco": len(IXC_CTOS.addr), "campos": IXC_CTOS.keys,
+                                    "exemplo": dict(list(IXC_CTOS.addr.items())[:5])},
                      "itens_ixc": ENGINE.debug.get("itens_ixc"),
                      "resumo": ENGINE.state.get("summary")}
             return self.send_json(200, d)

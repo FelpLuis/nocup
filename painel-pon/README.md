@@ -11,9 +11,11 @@ A tela não tem regra própria para CTO: ela lê no Zabbix **as ações que envi
 | **CTO down** | problema ativo que passa nas condições das ações da `Wpp PON` e cita a CTO (tag `cto` ou "CTO 012" no nome) |
 | **Queda massiva** | o trigger "Queda massiva" ativo acende a faixa; as CTOs da `ixc.cto.quedas.lista` entram como cards, com a PON de cada uma |
 | **Queda parcial** | desligada por padrão (`SHOW_PARTIAL=0`): a tela é só para CTO ou PON **inteira** fora |
-| **PON down** | PON **inteira** fora: a OLT informa a porta DOWN **e** a PON tem cliente, ou **todas** as CTOs com cliente dela estão fora. Algumas ONUs desconectadas não bastam: as ONUs monitoradas no grupo `GPON/ONUs` são só uma amostra dos clientes |
+| **PON down** | PON **inteira** fora: o script do IXC marca "(PON inteira fora)" (ele lê todas as ONUs da PON na OLT), ou a OLT informa a porta DOWN **e** a PON tem cliente. Algumas CTOs ou ONUs fora na mesma PON não bastam |
 | **CTO sem ONU fora** | CTO sem cliente, ou com a causa "Nenhuma ONU fora do ar na OLT", não aparece |
 | **CTOs ignoradas** | ERRO, CLIENTES FUSIONADOS e EQUIPAMENTO COM CLIENTE nunca aparecem (`CTO_IGNORAR` no `config.env`) |
+| **OLT e PON da CTO** | vêm da lista "CTOs em queda (lista por PON)" do script do IXC no Zabbix; "C350 CENTRAL" (nome no IXC) = Vila Natal (`OLT_ALIASES`) |
+| **Endereço da CTO** | cadastro da caixa FTTH no IXC (`rad_caixa_ftth`), lido 1x por hora com o token do `IXC_TOKEN` (o mesmo da macro `{$IXC_TOKEN}` do Zabbix) |
 | **PON sem cliente** | nunca é alerta, mesmo com a porta down na OLT; aparece apagada na grade |
 
 Se o token não puder ler as ações (`action.get`), a tela usa os problemas ativos do host `IXC - CTO`. Para usar exatamente as ações, dê ao usuário do token o papel **Admin** (leitura).

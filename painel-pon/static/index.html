@@ -96,6 +96,11 @@
   .alert h3{font-size:calc(2.6*var(--u));font-weight:800;letter-spacing:-.01em;line-height:1.05;margin:calc(.35*var(--u)) 0}
   .alert .meta{font-size:calc(1.15*var(--u));color:var(--mut);display:flex;flex-wrap:wrap;gap:calc(.4*var(--u)) calc(1.2*var(--u))}
   .alert .meta b{color:var(--txt);font-weight:700}
+  .alert .end{display:flex;align-items:center;gap:calc(.4*var(--u));font-size:calc(1.15*var(--u));color:#dbe7ff;font-weight:600;margin:calc(.1*var(--u)) 0 calc(.25*var(--u));min-width:0}
+  .alert .end svg{flex:0 0 auto;width:calc(1.15*var(--u));height:calc(1.15*var(--u));color:var(--k)}
+  .alert .end span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #alerts.c2 .alert .end{font-size:calc(1.02*var(--u))}
+  #alerts.c3 .alert .end{font-size:calc(.95*var(--u));margin:0}
   .alert .causa{margin-top:calc(.5*var(--u));font-size:calc(1.1*var(--u));color:#cfe0ff}
   .chips{display:flex;flex-wrap:wrap;gap:calc(.4*var(--u));margin-top:calc(.6*var(--u))}
   .chip{font-size:calc(.95*var(--u));font-weight:700;padding:calc(.2*var(--u)) calc(.7*var(--u));border-radius:calc(.4*var(--u));
@@ -121,7 +126,7 @@
   #alerts.c3 .alert .meta,#alerts.c3 .alert .causa{font-size:calc(.95*var(--u))}
   #alerts.c3 .alert .timer{font-size:calc(1.5*var(--u))}
   #alerts.c3 .alert .cli{font-size:calc(1.2*var(--u));margin-top:calc(.3*var(--u))}
-  #alerts.c3 .alert .tl,#alerts.c3 .chips{display:none}
+  #alerts.c3 .alert .tl,#alerts.c3 .chips,#alerts.c3 .alert .onus{display:none}
   #alerts.c3 .alert .right{min-width:0}
   #alerts.c3 .alert h3{margin:calc(.2*var(--u)) 0}
   #alerts.c3 .alert .badge{font-size:calc(.7*var(--u))}
@@ -212,7 +217,6 @@
     #alerts.c3{gap:calc(.7*var(--u))}
     #alerts.c3 .alert{padding:calc(.65*var(--u)) calc(1*var(--u)) calc(.65*var(--u)) calc(1.4*var(--u));align-items:center}
     #alerts.c3 .alert .badge{display:none}
-    #alerts.c3 .alert .onus{display:none}
     #alerts.c3 .alert h3{font-size:calc(1.75*var(--u));margin:0}
     #alerts.c3 .alert .causa{margin-top:calc(.15*var(--u))}
     #alerts.c3 .alert .right{display:flex;flex-direction:column;align-items:flex-end;gap:calc(.2*var(--u))}
@@ -339,6 +343,7 @@
       <div>
         <span class="badge">${LABEL[a.kind]}</span>
         <h3>${esc(a.title)}</h3>
+        ${a.endereco ? `<div class="end"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg><span>${esc(a.endereco)}</span></div>` : ''}
         <div class="meta">${where}</div>
         ${a.causa ? `<div class="causa">${esc(a.causa)}</div>` : ''}
         ${chips}
@@ -354,8 +359,8 @@
     const box = $('#alerts');
     const n = list.length;
     const tall = innerWidth / innerHeight < 1.3;
-    box.className = tall ? (n > 12 ? 'c3' : n > 4 ? 'c3 two' : n > 2 ? 'c2' : '') : (n > 8 ? 'c3' : n > 3 ? 'c2' : '');
-    const max = tall ? (n > 12 ? 24 : n > 4 ? 16 : n > 2 ? 4 : 2) : (n > 8 ? 18 : n > 3 ? 8 : 3);
+    box.className = tall ? (n > 12 ? 'c3' : n > 4 ? 'c3 two' : n > 2 ? 'c2' : '') : (n > 12 ? 'c3' : n > 4 ? 'c3 two' : n > 3 ? 'c2' : '');
+    const max = tall ? (n > 12 ? 24 : n > 4 ? 16 : n > 2 ? 4 : 2) : (n > 12 ? 24 : n > 4 ? 16 : n > 3 ? 4 : 3);
     const shown = list.slice(0, max);
     const ids = new Set(shown.map(a => a.id));
     // remove os que saíram (com animação)
@@ -530,8 +535,8 @@
     const olts = [{key:'casqueiro', name:'C300 Casqueiro', pons:mk('casqueiro')}, {key:'vilanatal', name:'C350 Vila Natal', pons:mk('vilanatal')}];
     const alerts = [];
     if (k !== 3) alerts.push({id:'pon:vilanatal:1/10/13', kind:'pon', title:'PON 1/10/13', olt:'vilanatal', olt_name:'C350 Vila Natal', pon:'1/10/13', ctos:['012','013','017','022'], clientes:61, onus:9, onus_online:0, causa:'Todas as 9 ONUs monitoradas fora · Todas as 4 CTOs da PON sem clientes online', since: demoT0 - 754});
-    alerts.push({id:'cto:041', kind:'cto', cto:'041', title:'CTO 041', olt:'casqueiro', olt_name:'C300 Casqueiro', pon:'1/3/7', clientes:14, sessoes:0, causa:'Queda de energia: 9 ONUs', since: demoT0 - 302});
-    if (k >= 1) alerts.push({id:'cto:108', kind:'cto', cto:'108', title:'CTO 108', olt:'vilanatal', olt_name:'C350 Vila Natal', pon:'1/11/2', clientes:11, sessoes:0, causa:'Rompimento de fibra (LOS): 11 ONUs', since: demoT0 + 20});
+    alerts.push({id:'cto:041', kind:'cto', cto:'041', title:'CTO 041', endereco:'Rua Bahia, 120 · Vila Natal', olt:'casqueiro', olt_name:'C300 Casqueiro', pon:'1/3/7', clientes:14, sessoes:0, causa:'Queda de energia: 9 ONUs', since: demoT0 - 302});
+    if (k >= 1) alerts.push({id:'cto:108', kind:'cto', cto:'108', title:'CTO 108', endereco:'Av. Nove de Abril, 2400 · Centro', olt:'vilanatal', olt_name:'C350 Vila Natal', pon:'1/11/2', clientes:11, sessoes:0, causa:'Rompimento de fibra (LOS): 11 ONUs', since: demoT0 + 20});
     alerts.push({id:'parcial:077', kind:'parcial', cto:'077', title:'CTO 077', olt:'casqueiro', olt_name:'C300 Casqueiro', pon:'1/2/12', clientes:16, sessoes:9, causa:'Queda de energia: 5 ONUs · Offline sem causa informada: 2 ONUs', problema:'Queda parcial', since: demoT0 - 95});
     const paint = (o, p, st) => { const x = olts.find(a => a.key === o).pons.find(q => q.pon === p); if (x) x.status = st; };
     alerts.forEach(a => paint(a.olt, a.pon, a.kind === 'pon' ? 'down' : a.kind));
