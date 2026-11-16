@@ -76,6 +76,7 @@
     grid-template-columns:1fr}
   #alerts.c2{grid-template-columns:1fr 1fr}
   #alerts.c3{grid-template-columns:1fr 1fr 1fr}
+  #alerts.c3.two{grid-template-columns:1fr 1fr}
   .alert{position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:calc(1.6*var(--u));align-items:center;
     background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);border-radius:calc(1*var(--u));
     padding:calc(1.2*var(--u)) calc(1.6*var(--u)) calc(1.2*var(--u)) calc(2*var(--u));overflow:hidden;
@@ -181,6 +182,44 @@
 
   footer{position:fixed;right:calc(2*var(--u));bottom:calc(.6*var(--u));font-size:calc(.75*var(--u));color:var(--dim)}
 
+
+  /* ===== Meia tela / tela em pé (ex.: TV dividida com o painel de links) ===== */
+  @media (max-aspect-ratio: 13/10) {
+    :root{ --u: min(2.1vw, 1.25vh); }
+    #app{gap:calc(1*var(--u));padding:calc(1.2*var(--u)) calc(1.4*var(--u))}
+    header{gap:calc(1.2*var(--u))}
+    .brand{height:calc(3.4*var(--u))}
+    .htitle{padding-left:calc(1.2*var(--u))}
+    .htitle h1{font-size:calc(2*var(--u))}
+    .pill{font-size:calc(1.2*var(--u));padding:calc(.55*var(--u)) calc(1.1*var(--u))}
+    #snd,#fs{display:none}
+    .clock .t{font-size:calc(2.3*var(--u))}
+    .clock .d{display:none}
+    main{grid-template-columns:minmax(0,1fr);
+      grid-template-rows:auto minmax(0,1fr) auto auto;
+      grid-template-areas:"kpis" "alerts" "olts" "rec";gap:calc(1*var(--u))}
+    main > .side{display:contents}
+    main > section.panel{grid-area:alerts}
+    .kpis{grid-area:kpis;grid-template-columns:repeat(4,1fr);gap:calc(.7*var(--u))}
+    .kpi{padding:calc(.6*var(--u)) calc(1*var(--u))}
+    .kpi div{font-size:calc(2.6*var(--u))}
+    #olts{grid-area:olts;height:28vh;display:grid;grid-template-columns:1fr 1fr;align-content:start;
+      column-gap:calc(1.6*var(--u));row-gap:calc(.6*var(--u));padding:calc(1*var(--u)) calc(1.2*var(--u))}
+    #olts > .ptitle, #olts > .legend, #olts > .empty{grid-column:1/-1}
+    #olts > .ptitle{margin-bottom:0}
+    #recPanel{grid-area:rec}
+    .alert{gap:calc(1.1*var(--u))}
+    #alerts.c3{gap:calc(.7*var(--u))}
+    #alerts.c3 .alert{padding:calc(.65*var(--u)) calc(1*var(--u)) calc(.65*var(--u)) calc(1.4*var(--u));align-items:center}
+    #alerts.c3 .alert .badge{display:none}
+    #alerts.c3 .alert .onus{display:none}
+    #alerts.c3 .alert h3{font-size:calc(1.75*var(--u));margin:0}
+    #alerts.c3 .alert .causa{margin-top:calc(.15*var(--u))}
+    #alerts.c3 .alert .right{display:flex;flex-direction:column;align-items:flex-end;gap:calc(.2*var(--u))}
+    #alerts.c3 .alert .timer{font-size:calc(1.7*var(--u))}
+    #alerts.c3 .alert .cli{margin-top:0;font-size:calc(1.15*var(--u));white-space:nowrap}
+    #alerts.c3 .alert .cli small{display:inline;margin-left:calc(.35*var(--u));font-size:calc(.75*var(--u))}
+  }
   @keyframes enter{from{opacity:0;transform:translateX(-30px) scale(.98)}to{opacity:1;transform:none}}
   @keyframes leave{to{opacity:0;transform:translateX(40px);filter:saturate(0)}}
   @keyframes blink{50%{opacity:.25}}
@@ -192,6 +231,7 @@
 </style>
 </head>
 <body>
+<div id="uprobe" aria-hidden="true" style="position:absolute;visibility:hidden;pointer-events:none;width:calc(100*var(--u));height:0"></div>
 <div id="app">
   <header>
     <img class="brand" src="logo-updown.png" alt="UpDown Internet" width="360" height="107">
@@ -288,7 +328,7 @@
     const where = [
       a.olt_name ? `OLT <b>${esc(a.olt_name)}</b>` : '',
       a.pon && a.kind !== 'pon' ? `PON <b>${esc(a.pon)}</b>` : '',
-      a.kind === 'pon' && a.onus ? `ONUs monitoradas <b>${a.onus_online}/${a.onus}</b> online` : '',
+      a.kind === 'pon' && a.onus ? `<span class="onus">ONUs monitoradas <b>${a.onus_online}/${a.onus}</b> online</span>` : '',
       a.kind === 'parcial' ? `Sessões <b>${a.sessoes}/${a.clientes}</b>` : ''
     ].filter(Boolean).join('<span style="color:var(--dim)">·</span>');
     const chips = a.kind === 'pon' && a.ctos && a.ctos.length
@@ -313,8 +353,9 @@
   function renderAlerts(list) {
     const box = $('#alerts');
     const n = list.length;
-    box.className = n > 8 ? 'c3' : n > 3 ? 'c2' : '';
-    const max = n > 8 ? 18 : n > 3 ? 8 : 3;
+    const tall = innerWidth / innerHeight < 1.3;
+    box.className = tall ? (n > 12 ? 'c3' : n > 4 ? 'c3 two' : n > 2 ? 'c2' : '') : (n > 8 ? 'c3' : n > 3 ? 'c2' : '');
+    const max = tall ? (n > 12 ? 24 : n > 4 ? 16 : n > 2 ? 4 : 2) : (n > 8 ? 18 : n > 3 ? 8 : 3);
     const shown = list.slice(0, max);
     const ids = new Set(shown.map(a => a.id));
     // remove os que saíram (com animação)
@@ -370,13 +411,13 @@
       }
       }
   }
-  window.addEventListener('resize', () => requestAnimationFrame(() => { fitAlerts(); fitOlts(); }));
+  window.addEventListener('resize', () => requestAnimationFrame(() => { if (state) render(); fitAlerts(); fitOlts(); }));
 
   // diminui os quadradinhos das PONs até todos os slots das OLTs caberem no quadro
   function fitOlts() {
     const box = $('#olts');
     if (!box) return;
-    const u = Math.min(innerWidth / 100, innerHeight * 1.78 / 100);
+    const u = ($('#uprobe')?.offsetWidth || Math.min(innerWidth, innerHeight * 1.78)) / 100;
     let th = 1.5 * u;
     const min = 0.55 * u;
     box.style.setProperty('--th', th + 'px'); box.style.setProperty('--tg', (0.3 * u) + 'px');
