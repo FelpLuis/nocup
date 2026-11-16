@@ -245,38 +245,6 @@ main .inner{display:flex;flex-direction:column;gap:var(--s-5)}
 .hside dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px var(--s-3);font-size:var(--fs-12)}
 .hside dt{color:var(--text-3)} .hside dd{margin:0;font-family:var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
 .hside .where{font-size:var(--fs-11);color:var(--text-3);overflow-wrap:anywhere}
-.hcard[data-open],.tv-g[data-open]{cursor:pointer;transition:border-color var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
-.hcard[data-open]:hover,.tv-g[data-open]:hover{border-color:var(--line-strong);box-shadow:var(--shadow-2)}
-.hcard-more{justify-self:end;font-size:var(--fs-12);font-weight:650;color:var(--info-text)}
-.d-title-sans{font-family:var(--font-sans)!important}
-.pb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:var(--s-3)}
-.pb{position:relative;overflow:hidden;display:grid;gap:var(--s-1);padding:var(--s-3);border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2);min-width:0;cursor:pointer;transition:border-color var(--dur-1) var(--ease)}
-.pb::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--grad-brand);opacity:.8}
-.pb.is-warn::before{background:var(--grad-warn)} .pb.is-danger::before{background:var(--grad-danger)}
-.pb:hover{border-color:var(--line-strong)}
-.pb.is-danger{border-color:var(--danger-line)}
-.pb-v{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s-1) var(--s-2)}
-.pb label{font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
-.pb strong{font-size:var(--fs-24);font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1}
-.pb.is-warn strong{color:var(--warn-text)} .pb.is-danger strong{color:var(--danger-text)}
-.pb small{font-size:var(--fs-11);color:var(--text-3);font-family:var(--font-mono)}
-.pb .spark{height:28px}
-.pb.none{cursor:default;color:var(--text-3);font-size:var(--fs-12);align-content:start}
-.pb.none::before{display:none}
-.d-sec-h small{font-size:var(--fs-12)}
-.hb-list{display:grid;gap:var(--s-2)}
-.hb-row{display:grid;grid-template-columns:minmax(84px,auto) 64px minmax(60px,1fr) minmax(0,1.3fr) 82px;align-items:center;gap:var(--s-3);padding:var(--s-2) var(--s-3);border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
-.hb-row.is-warn{border-color:var(--warn-line)}
-.hb-row.is-danger{border-color:var(--danger-line);background:var(--danger-bg)}
-.hb-name{display:grid;font-weight:650;font-size:var(--fs-13);line-height:1.2}
-.hb-name small{font-weight:500;font-size:var(--fs-11);color:var(--text-3)}
-.hb-val{font-family:var(--font-mono);font-weight:700;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.hb-row.is-warn .hb-val{color:var(--warn-text)} .hb-row.is-danger .hb-val{color:var(--danger-text)}
-.hb-row.is-warn .track i{background:var(--warn-500)} .hb-row.is-danger .track i{background:var(--danger-500)}
-.hb-spark{min-width:0}
-.hb-spark .spark{height:28px}
-.hb-peak{font-family:var(--font-mono);font-size:var(--fs-11);color:var(--text-3);text-align:right;white-space:nowrap}
-@media (max-width:540px){.hb-row{grid-template-columns:minmax(0,1fr) auto}.hb-bar,.hb-spark{grid-column:1/-1}.hb-peak{grid-column:1/-1;text-align:left}}
 @media (max-width:380px){.hbody{grid-template-columns:1fr}.gauge{margin:0 auto}}
 
 .grid-mid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:var(--s-4)}
@@ -362,7 +330,6 @@ main .inner{display:flex;flex-direction:column;gap:var(--s-5)}
 .sel{display:flex;align-items:center;gap:var(--s-2);font-size:var(--fs-13);color:var(--text-3)}
 select{height:36px;padding:0 var(--s-2);background:var(--surface-input);color:var(--text-1);border:1px solid var(--line);border-radius:var(--r-sm)}
 .seg{display:inline-flex;padding:2px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-input)}
-.d-sec-h .seg{flex-wrap:wrap;max-width:100%}
 .seg button{min-height:30px;padding:0 var(--s-3);border:0;border-radius:var(--r-1);background:transparent;color:var(--text-3);font-size:var(--fs-13);font-weight:600;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--grad-brand);color:var(--text-on-brand)}
 .legend-row{display:flex;flex-wrap:wrap;gap:var(--s-2) var(--s-4);margin-top:var(--s-3);font-size:var(--fs-11);color:var(--text-3);align-items:center}
@@ -402,21 +369,6 @@ button.hc:hover{transform:scale(1.06);border-color:var(--line-strong)}
 .hc.bw{background:var(--warn-500);color:var(--on-warn)}
 .hc.bc{background:var(--danger-500);color:var(--on-solid);box-shadow:0 0 0 2px var(--danger-line)}
 .hc.bi{background:repeating-linear-gradient(45deg,transparent 0 4px,var(--line) 4px 6px);border-color:var(--line);cursor:default;font-weight:500}
-.hc.bq{background:var(--surface-3);color:var(--warn-text);border:1px dashed var(--warn-line)}
-.hc.rok{background:var(--ok-bg);color:var(--ok-text);border-color:var(--ok-line)}
-.hc.rq{background:var(--surface-3);color:var(--text-3)}
-.pon-opt{display:block;font-family:var(--font-mono);font-size:var(--fs-11);color:var(--text-3)}
-.pon-opt b{color:var(--text-1);font-weight:700}
-.pon-opt.is-warn b{color:var(--warn-text)} .pon-opt.is-danger b{color:var(--danger-text)}
-.pon-opt small{font-size:inherit}
-.onu-h{margin:var(--s-3) 0 var(--s-2);font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
-.onu-list{display:flex;flex-wrap:wrap;gap:var(--s-2)}
-.onu{display:inline-flex;gap:var(--s-2);align-items:baseline;padding:2px var(--s-2);border:1px solid var(--line);border-radius:var(--r-full);background:var(--surface-2);font-family:var(--font-mono);font-size:var(--fs-12);font-variant-numeric:tabular-nums}
-.onu b{font-family:var(--font-sans);font-weight:650;font-size:var(--fs-11);color:var(--text-3)}
-.onu.is-warn{border-color:var(--warn-line);color:var(--warn-text)} .onu.is-danger{border-color:var(--danger-line);background:var(--danger-bg);color:var(--danger-text)}
-.onu.more{color:var(--text-3);font-family:var(--font-sans)}
-.opt-chart{margin-top:var(--s-4)}
-.chart-thr.warn{stroke:var(--warn-500)}
 .hc.none{visibility:hidden}
 .hc.dim{opacity:.18}
 .hc .up-mark{font-size:9px;margin-left:1px;vertical-align:1px}
@@ -425,7 +377,6 @@ button.hc:hover{transform:scale(1.06);border-color:var(--line-strong)}
 /* ---------- gaveta de detalhe ---------- */
 .scrim{position:fixed;inset:0;z-index:calc(var(--z-drawer) - 1);background:var(--scrim)}
 .drawer{position:fixed;top:0;right:0;bottom:0;z-index:var(--z-drawer);width:min(600px,100%);overflow-y:auto;display:flex;flex-direction:column;gap:var(--s-5);background:var(--surface-1);border-left:1px solid var(--line);box-shadow:var(--shadow-3);padding:calc(env(safe-area-inset-top,0px) + var(--s-5)) max(var(--s-5),env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + var(--s-8)) var(--s-5)}
-.drawer > *{flex-shrink:0}
 .d-head{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s-3)}
 .d-head h2{margin:var(--s-1) 0 0;font-family:var(--font-mono);font-size:var(--fs-24);letter-spacing:-.02em;overflow-wrap:anywhere}
 .d-head p{margin:var(--s-1) 0 0;font-weight:650}
@@ -449,11 +400,6 @@ button.hc:hover{transform:scale(1.06);border-color:var(--line-strong)}
 .tip .mono{font-size:var(--fs-11)}
 .scale-note{margin:var(--s-2) 0 0;font-size:var(--fs-12);color:var(--text-3)}
 .d-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
-.d-stats > div:last-child:nth-child(odd){grid-column:1/-1}
-.d-stats div.is-warn strong{color:var(--warn-text)} .d-stats div.is-danger strong{color:var(--danger-text)}
-.d-stats div.is-danger{background:linear-gradient(var(--danger-bg),var(--danger-bg)),var(--surface-1)}
-.opt-none{display:grid;gap:var(--s-1);padding:var(--s-3) var(--s-4);border:1px dashed var(--line-strong);border-radius:var(--r-md);font-size:var(--fs-13);color:var(--text-3)}
-.opt-none b{color:var(--text-1);font-weight:650}
 .d-stats div{background:var(--surface-1);padding:var(--s-3) var(--s-4);display:grid;gap:2px;min-width:0}
 .d-stats span{font-size:var(--fs-10);font-weight:800;letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-3)}
 .d-stats strong{font-family:var(--font-mono);font-size:var(--fs-14);font-weight:600}
@@ -603,7 +549,6 @@ body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;rig
         <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="sr">Buscar</span><input id="q" type="search" placeholder="Porta, região ou VLAN" autocomplete="off"></label>
         <label class="sel">Ordenar <select id="sort"><option value="slot">Placa e porta</option><option value="util">Maior utilização</option><option value="region">Região</option></select></label>
         <div class="seg" role="group" aria-label="Visualização" id="viewSeg"><button type="button" data-v="cards" aria-pressed="true">Cartões</button><button type="button" data-v="heat" aria-pressed="false">Mapa de calor</button></div>
-        <div class="seg" role="group" aria-label="O que o mapa mostra" id="metricSeg" hidden><button type="button" data-m="traffic" aria-pressed="true">Tráfego</button><button type="button" data-m="rx" aria-pressed="false">Sinal RX</button></div>
       </div>
       <div id="ponBody"></div>
     </section>
@@ -623,7 +568,7 @@ body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;rig
     <p class="form-err" id="formErr" hidden></p>
     <fieldset>
       <legend>Conexão</legend>
-      <p class="note" style="margin-top:0">Os dados vêm do Zabbix configurado no servidor do painel. O token fica guardado no servidor e nunca passa pelo navegador.</p>
+      <p class="note" style="margin-top:0">Os dados vêm do Zabbix da LV Network, consultado pelo servidor do painel. O token fica guardado no servidor e nunca passa pelo navegador.</p>
       <div class="row"><button class="btn" type="button" id="btnTest">Testar conexão</button><span class="out" id="testOut" role="status"></span></div>
     </fieldset>
     <fieldset>
@@ -636,7 +581,6 @@ body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;rig
         <label class="field">CPU atenção / alerta (%)<input id="fCpu" type="text" inputmode="numeric" placeholder="75 / 90"></label>
         <label class="field">Memória atenção / alerta (%)<input id="fMem" type="text" inputmode="numeric" placeholder="80 / 90"></label>
         <label class="field">Temperatura atenção / alerta (°C)<input id="fTemp" type="text" inputmode="numeric" placeholder="60 / 70"></label>
-        <label class="field">Sinal RX atenção / alerta (dBm)<input id="fRx" type="text" inputmode="numeric" placeholder="-25 / -28"></label>
         <label class="field">Atualizar a cada (s)<input id="fInt" type="number" min="10" max="600" step="5"></label>
       </div>
       <p class="note">O alerta abre quando a porta passa do limite e só fecha quando cai 5 pontos abaixo dele, para não piscar.</p>
@@ -678,24 +622,16 @@ body.tv-on .toasts{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;rig
 const DATA = {"olts":[{"id":"c300","nome":"C300 Casqueiro","curto":"C300","local":"Casqueiro","modelo":"ZTE C300","lag":null},{"id":"c350","nome":"C350 Vila Natal","curto":"C350","local":"Vila Natal","modelo":"ZTE C350","lag":{"name":"smartgroup1","members":["xgei_1/0/1","xgei_1/1/1","xgei_1/1/2"]}}]};
 const MIN = 60000, HOUR = 3600000, TAU = Math.PI * 2, WINDOW = 120 * MIN;
 const STORE = 'updown.painel-olt.v1', STORE_UI = 'updown.painel-olt.ui';
-/* Fonte fixa: o nginx do servidor encaminha /zbx-api para a API do Zabbix com o token de leitura. */
+/* Fonte fixa: o nginx do servidor encaminha /zbx-api para https://zbx7.lv.network/api_jsonrpc.php com o token. */
 const ZBX = { url:'/zbx-api', token:'' };
-/* Nomes no Zabbix da UpDown; a busca por trecho também acha os da LV ("18400 UPT | OLT …"). */
-const HOSTS = { c300:'OLT C300 CASQUEIRO', c350:'OLT C350 VILA NATAL' };
+const HOSTS = { c300:'18400 UPT | OLT C300 CASQUEIRO', c350:'18400 UPT | OLT C350 VILA NATAL' };
 const DEFAULTS = {
   thr:90, warn:75, capDown:1250, capUp:1250,
   cpuWarn:75, cpuCrit:90, memWarn:80, memCrit:90, tempWarn:60, tempCrit:70,
-  rxWarn:-25, rxCrit:-28,
   interval:30, sound:false, notify:false
 };
 const TH = { cpu:{w:'cpuWarn',c:'cpuCrit',hy:3}, mem:{w:'memWarn',c:'memCrit',hy:2}, temp:{w:'tempWarn',c:'tempCrit',hy:2} };
 const RANK = { idle:-1, ok:0, warn:1, crit:2 };
-/* Períodos do gráfico. Até 48 h vem o histórico bruto do Zabbix; 7 e 30 dias
-   vêm das tendências (uma amostra por hora, com média e pico da hora). */
-const WINDOWS = [[6,'6 h'], [12,'12 h'], [24,'24 h'], [48,'48 h'], [168,'7 dias'], [720,'30 dias']];
-const TREND_FROM = 168;
-const winLabel = h => (WINDOWS.find(w => w[0] === h) || [h, h + ' h'])[1];
-const winSpan = h => h >= 168 ? `últimos ${h / 24} dias` : `últimas ${h} h`;
 
 /* ---------- utilidades ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -757,8 +693,7 @@ const ui = {
   filter: ['active','crit','warn','idle'].includes(uiSaved.filter) ? uiSaved.filter : 'active',
   sort: ['slot','util','region'].includes(uiSaved.sort) ? uiSaved.sort : 'slot',
   view: uiSaved.view === 'heat' ? 'heat' : 'cards',
-  heatMetric: uiSaved.heatMetric === 'rx' ? 'rx' : 'traffic',
-  q:'', detail:null, dWin:WINDOWS.some(w => w[0] === uiSaved.dWin) ? uiSaved.dWin : 24, dSeries:null, dLoading:false, tv:false, lastFocus:null
+  q:'', detail:null, dWin:24, dSeries:null, dLoading:false, tv:false, lastFocus:null
 };
 const OLTS = DATA.olts.map(d => ({ id:d.id, nome:d.nome, curto:d.curto, local:d.local, modelo:d.modelo, src:d,
   ports:[], portMap:new Map(), uplinks:[], health:{}, boards:[], updatedAt:null, error:null, loading:false, zhostid:null, zraw:{} }));
@@ -799,19 +734,6 @@ function makePort(oltId, name, alias, active){
   setCaps(p);
   return p;
 }
-/* Teto físico da porta. Uma leitura acima dele não é tráfego (GPON não sobe
-   15 Gbps): é item mal configurado no Zabbix ou contador reiniciado. A porta
-   mostra "leitura inválida" em vez de um alerta falso. */
-function physMax(t, dir){
-  if (t.type === 'pon') return (t.kind === 'xgs' ? 10e9 : dir === 'down' ? 2.488e9 : 1.244e9) * 1.05;
-  return ((dir === 'down' ? t.capD : t.capU) || 0) * 1.05 || Infinity;
-}
-function cleanRate(t, dir, v){
-  const bad = v != null && v > physMax(t, dir);
-  if (dir === 'down') t.badD = bad ? v : null; else t.badU = bad ? v : null;
-  return bad ? null : v;
-}
-const isBad = p => p.badD != null || p.badU != null;
 function guessSpeed(name){ if (/^smartgroup/i.test(name)) return 0; if (/^xgei/i.test(name)) return 1e10; if (/^gei/i.test(name)) return 1e9; return 1e10; }
 function makeUplink(oltId, name, alias, active, speed){
   return { type:'uplink', key:oltId + '|' + name, olt:oltId, name, short:name, alias:alias || '', label:alias || '', region:alias || '',
@@ -840,80 +762,6 @@ function applyLag(o){
     }
   }
 }
-/* Sinal óptico (dBm). O painel reconhece itens com RX/TX (ou sinal, óptico,
-   power, laser) no nome e a porta no formato 1/2/1; com ":N" depois da porta o
-   item é de uma ONU. Enquanto o Zabbix não coletar, a porta mostra "não coletado". */
-const portNum = name => { const m = String(name).match(/(\d+)\/(\d+)\/(\d+)\s*$/); return m ? `${m[1]}/${m[2]}/${m[3]}` : null; };
-function finishOnuRx(op){
-  const list = (op.onus || []).filter(x => x && isFinite(x.v)).sort((a, b) => a.v - b.v);
-  if (!list.length && op._worst == null) return;
-  op.onuRx = {
-    n: list.length || op._count || 0,
-    worst: list.length ? list[0] : { onu:op._worstonu, v:op._worst },
-    avg: list.length ? list.reduce((a, x) => a + x.v, 0) / list.length : op._avg,
-    list,
-    low: list.length ? list.filter(x => x.v <= cfg.rxCrit).length : (op._low || 0),
-    warn: list.filter(x => x.v <= cfg.rxWarn && x.v > cfg.rxCrit).length,
-    over: list.filter(x => x.v > -8).length
-  };
-}
-function mergeOptical(o, items){
-  for (const t of [...o.ports, ...o.uplinks]) t.opt = null;
-  o.optCount = 0; o.optSource = null;
-  const byNum = new Map();
-  for (const t of [...o.ports, ...o.uplinks]){ const k = portNum(t.name); if (k && !t.isLag) byNum.set(k, t); }
-  let modern = false;
-  for (const it of items || []){
-    const km = String(it.key_).match(/^zte\.(?:pon\.rx\.(worst|worstonu|avg|count|low|onus)|opt\.(tx|rx))\[(\d+\/\d+\/\d+)\]$/);
-    if (!km) continue;
-    modern = true;
-    const t = byNum.get(km[3]); if (!t) continue;
-    const op = t.opt || (t.opt = { tx:null, rx:null, onus:[], onuRx:null, z:{} });
-    const lv = it.lastvalue, has = lv !== '' && lv != null && +it.lastclock > 0;
-    const f = km[1] || km[2];
-    op.z[km[2] ? 'mod' + f : f] = it;
-    if (!has) continue;
-    if (km[2]){ if (isFinite(+lv)) op[f] = { v:+lv, clock:+it.lastclock * 1000 }; }
-    else if (f === 'onus'){ try { const arr = JSON.parse(lv); if (Array.isArray(arr)) op.onus = arr.filter(x => Array.isArray(x)).map(x => ({ onu:+x[0], v:+x[1] })); } catch(e){} }
-    else op['_' + f] = +lv;
-    o.optCount++;
-  }
-  if (modern){
-    for (const t of [...o.ports, ...o.uplinks]) if (t.opt) finishOnuRx(t.opt);
-    o.optSource = 'zte';
-    return;
-  }
-  const byShort = new Map(o.ports.map(p => [p.short, p]));
-  for (const it of items || []){
-    if (/^net\.if/.test(it.key_) || /^Interface\s.+:\s(Bits|Operational|Speed|Inbound|Outbound)/i.test(it.name)) continue;
-    const n = String(it.name), u = String(it.units || '').trim(), v = +it.lastvalue;
-    if (it.lastvalue === '' || !isFinite(v)) continue;
-    if (u && !/dbm/i.test(u)) continue;
-    if (v < -60 || v > 15) continue;
-    const dir = /\brx\b|receb|recep|input|entrada/i.test(n) ? 'rx' : /\btx\b|transm|output|envi|sa[ií]da|laser/i.test(n) ? 'tx' : null;
-    if (!dir) continue;
-    const pm = n.match(/(\d+)[\/.](\d+)[\/.](\d+)(?:\s*[:]\s*(\d+))?/) || String(it.key_).match(/(\d+)[\/.](\d+)[\/.](\d+)(?:\s*[:]\s*(\d+))?/);
-    if (!pm) continue;
-    const p = byShort.get(`${pm[1]}/${pm[2]}/${pm[3]}`); if (!p) continue;
-    p.opt = p.opt || { tx:null, rx:null, onus:[], z:{} };
-    if (pm[4] != null) p.opt.onus.push({ onu:+pm[4], dir, v });
-    else p.opt[dir] = { v, clock:+it.lastclock * 1000 };
-    o.optCount++;
-  }
-  for (const p of o.ports){
-    if (!p.opt) continue;
-    const rx = p.opt.onus.filter(x => x.dir === 'rx');
-    if (rx.length){
-      let worst = rx[0]; for (const x of rx) if (x.v < worst.v) worst = x;
-      p.opt.onuRx = { n:rx.length, worst, avg:rx.reduce((a, x) => a + x.v, 0) / rx.length, low:rx.filter(x => x.v <= cfg.rxCrit).length,
-        warn:rx.filter(x => x.v <= cfg.rxWarn && x.v > cfg.rxCrit).length, over:rx.filter(x => x.v > -8).length, list:rx.slice().sort((a, b) => a.v - b.v) };
-    }
-  }
-}
-const fmtDbm = v => v == null || !isFinite(v) ? '—' : (v > 0 ? '+' : '') + nf(v, 1).replace('-', '−') + ' dBm';
-function rxSev(v){ if (v == null || !isFinite(v)) return ''; if (v <= cfg.rxCrit || v > -8) return 'is-danger'; if (v <= cfg.rxWarn) return 'is-warn'; return ''; }
-function txSev(v){ if (v == null || !isFinite(v)) return ''; if (v < 0.5 || v > 8) return 'is-danger'; if (v < 1.5 || v > 7) return 'is-warn'; return ''; }
-const fmtDbmShort = v => v == null || !isFinite(v) ? '—' : (v > 0 ? '+' : '') + nf(v, 1).replace('-', '−');
 function mkMetric(oltId, id, label, unit){ return { type:'health', key:oltId + '|h|' + id, olt:oltId, id, label, unit, value:null, hist:[], sev:'ok', where:'', missing:false }; }
 function rebuildIndex(){
   targets.clear();
@@ -982,7 +830,7 @@ async function zResolve(o){
 function mergeInterfaces(o, items){
   const ifs = new Map();
   for (const it of items || []){
-    const km = String(it.key_).match(/\[(ifHCInOctets|ifHCOutOctets|ifOperStatus|ifHighSpeed|ifSpeed|ifInErrors|ifOutErrors|ifInDiscards|ifOutDiscards)\.(\d+)\]/);
+    const km = String(it.key_).match(/\[(ifHCInOctets|ifHCOutOctets|ifOperStatus|ifHighSpeed|ifSpeed)\.(\d+)\]/);
     if (!km) continue;
     const nm = String(it.name).match(/^Interface\s+(.+?):\s/);
     if (!nm) continue;
@@ -1015,15 +863,12 @@ function mergeInterfaces(o, items){
       (isPon ? o.ports : o.uplinks).push(t);
     }
     t.active = active;
-    t.oper = oper; t.speedRaw = speed;
-    t.zx = { inErr:r.it.ifInErrors, outErr:r.it.ifOutErrors, inDisc:r.it.ifInDiscards, outDisc:r.it.ifOutDiscards };
-    t.lastClock = Math.max(...[r.it.ifHCInOctets, r.it.ifHCOutOctets, r.it.ifOperStatus].filter(Boolean).map(x => +x.lastclock * 1000), 0) || null;
     if (isPon){
       setCaps(t, speed);
-      t.down = cleanRate(t, 'down', outR); t.up = cleanRate(t, 'up', inR); t.zD = r.it.ifHCOutOctets; t.zU = r.it.ifHCInOctets;
+      t.down = outR; t.up = inR; t.zD = r.it.ifHCOutOctets; t.zU = r.it.ifHCInOctets;
     } else {
       t.capD = t.capU = speed || guessSpeed(r.name) || t.capD;
-      t.down = cleanRate(t, 'down', inR); t.up = cleanRate(t, 'up', outR); t.zD = r.it.ifHCInOctets; t.zU = r.it.ifHCOutOctets;
+      t.down = inR; t.up = outR; t.zD = r.it.ifHCInOctets; t.zU = r.it.ifHCOutOctets;
     }
     if (t.down != null) pushPoint(t.hd, clockOf(t.zD), t.down);
     if (t.up != null) pushPoint(t.hu, clockOf(t.zU), t.up);
@@ -1037,41 +882,19 @@ function boardLabel(name){
     .replace(/\b(cpu|processador|processor|processamento|utiliza[cç][aã]o|utilization|usage|uso|load|carga|mem[oó]ria|memory|temperatura|temperature|temp|util|ratio|percent)\b/gi, '')
     .replace(/[:()\[\]%]+/g, ' ').replace(/\s{2,}/g, ' ').replace(/^[\s\-–_]+|[\s\-–_]+$/g, '').trim() || 'Geral';
 }
-/* Itens de saúde das OLTs ZTE no Zabbix da LV: "CPU Load Placa 1.1.X" (%, sem
-   unidade) e "Temperatura Placa 1.1.X" (ºC; -1000 = slot vazio), mais
-   "Device: Temperature" do chassi. "ICMP - Tempo de Resposta" não é temperatura. */
-function healthKind(it){
-  const n = String(it.name), k = String(it.key_), u = String(it.units || '').trim();
-  if (/icmp|ping|tempo de resposta|response time/i.test(n) || /^icmp/i.test(k)) return null;
-  if (/temperat/i.test(n) || /^[º°]?C$/i.test(u) && /temp/i.test(n + k)) return 'temp';
-  if (/mem[oó]ria|memory|\bmem\b|\bram\b/i.test(n) || /memory|mem\./i.test(k)) return 'mem';
-  if (/\bcpu\b|processa|processor/i.test(n) || /cpu/i.test(k)) return 'cpu';
-  return null;
-}
-function boardOf(name){
-  const n = String(name);
-  const m = n.match(/(\d+)\.(\d+)\.(\d+)\s*$/) || n.match(/(?:placa|slot|card)\s*(\d+)\s*$/i);
-  if (m){ const slot = +(m[3] || m[1]); return { key:'s' + slot, label:'Placa ' + slot, slot }; }
-  const l = boardLabel(n);
-  return /^(device|chassi[s]?|system|sistema|geral)$/i.test(l) ? { key:'chassi', label:'Chassi', slot:-1 } : { key:l, label:l, slot:null };
-}
 function mergeHealth(o, items){
-  const groups = { cpu:[], mem:[], temp:[] }, absent = new Set();
-  const parsed = [];
+  const groups = { cpu:[], mem:[], temp:[] };
   for (const it of items || []){
     if (/^net\.if/.test(it.key_) || /^Interface\s/i.test(it.name)) continue;
     if (!['0','3'].includes(String(it.value_type))) continue;
-    const id = healthKind(it); if (!id) continue;
-    const v = +it.lastvalue; if (it.lastvalue === '' || !isFinite(v)) continue;
-    const b = boardOf(it.name);
-    if (id === 'temp' && v <= -100){ absent.add(b.key); continue; }   // slot vazio
-    parsed.push({ id, it, v, b, u:String(it.units || '').trim(), clock:+it.lastclock * 1000 });
-  }
-  for (const x of parsed){
-    if (absent.has(x.b.key)) continue;
-    if ((x.id === 'cpu' || x.id === 'mem') && ((x.u && x.u !== '%') || x.v < 0 || x.v > 100)) continue;
-    if (x.id === 'temp' && (x.v < -20 || x.v > 150)) continue;
-    groups[x.id].push({ it:x.it, v:x.v, label:x.b.label, b:x.b, clock:x.clock });
+    const n = it.name; let id = null;
+    if (/temp/i.test(n)) id = 'temp'; else if (/cpu|process/i.test(n)) id = 'cpu'; else if (/mem/i.test(n)) id = 'mem';
+    if (!id) continue;
+    const u = String(it.units || '').trim(), v = +it.lastvalue;
+    if (!isFinite(v)) continue;
+    if ((id === 'cpu' || id === 'mem') && ((u && u !== '%') || v < 0 || v > 100)) continue;
+    if (id === 'temp' && (v < -20 || v > 150)) continue;
+    groups[id].push({ it, v, label:boardLabel(n), clock:+it.lastclock * 1000 });
   }
   const labels = { cpu:['Processamento','%'], mem:['Memória','%'], temp:['Temperatura','°C'] };
   const boards = new Map();
@@ -1079,25 +902,14 @@ function mergeHealth(o, items){
     let m = o.health[id];
     if (!m){ m = mkMetric(o.id, id, labels[id][0], labels[id][1]); o.health[id] = m; }
     const g = groups[id];
-    if (!g.length){ m.missing = true; m.value = null; m.boards = []; continue; }
+    if (!g.length){ m.missing = true; m.value = null; continue; }
     g.sort((a, b) => b.v - a.v);
     if (m.zItem && m.zItem.itemid !== g[0].it.itemid) m.hist = [];
     m.missing = false; m.value = g[0].v; m.where = g[0].label; m.zItem = g[0].it;
-    m.boards = g.map(x => ({ key:x.b.key, label:x.b.label, slot:x.b.slot, v:x.v, it:x.it }))
-      .sort((a, b) => ((a.slot ?? 999) - (b.slot ?? 999)) || a.label.localeCompare(b.label, 'pt-BR', { numeric:true }));
     pushPoint(m.hist, g[0].clock, g[0].v);
-    for (const x of g){
-      const b = boards.get(x.b.key) || { label:x.b.label, slot:x.b.slot, cpu:null, mem:null, temp:null, ports:null };
-      b[id] = x.v; boards.set(x.b.key, b);
-    }
+    for (const x of g){ const b = boards.get(x.label) || { label:x.label, cpu:null, mem:null, temp:null, ports:null }; b[id] = x.v; boards.set(x.label, b); }
   }
-  for (const b of boards.values()){
-    if (b.slot != null && b.slot >= 0){
-      const ps = o.ports.filter(p => p.slot === b.slot);
-      if (ps.length) b.ports = ps.filter(p => p.active).length + '/' + ps.length;
-    }
-  }
-  o.boards = [...boards.values()].sort((a, b) => ((a.slot ?? 999) - (b.slot ?? 999)) || a.label.localeCompare(b.label, 'pt-BR', { numeric:true }));
+  o.boards = [...boards.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR', { numeric:true }));
 }
 async function zHistory(o){
   const from = Math.floor((Date.now() - WINDOW) / 1000);
@@ -1117,11 +929,6 @@ async function zHistory(o){
     }
   }
   for (const arr of map.values()) arr.sort((a, b) => a[0] - b[0]);
-  for (const t of [...o.ports, ...o.uplinks]){
-    const md = physMax(t, 'down'), mu = physMax(t, 'up');
-    if (t.hd.length) t.hd = t.hd.filter(a => a[1] <= md);
-    if (t.hu.length) t.hu = t.hu.filter(a => a[1] <= mu);
-  }
 }
 async function zPoll(o, first){
   await zResolve(o);
@@ -1131,14 +938,6 @@ async function zPoll(o, first){
   try { hitems = await zbx('item.get', { hostids:[o.zhostid], output:IOUT, search:{ name:['*CPU*','*Mem*','*Temp*','*Process*'] }, searchByAny:true, searchWildcardsEnabled:true, limit:2000 }); }
   catch(e){ hitems = []; }
   mergeHealth(o, hitems);
-  let oitems = [];
-  try { oitems = await zbx('item.get', { hostids:[o.zhostid], output:IOUT, search:{ key_:['zte.pon.rx.','zte.opt.tx[','zte.opt.rx['] }, searchByAny:true, filter:{ status:0 }, limit:20000 }); }
-  catch(e){ oitems = []; }
-  if (!oitems.length){
-    try { oitems = await zbx('item.get', { hostids:[o.zhostid], output:IOUT, search:{ name:['*rx*','*tx*','*sinal*','*optic*','*óptic*','*power*','*potência*','*dbm*','*laser*'] }, searchByAny:true, searchWildcardsEnabled:true, limit:10000 }); }
-    catch(e){ oitems = []; }
-  }
-  mergeOptical(o, oitems);
   rebuildIndex();
   if (first) await zHistory(o);
   o.updatedAt = Date.now(); o.error = null; o.loading = false;
@@ -1189,12 +988,12 @@ function evaluate(now, silent){
   const fresh = [];
   for (const o of OLTS){
     for (const t of [...o.ports, ...o.uplinks]){
-      if (!t.active || (t.down == null && t.up == null)){
-        t.sev = t.active ? 'ok' : 'idle'; t.pd = t.pu = null; t.sevD = t.sevU = 'ok';
+      if (!t.active || t.down == null){
+        t.sev = t.active ? 'ok' : 'idle'; t.pd = t.pu = null;
         track(o, t, 'down', false, null, null, now, fresh); track(o, t, 'up', false, null, null, now, fresh);
         continue;
       }
-      t.pd = (t.capD && t.down != null) ? t.down / t.capD : null;
+      t.pd = t.capD ? t.down / t.capD : null;
       t.pu = (t.capU && t.up != null) ? t.up / t.capU : null;
       t.sevD = sevPct(t.pd, t.sevD); t.sevU = sevPct(t.pu, t.sevU); t.sev = worst(t.sevD, t.sevU);
       track(o, t, 'down', t.sevD === 'crit', t.down, t.pd, now, fresh);
@@ -1322,10 +1121,9 @@ function gaugeSVG(m){
     <text class="gauge-sub" x="${cx}" y="${cy + 22}">${isTemp ? '°C' : 'por cento'}</text>
   </svg>`;
 }
-function healthSpark(m, t1){ return metricSpark(m, m.hist, t1 - WINDOW, t1); }
-function metricSpark(m, series, t0, t1){
-  const W = 200, H = 34, isTemp = m.id === 'temp';
-  const pts = series.filter(a => a[0] >= t0);
+function healthSpark(m, t1){
+  const W = 200, H = 34, t0 = t1 - WINDOW, isTemp = m.id === 'temp';
+  const pts = m.hist.filter(a => a[0] >= t0);
   if (pts.length < 2) return '';
   const lo = isTemp ? Math.min(20, ...pts.map(p => p[1])) : 0, hi = isTemp ? Math.max(90, ...pts.map(p => p[1])) : 100;
   const X = t => clamp((t - t0) / (t1 - t0), 0, 1) * W, Y = v => H - 2 - ((v - lo) / (hi - lo)) * (H - 4);
@@ -1333,7 +1131,7 @@ function metricSpark(m, series, t0, t1){
   const cy = Y(cfg[TH[m.id].c]);
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><line class="spark-thr" x1="0" x2="${W}" y1="${cy.toFixed(1)}" y2="${cy.toFixed(1)}"/><path class="spark-fill" d="${linePath(p)}L${p[p.length - 1][0].toFixed(1)} ${H}L${p[0][0].toFixed(1)} ${H}Z"/><path class="spark-in" d="${linePath(p)}"/></svg>`;
 }
-const NICE = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 1, 1.25, 1.5, 2, 3, 5];
+const NICE = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 1];
 let chartUid = 0;
 function chartSVG(W, d, u, capD, capU, t0, t1, winH){
   const H = 248, PL = 46, PR = 14, PT = 16, PB = 28, iw = W - PL - PR, ih = H - PT - PB;
@@ -1342,7 +1140,7 @@ function chartSVG(W, d, u, capD, capU, t0, t1, winH){
   for (const a of d) peak = Math.max(peak, a[1] / capD);
   for (const a of u) peak = Math.max(peak, a[1] / capU);
   let ymax = NICE.find(n => n >= peak * 1.12) || 1;
-  if (ymax >= 0.75 && ymax <= 1) ymax = 1;
+  if (ymax >= 0.75) ymax = 1;
   const X = t => PL + (t - t0) / (t1 - t0) * iw, Y = p => PT + ih - (Math.min(p, ymax) / ymax) * ih;
   const pd = d.map(a => [X(a[0]), Y(a[1] / capD)]), pu = u.map(a => [X(a[0]), Y(a[1] / capU)]);
   const id = 'g' + (++chartUid);
@@ -1351,10 +1149,9 @@ function chartSVG(W, d, u, capD, capU, t0, t1, winH){
     const v = ymax * k / 4, y = Y(v);
     grid += `<line class="chart-grid" x1="${PL}" x2="${PL + iw}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}"/><text class="chart-axis" x="${PL - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${nf(v * 100, v * 100 < 10 && v > 0 ? 1 : 0)}%</text>`;
   }
-  const stepH = winH <= 6 ? 1 : winH <= 12 ? 2 : winH <= 24 ? 3 : winH <= 48 ? 6 : winH <= 168 ? 24 : 120;
+  const stepH = winH <= 6 ? 1 : winH <= 24 ? 3 : 6;
   const tk = new Date(t0); tk.setMinutes(0, 0, 0); tk.setHours(tk.getHours() + 1);
-  if (stepH >= 24){ while (tk.getHours() !== 0) tk.setHours(tk.getHours() + 1); }
-  else while (tk.getHours() % stepH) tk.setHours(tk.getHours() + 1);
+  while (tk.getHours() % stepH) tk.setHours(tk.getHours() + 1);
   let xl = '';
   for (let t = tk.getTime(); t <= t1; t += stepH * HOUR){
     const x = X(t), dd = new Date(t);
@@ -1365,7 +1162,7 @@ function chartSVG(W, d, u, capD, capU, t0, t1, winH){
   const thrLine = thr <= ymax ? `<line class="chart-thr" x1="${PL}" x2="${PL + iw}" y1="${Y(thr).toFixed(1)}" y2="${Y(thr).toFixed(1)}"/><text class="chart-thr-label" x="${PL + iw}" y="${(Y(thr) - 6).toFixed(1)}" text-anchor="end">limite ${cfg.thr}%</text>` : '';
   const area = (pts) => pts.length > 1 ? `${linePath(pts)}L${pts[pts.length - 1][0].toFixed(1)} ${PT + ih}L${pts[0][0].toFixed(1)} ${PT + ih}Z` : '';
   const lastD = pd[pd.length - 1], lastU = pu[pu.length - 1];
-  const svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Utilização de download e upload, ${winSpan(winH)}, escala até ${Math.round(ymax * 100)}%">
+  const svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Utilização de download e upload nas últimas ${winH} horas, escala até ${Math.round(ymax * 100)}%">
     <defs>
       <linearGradient id="${id}i" x1="0" y1="0" x2="0" y2="1"><stop class="stop-in" offset="0%" stop-opacity=".34"/><stop class="stop-in" offset="100%" stop-opacity="0"/></linearGradient>
       <linearGradient id="${id}o" x1="0" y1="0" x2="0" y2="1"><stop class="stop-out" offset="0%" stop-opacity=".30"/><stop class="stop-out" offset="100%" stop-opacity="0"/></linearGradient>
@@ -1464,18 +1261,17 @@ function renderHealth(o){
     const m = o.health[id];
     const label = { cpu:'Processamento', mem:'Memória', temp:'Temperatura' }[id];
     if (!m || m.missing || m.value == null){
-      return `<article class="card hcard"><div class="hcard-h"><label>${label}</label><span class="badge badge--idle">sem item</span></div><p class="muted" style="margin:0">${o.loading ? 'Carregando…' : 'O Zabbix não coleta ' + label.toLowerCase() + ' desta OLT. Quando o item for criado no host, ele aparece aqui sozinho.'}</p></article>`;
+      return `<article class="card hcard"><div class="hcard-h"><label>${label}</label><span class="badge badge--idle">sem item</span></div><p class="muted" style="margin:0">${o.loading ? 'Carregando…' : 'Nenhum item de ' + label.toLowerCase() + ' encontrado neste host do Zabbix.'}</p></article>`;
     }
     const th = TH[id], pts = m.hist.filter(a => a[0] >= t1 - WINDOW).map(a => a[1]);
     const pk = pts.length ? Math.max(...pts) : m.value, mn = pts.length ? Math.min(...pts) : m.value;
     const st = m.sev === 'crit' ? ['is-danger','badge--danger','Alerta'] : m.sev === 'warn' ? ['is-warn','badge--warn','Atenção'] : ['','badge--ok','Normal'];
     const u = m.unit === '%' ? '%' : ' °C';
-    const nb = (m.boards || []).length;
-    return `<article class="card hcard ${st[0]}" data-open="${esc(m.key)}" role="button" tabindex="0" aria-label="${label} da ${esc(o.curto)}: ${esc(fmtMetric(m, m.value))}. Ver as ${nb} placas"><div class="hcard-h"><label>${label}</label><span class="badge ${st[1]}">${st[2]}</span></div>
+    return `<article class="card hcard ${st[0]}"><div class="hcard-h"><label>${label}</label><span class="badge ${st[1]}">${st[2]}</span></div>
       <div class="hbody">${gaugeSVG(m)}<div class="hside">
         <dl><dt>Pico 2 h</dt><dd>${esc(fmtMetric(m, pk))}</dd><dt>Mínimo 2 h</dt><dd>${esc(fmtMetric(m, mn))}</dd><dt>Atenção / alerta</dt><dd>${cfg[th.w]} / ${cfg[th.c]}${u}</dd></dl>
         ${healthSpark(m, t1)}<span class="where">${esc(m.where || '')}${m.where ? ' · ' : ''}últimas 2 h</span>
-      </div></div><span class="hcard-more">Ver as ${nb} placas →</span></article>`;
+      </div></div></article>`;
   }).join('');
 }
 function dmHTML(dir, v, p, sev){
@@ -1505,12 +1301,10 @@ function renderBoards(o){
   const card = $('#boardCard');
   const tc = (v, w, c) => v == null ? '' : v >= c ? 'is-danger' : v >= w ? 'is-warn' : '';
   const rows = o.boards || [];
-  const hasMem = rows.some(b => b.mem != null);
-  card.innerHTML = `<div class="card-h"><h2>Placas</h2><small>${rows.length ? (hasMem ? 'CPU, memória e temperatura por placa' : 'CPU e temperatura por placa') : ''}</small></div>
-    ${rows.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Placa</th><th class="r">PONs</th><th class="r">CPU</th>${hasMem ? '<th class="r">Mem.</th>' : ''}<th class="r">Temp.</th></tr></thead><tbody>
+  card.innerHTML = `<div class="card-h"><h2>Placas</h2><small>${rows.length ? 'CPU e temperatura por placa' : ''}</small></div>
+    ${rows.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Placa</th><th class="r">PONs</th><th class="r">CPU</th><th class="r">Temp.</th></tr></thead><tbody>
       ${rows.map(b => `<tr><td>${esc(b.label)}</td><td class="r">${b.ports == null ? '—' : esc(b.ports)}</td>
         <td class="r ${tc(b.cpu, cfg.cpuWarn, cfg.cpuCrit)}">${b.cpu == null ? '—' : nf(b.cpu, 0) + '%'}</td>
-        ${hasMem ? `<td class="r ${tc(b.mem, cfg.memWarn, cfg.memCrit)}">${b.mem == null ? '—' : nf(b.mem, 0) + '%'}</td>` : ''}
         <td class="r ${tc(b.temp, cfg.tempWarn, cfg.tempCrit)}">${b.temp == null ? '—' : nf(b.temp, 1) + ' °C'}</td></tr>`).join('')}
     </tbody></table></div>` : `<p class="muted">${o.loading ? 'Carregando…' : 'Sem itens por placa no Zabbix.'}</p>`}`;
 }
@@ -1531,8 +1325,6 @@ function renderChips(o){
   $('#ponTitle').textContent = `${o.ports.length} portas · ${c.active} ativas`;
   $('#ponLegend').innerHTML = `<span><i class="sw in"></i>Download</span><span><i class="sw out"></i>Upload</span><span><i class="thr-sw"></i>Limite ${cfg.thr}%</span><span class="dim">curvas das últimas 2 h</span>`;
   for (const b of $('#viewSeg').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.v === ui.view));
-  $('#metricSeg').hidden = ui.view !== 'heat';
-  for (const b of $('#metricSeg').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.m === ui.heatMetric));
 }
 function visiblePorts(o){
   const q = norm(ui.q.trim());
@@ -1555,22 +1347,14 @@ function cardHTML(p){
   return `<button type="button" class="pon" data-key="${esc(p.key)}" data-open="${esc(p.key)}" data-fk="p-${esc(p.key)}">
     <span class="pon-top"><span class="pon-id">${esc(p.short)}</span><span class="pon-pct"></span></span>
     <span><span class="pon-reg">${esc(p.region || 'Sem descrição')}</span>${meta ? `<span class="pon-meta">${esc(meta)}</span>` : ''}</span>
-    <span class="dmw"></span><span class="spk"></span><span class="pon-opt" hidden></span></button>`;
+    <span class="dmw"></span><span class="spk"></span></button>`;
 }
 function fillCard(el, p, t1){
   if (!p.active) return;
   el.className = 'pon' + (p.sev === 'crit' ? ' is-danger' : p.sev === 'warn' ? ' is-warn' : '');
-  el.querySelector('.pon-pct').textContent = isBad(p) && !Math.max(p.pd || 0, p.pu || 0) ? 'leitura inválida' : fmtPct(Math.max(p.pd || 0, p.pu || 0));
-  el.title = isBad(p) ? heatTitle(p) : '';
+  el.querySelector('.pon-pct').textContent = fmtPct(Math.max(p.pd || 0, p.pu || 0));
   el.querySelector('.dmw').innerHTML = dmHTML('down', p.down, p.pd, p.sevD) + dmHTML('up', p.up, p.pu, p.sevU);
   el.querySelector('.spk').innerHTML = sparkSVG(p.hd, p.hu, p.capD, t1);
-  const po = el.querySelector('.pon-opt'), r = p.opt && p.opt.onuRx, tx = p.opt && p.opt.tx;
-  if (po){
-    po.hidden = !(r || tx);
-    po.className = 'pon-opt ' + (r ? rxSev(r.worst.v) : '');
-    po.innerHTML = r || tx ? `${r ? `RX pior <b>${esc(fmtDbmShort(r.worst.v))}</b>` : ''}${tx ? `${r ? ' · ' : ''}TX ${esc(fmtDbmShort(tx.v))}` : ''} <small>dBm</small>` : '';
-    po.title = r ? `Pior ONU ${r.worst.onu ?? ''}: ${fmtDbm(r.worst.v)} · média ${fmtDbm(r.avg)} · ${r.n} ONUs` : '';
-  }
   el.setAttribute('aria-label', `Porta ${p.name}, ${p.region || 'sem descrição'}. Download ${fmtBps(p.down)} (${fmtPct(p.pd)}), upload ${fmtBps(p.up)} (${fmtPct(p.pu)}). Abrir gráfico`);
 }
 function slotSummary(o, sl){
@@ -1603,28 +1387,16 @@ function renderPons(o, force){
 }
 function heatClass(p){
   if (!p.active) return 'bi';
-  if (isBad(p) && p.sev !== 'crit' && p.sev !== 'warn') return 'bq';
   if (p.sev === 'crit') return 'bc';
   if (p.sev === 'warn') return 'bw';
   const u = Math.max(p.pd || 0, p.pu || 0);
   return u < 0.1 ? 'b1' : u < 0.25 ? 'b2' : u < 0.5 ? 'b3' : 'b4';
 }
-function heatText(p){
-  const u = Math.max(p.pd || 0, p.pu || 0), upMax = (p.pu || 0) > (p.pd || 0);
-  if (isBad(p) && !u) return '?';
-  const v = u * 100;
-  return `${nf(v, v >= 0.05 && v < 1 ? 1 : 0)}%${upMax ? '<span class="up-mark" aria-hidden="true">↑</span>' : ''}`;
-}
-function heatTitle(p){
-  const bad = [p.badD != null ? `↓ leitura inválida (${fmtBps(p.badD)})` : '', p.badU != null ? `↑ leitura inválida (${fmtBps(p.badU)})` : ''].filter(Boolean).join(' · ');
-  const opt = p.opt ? ` · TX ${fmtDbm(p.opt.tx && p.opt.tx.v)}${p.opt.rx ? ' · RX ' + fmtDbm(p.opt.rx.v) : ''}${p.opt.onuRx ? ' · RX pior ONU ' + fmtDbm(p.opt.onuRx.worst.v) : ''}` : '';
-  return `${p.name} · ${p.region || 'sem descrição'} · ↓ ${fmtBps(p.down)} (${fmtPct(p.pd)} de ${fmtBps(p.capD)}) · ↑ ${fmtBps(p.up)} (${fmtPct(p.pu)} de ${fmtBps(p.capU)})${opt}${bad ? ' · ' + bad + ', acima do máximo do GPON: confira o item no Zabbix' : ''}`;
-}
 function renderHeat(o, force){
   const body = $('#ponBody');
   const slots = [...new Set(o.ports.map(p => p.slot))].sort((a, b) => a - b);
   const cols = Math.max(...o.ports.map(p => p.idx), 1);
-  const sig = ['heat', ui.heatMetric, o.id, o.ports.length, cols].join('|');
+  const sig = ['heat', o.id, o.ports.length, cols].join('|');
   const vis = new Set(visiblePorts(o).map(p => p.key));
   if (force || sig !== pons.sig){
     pons.sig = sig;
@@ -1642,11 +1414,11 @@ function renderHeat(o, force){
     }
     h += `</div>`;
     keepFocus(body, () => {
-      body.innerHTML = ui.heatMetric === 'rx' ? `<div class="heat-wrap">${h}</div>${rxLegend(o)}` : `<div class="heat-wrap">${h}</div><div class="legend-row"><span>% do limite da porta (${esc(fmtBps(cfg.capDown * 1e6))}), direção mais carregada:</span>
+      body.innerHTML = `<div class="heat-wrap">${h}</div><div class="legend-row"><span>Utilização da direção mais carregada:</span>
         <span><i class="lg" style="background:var(--heat-1)"></i>&lt; 10%</span><span><i class="lg" style="background:var(--heat-2)"></i>10–25%</span>
         <span><i class="lg" style="background:var(--heat-3)"></i>25–50%</span><span><i class="lg" style="background:var(--heat-4)"></i>50–${cfg.warn}%</span>
         <span><i class="lg" style="background:var(--warn-500)"></i>${cfg.warn}–${cfg.thr}%</span><span><i class="lg" style="background:var(--danger-500)"></i>≥ ${cfg.thr}%</span>
-        <span><i class="lg" style="background:repeating-linear-gradient(45deg,transparent 0 3px,var(--line-strong) 3px 5px)"></i>sem link</span><span><i class="lg" style="background:var(--surface-3);outline:1px dashed var(--warn-line)"></i>? leitura inválida</span><span>↑ marca quando o upload é a direção mais carregada</span></div>`;
+        <span><i class="lg" style="background:repeating-linear-gradient(45deg,transparent 0 3px,var(--line-strong) 3px 5px)"></i>sem link</span><span>↑ marca quando o upload é a direção mais carregada</span></div>`;
     });
     pons.refs = new Map([...body.querySelectorAll('[data-key]')].map(el => [el.dataset.key, el]));
   }
@@ -1654,36 +1426,16 @@ function renderHeat(o, force){
     const el = pons.refs.get(p.key); if (!el) continue;
     const dim = !vis.has(p.key) && (ui.q.trim() || ui.filter !== 'active');
     if (!p.active){ el.className = 'hc bi' + (dim ? ' dim' : ''); continue; }
-    if (ui.heatMetric === 'rx'){
-      const r = p.opt && p.opt.onuRx, sev = r ? rxSev(r.worst.v) : '';
-      el.className = 'hc ' + (!r ? 'rq' : sev === 'is-danger' ? 'bc' : sev === 'is-warn' ? 'bw' : 'rok') + (dim ? ' dim' : '');
-      el.innerHTML = r ? esc(fmtDbmShort(r.worst.v)) : '–';
-      el.title = `${p.name} · ${p.region || 'sem descrição'}${r ? ` · pior ONU ${r.worst.onu ?? ''} ${fmtDbm(r.worst.v)} · média ${fmtDbm(r.avg)} · ${r.n} ONUs${r.low ? ` · ${r.low} abaixo de ${fmtDbm(cfg.rxCrit)}` : ''}` : ' · sem leitura de sinal'}${p.opt && p.opt.tx ? ' · TX ' + fmtDbm(p.opt.tx.v) : ''}`;
-      el.setAttribute('aria-label', `Porta ${p.short}, ${p.region || 'sem descrição'}: ${r ? 'pior ONU ' + fmtDbm(r.worst.v) : 'sem leitura de sinal'}. Abrir detalhes`);
-      continue;
-    }
     el.className = 'hc ' + heatClass(p) + (dim ? ' dim' : '');
     const u = Math.max(p.pd || 0, p.pu || 0), upMax = (p.pu || 0) > (p.pd || 0);
-    el.innerHTML = heatText(p);
-    el.title = heatTitle(p);
-    el.setAttribute('aria-label', `Porta ${p.short}, ${p.region || 'sem descrição'}: ${isBad(p) && !u ? 'leitura inválida' : fmtPct(u) + (upMax ? ' no upload' : ' no download')}. Abrir gráfico`);
+    el.innerHTML = `${nf(u * 100, 0)}${upMax ? '<span class="up-mark" aria-hidden="true">↑</span>' : ''}`;
+    el.title = `${p.name} · ${p.region || 'sem descrição'} · ↓ ${fmtBps(p.down)} (${fmtPct(p.pd)}) · ↑ ${fmtBps(p.up)} (${fmtPct(p.pu)})`;
+    el.setAttribute('aria-label', `Porta ${p.short}, ${p.region || 'sem descrição'}: ${fmtPct(u)}${upMax ? ' no upload' : ' no download'}. Abrir gráfico`);
   }
   for (const el of body.querySelectorAll('[data-hs]')){
     const sl = +el.dataset.hs, act = o.ports.filter(p => p.slot === sl && p.active);
-    if (ui.heatMetric === 'rx'){
-      const low = act.reduce((s, p) => s + ((p.opt && p.opt.onuRx && p.opt.onuRx.low) || 0), 0);
-      el.textContent = low ? `${low} ${low === 1 ? 'ONU' : 'ONUs'} ≤ ${fmtDbmShort(cfg.rxCrit)}` : 'sinal ok';
-    } else el.textContent = '↓ ' + fmtBps(act.reduce((s, p) => s + (p.down || 0), 0));
+    el.textContent = '↓ ' + fmtBps(act.reduce((s, p) => s + (p.down || 0), 0));
   }
-}
-function rxLegend(o){
-  const com = o.ports.filter(p => p.opt && p.opt.onuRx).length;
-  if (!com) return `<div class="legend-row"><span>${o.optSource === 'zte' ? 'O Zabbix ainda não tem leitura de sinal desta OLT.' : 'O Zabbix ainda não coleta o sinal desta OLT. Rode o provisionar-zabbix.py (versão 2) no servidor.'}</span></div>`;
-  return `<div class="legend-row"><span>RX da pior ONU de cada PON (dBm):</span>
-    <span><i class="lg" style="background:var(--ok-bg);outline:1px solid var(--ok-line)"></i>acima de ${esc(fmtDbmShort(cfg.rxWarn))}</span>
-    <span><i class="lg" style="background:var(--warn-500)"></i>${esc(fmtDbmShort(cfg.rxWarn))} a ${esc(fmtDbmShort(cfg.rxCrit))}</span>
-    <span><i class="lg" style="background:var(--danger-500)"></i>${esc(fmtDbmShort(cfg.rxCrit))} ou menos, ou acima de −8</span>
-    <span><i class="lg" style="background:var(--surface-3)"></i>sem leitura</span><span>${com} de ${o.ports.filter(p => p.active).length} PONs com sinal</span></div>`;
 }
 
 /* modo TV */
@@ -1702,8 +1454,8 @@ function tvHeatHTML(o){
       const p = o.ports.find(x => x.slot === sl && x.idx === i);
       if (!p){ h += `<span class="hc none"></span>`; continue; }
       if (!p.active){ h += `<span class="hc bi" title="${esc(p.name)} · ${esc(p.region || 'sem descrição')} · sem link">–</span>`; continue; }
-      const u = Math.max(p.pd || 0, p.pu || 0);
-      h += `<button type="button" class="hc ${heatClass(p)}" data-open="${esc(p.key)}" title="${esc(heatTitle(p))}" aria-label="Porta ${esc(p.short)}, ${esc(p.region || 'sem descrição')}: ${isBad(p) && !u ? 'leitura inválida' : fmtPct(u)}">${heatText(p)}</button>`;
+      const u = Math.max(p.pd || 0, p.pu || 0), upMax = (p.pu || 0) > (p.pd || 0);
+      h += `<button type="button" class="hc ${heatClass(p)}" data-open="${esc(p.key)}" title="${esc(p.name)} · ${esc(p.region || 'sem descrição')} · ↓ ${esc(fmtBps(p.down))} (${fmtPct(p.pd)}) · ↑ ${esc(fmtBps(p.up))} (${fmtPct(p.pu)})" aria-label="Porta ${esc(p.short)}, ${esc(p.region || 'sem descrição')}: ${fmtPct(u)}">${nf(u * 100, 0)}${upMax ? '<span class="up-mark" aria-hidden="true">↑</span>' : ''}</button>`;
     }
   }
   return h + `</div>`;
@@ -1712,11 +1464,11 @@ function tvHealthHTML(o){
   const t1 = Date.now();
   return ['cpu','mem','temp'].map(id => {
     const m = o.health[id], label = { cpu:'Processamento', mem:'Memória', temp:'Temperatura' }[id];
-    if (!m || m.missing || m.value == null) return `<div class="tv-g none"><span>${label}: ${o.loading ? 'carregando…' : 'não coletada no Zabbix'}</span></div>`;
+    if (!m || m.missing || m.value == null) return `<div class="tv-g none"><span>${label}: ${o.loading ? 'carregando…' : 'sem item no Zabbix'}</span></div>`;
     const pts = m.hist.filter(a => a[0] >= t1 - WINDOW).map(a => a[1]);
     const pk = pts.length ? Math.max(...pts) : m.value;
     const st = m.sev === 'crit' ? ['is-danger','badge--danger','Alerta'] : m.sev === 'warn' ? ['is-warn','badge--warn','Atenção'] : ['','badge--ok','Normal'];
-    return `<div class="tv-g ${st[0]}" data-open="${esc(m.key)}" role="button" tabindex="0" aria-label="${label} da ${esc(o.curto)}: ver todas as placas">${gaugeSVG(m)}<div class="tv-g-side"><label>${label}</label><span><span class="badge ${st[1]}">${st[2]}</span></span><small>pico 2 h ${esc(fmtMetric(m, pk))}</small>${healthSpark(m, t1)}</div></div>`;
+    return `<div class="tv-g ${st[0]}">${gaugeSVG(m)}<div class="tv-g-side"><label>${label}</label><span><span class="badge ${st[1]}">${st[2]}</span></span><small>pico 2 h ${esc(fmtMetric(m, pk))}</small>${healthSpark(m, t1)}</div></div>`;
   }).join('');
 }
 function renderTv(){
@@ -1740,7 +1492,7 @@ function renderTv(){
   const anyErr = OLTS.some(x => x.error), loading = OLTS.some(x => x.loading && !x.updatedAt);
   $('#tvPill').dataset.state = anyErr ? 'error' : loading ? 'loading' : 'live';
   $('#tvSrc').textContent = anyErr ? 'Falha no Zabbix' : loading ? 'Conectando…' : 'Zabbix ao vivo';
-  $('#tvLegend').innerHTML = `<span><i class="lg" style="background:var(--heat-1)"></i>&lt;10%</span><span><i class="lg" style="background:var(--heat-2)"></i>10–25</span><span><i class="lg" style="background:var(--heat-3)"></i>25–50</span><span><i class="lg" style="background:var(--heat-4)"></i>50–${cfg.warn}</span><span><i class="lg" style="background:var(--warn-500)"></i>${cfg.warn}–${cfg.thr}</span><span><i class="lg" style="background:var(--danger-500)"></i>≥ ${cfg.thr}%</span><span>? inválida</span><span>↑ upload</span>`;
+  $('#tvLegend').innerHTML = `<span><i class="lg" style="background:var(--heat-1)"></i>&lt;10%</span><span><i class="lg" style="background:var(--heat-2)"></i>10–25</span><span><i class="lg" style="background:var(--heat-3)"></i>25–50</span><span><i class="lg" style="background:var(--heat-4)"></i>50–${cfg.warn}</span><span><i class="lg" style="background:var(--warn-500)"></i>${cfg.warn}–${cfg.thr}</span><span><i class="lg" style="background:var(--danger-500)"></i>≥ ${cfg.thr}%</span><span>↑ upload</span>`;
 }
 function tickClock(){ const el = $('#tvClock'); if (el) el.textContent = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }); }
 
@@ -1769,81 +1521,22 @@ function setTab(id, fromHash){
 /* ---------- gaveta de detalhe ---------- */
 async function zSeries(t, winH){
   const from = Math.floor((Date.now() - winH * HOUR) / 1000);
-  const md = physMax(t, 'down'), mu = physMax(t, 'up');
-  const hist = async it => {
+  const get = async it => {
     if (!it || !isBpsUnit(it.units)) return [];
-    const rows = await zbx('history.get', { history:+it.value_type, itemids:[it.itemid], time_from:from, output:'extend', sortfield:'clock', sortorder:'ASC', limit:50000 });
+    const rows = await zbx('history.get', { history:+it.value_type, itemids:[it.itemid], time_from:from, output:'extend', sortfield:'clock', sortorder:'ASC', limit:20000 });
     return (rows || []).map(r => [+r.clock * 1000, +r.value]);
   };
-  const trend = async it => {
-    if (!it || !isBpsUnit(it.units)) return { max:[], avg:[] };
-    const rows = await zbx('trend.get', { itemids:[it.itemid], time_from:from, output:['itemid','clock','value_avg','value_max'], limit:5000 });
-    const r = (rows || []).map(x => [+x.clock * 1000, +x.value_max, +x.value_avg]).sort((a, b) => a[0] - b[0]);
-    return { max:r.map(x => [x[0], x[1]]), avg:r.map(x => [x[0], x[2]]) };
-  };
-  let kind = winH >= TREND_FROM ? 'trend' : 'history', d, u, dAvg = null, uAvg = null;
-  if (kind === 'history'){
-    [d, u] = await Promise.all([hist(t.zD), hist(t.zU)]);
-    if (d.length < 2 && winH >= 12) kind = 'trend';   // histórico bruto mais curto que o período
-  }
-  if (kind === 'trend'){
-    const [a, b] = await Promise.all([trend(t.zD), trend(t.zU)]);
-    d = a.max; u = b.max; dAvg = a.avg; uAvg = b.avg;
-  }
-  const okD = x => x[1] <= md, okU = x => x[1] <= mu;
-  return { kind, d:d.filter(okD), u:u.filter(okU), dAvg:dAvg && dAvg.filter(okD), uAvg:uAvg && uAvg.filter(okU) };
-}
-async function zHealthSeries(m, winH){
-  const from = Math.floor((Date.now() - winH * HOUR) / 1000);
-  const items = (m.boards || []).filter(b => b.it);
-  const idMap = new Map(items.map(b => [String(b.it.itemid), b.key]));
-  const out = Object.fromEntries(items.map(b => [b.key, []]));
-  let kind = winH >= TREND_FROM ? 'trend' : 'history';
-  if (kind === 'history'){
-    for (const vt of ['0','3']){
-      const ids = items.filter(b => String(b.it.value_type) === vt).map(b => String(b.it.itemid));
-      if (!ids.length) continue;
-      const rows = await zbx('history.get', { history:+vt, itemids:ids, time_from:from, output:['itemid','clock','value'], sortfield:'clock', sortorder:'ASC', limit:150000 });
-      for (const r of rows || []){ const k = idMap.get(String(r.itemid)); if (k) out[k].push([+r.clock * 1000, +r.value]); }
-    }
-    if (winH >= 12 && Object.values(out).every(a => a.length < 2)) kind = 'trend';
-  }
-  if (kind === 'trend' && idMap.size){
-    for (const k in out) out[k] = [];
-    const rows = await zbx('trend.get', { itemids:[...idMap.keys()], time_from:from, output:['itemid','clock','value_max'], limit:30000 });
-    for (const r of rows || []){ const k = idMap.get(String(r.itemid)); if (k) out[k].push([+r.clock * 1000, +r.value_max]); }
-    for (const k in out) out[k].sort((a, b) => a[0] - b[0]);
-  }
-  const ok = m.id === 'temp' ? (a => a[1] > -100 && a[1] < 150) : (a => a[1] >= 0 && a[1] <= 100);
-  for (const k in out) out[k] = out[k].filter(ok);
-  return { kind, boards:out };
-}
-function boardMetrics(t){
-  const o = byId[t.olt];
-  return ['cpu','mem','temp'].map(id => {
-    const m = o.health[id];
-    const b = m && m.boards ? m.boards.find(x => x.slot === t.slot) : null;
-    return { id, m, b, label:{ cpu:'Processamento', mem:'Memória', temp:'Temperatura' }[id] };
-  });
-}
-async function zBoardSeries(t, winH){
-  const out = {};
-  await Promise.all(boardMetrics(t).map(async x => {
-    if (!x.m || !x.b) return;
-    try { const r = await zHealthSeries({ id:x.id, boards:[x.b] }, winH); out[x.id] = r.boards[x.b.key] || []; }
-    catch(e){ out[x.id] = []; }
-  }));
-  return out;
+  const [d, u] = await Promise.all([get(t.zD), get(t.zU)]);
+  return { d, u };
 }
 async function loadSeries(){
   const t = targets.get(ui.detail); if (!t) return;
   const key = ui.detail, win = ui.dWin;
   ui.dLoading = true; renderChartArea();
   try {
-    const [s, bs, os] = t.type === 'health' ? [await zHealthSeries(t, win), null, null]
-      : await Promise.all([zSeries(t, win), t.type === 'pon' ? zBoardSeries(t, win) : null, t.type === 'pon' ? zOptSeries(t, win).catch(() => null) : null]);
+    const s = await zSeries(t, win);
     if (ui.detail !== key || ui.dWin !== win) return;
-    ui.dSeries = { key, win, kind:s.kind, d:s.d || [], u:s.u || [], dAvg:s.dAvg, uAvg:s.uAvg, boards:s.boards, board:bs, opt:os, at:Date.now(), err:null };
+    ui.dSeries = { key, win, d:s.d, u:s.u, at:Date.now(), err:null };
   } catch(e){
     if (ui.detail !== key) return;
     ui.dSeries = { key, win, d:[], u:[], at:Date.now(), err:e.message };
@@ -1867,183 +1560,12 @@ function closeDetail(){
   if (lf && document.contains(lf)) lf.focus();
   else if (lf && lf.dataset && lf.dataset.fk){ const el = document.querySelector(`[data-fk="${CSS.escape(lf.dataset.fk)}"]`); if (el) el.focus(); }
 }
-function updateHealthDetail(m, full){
-  const dr = $('#drawer'), o = byId[m.olt], th = TH[m.id], u = m.unit === '%' ? '%' : ' °C';
-  if (full || !dr.querySelector('.d-head')){
-    dr.innerHTML = `<div class="d-head"><div><p class="kicker">Saúde · ${esc(o.nome)}</p><h2 id="dTitle" class="d-title-sans">${esc(m.label)}</h2><p id="dSub"></p></div>
-        <button class="close-btn" type="button" data-act="close" aria-label="Fechar">${ICON.x}</button></div>
-      <div class="d-tags"><span class="badge badge--warn">Atenção ${cfg[th.w]}${u}</span><span class="badge badge--danger">Alerta ${cfg[th.c]}${u}</span><span class="badge badge--idle" id="dCount"></span></div>
-      <div class="d-stats" id="dStats"></div>
-      <section><div class="d-sec-h"><h3>Todas as placas</h3><div class="seg" role="group" aria-label="Período">${WINDOWS.map(([w, l]) => `<button type="button" data-win="${w}" aria-pressed="${ui.dWin === w}">${l}</button>`).join('')}</div></div>
-        <div id="dChart"></div><div id="dLegend"></div></section>`;
-  }
-  $('#dSub').textContent = m.value == null ? 'Sem leitura agora' : `Maior agora: ${fmtMetric(m, m.value)} na ${m.where}`;
-  $('#dCount').textContent = `${(m.boards || []).length} placas`;
-  renderChartArea();
-  if (ui.dSeries && Date.now() - ui.dSeries.at > 120000 && !ui.dLoading) loadSeries();
-}
-function renderHealthArea(m){
-  const box = $('#dChart'), leg = $('#dLegend'), st = $('#dStats');
-  const o = byId[m.olt], th = TH[m.id], w = cfg[th.w], c = cfg[th.c], isTemp = m.id === 'temp';
-  const lo = isTemp ? 20 : 0, hi = isTemp ? 90 : 100, f = v => clamp((v - lo) / (hi - lo), 0, 1);
-  const rows = m.boards || [];
-  if (!rows.length){ box.innerHTML = `<div class="empty" style="margin:0">Nenhuma placa com leitura no Zabbix.</div>`; leg.innerHTML = ''; st.innerHTML = ''; return; }
-  const s = ui.dSeries && ui.dSeries.key === ui.detail && ui.dSeries.win === ui.dWin ? ui.dSeries : null;
-  const now = Date.now(), t0 = now - ui.dWin * HOUR;
-  let topPk = null;
-  box.innerHTML = `<div class="hb-list">${rows.map(b => {
-    const arr = s && s.boards ? (s.boards[b.key] || []) : null;
-    let pk = null; if (arr) for (const a of arr) if (!pk || a[1] > pk[1]) pk = a;
-    if (pk && (!topPk || pk[1] > topPk.v)) topPk = { v:pk[1], t:pk[0], label:b.label };
-    const sev = b.v >= c ? 'is-danger' : b.v >= w ? 'is-warn' : '';
-    const ps = b.slot != null && b.slot >= 0 ? o.ports.filter(p => p.slot === b.slot) : [];
-    const sub = ps.length ? `${ps.filter(p => p.active).length}/${ps.length} PONs` : b.slot === -1 ? 'ambiente' : '';
-    const spark = arr ? (arr.length > 1 ? metricSpark(m, arr, t0, now) : '<small class="muted">sem histórico</small>') : (ui.dLoading ? '<small class="muted">carregando…</small>' : '');
-    return `<div class="hb-row ${sev}"><span class="hb-name">${esc(b.label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
-      <span class="hb-val">${esc(fmtMetric(m, b.v))}</span>
-      <span class="track hb-bar" style="--thr-pos:${(f(c) * 100).toFixed(1)}%"><i style="width:${(f(b.v) * 100).toFixed(1)}%"></i></span>
-      <span class="hb-spark">${spark}</span>
-      <span class="hb-peak">${pk ? 'pico ' + esc(fmtMetric(m, pk[1])) : ''}</span></div>`;
-  }).join('')}</div>`;
-  leg.innerHTML = `<div class="chart-legend" style="margin-top:var(--s-3)"><span><i class="sw in"></i>${esc(m.label)} ${s && s.kind === 'trend' ? '(pico de cada hora)' : ''}</span><span><i class="thr-sw"></i>Alerta ${c}${m.unit === '%' ? '%' : ' °C'}</span><span class="dim">${winSpan(ui.dWin)}</span></div>`;
-  const vals = rows.map(b => b.v), avg = vals.reduce((a, v) => a + v, 0) / vals.length;
-  const nWarn = rows.filter(b => b.v >= w).length;
-  st.innerHTML = `<div><span>Maior agora</span><strong>${esc(fmtMetric(m, m.value))}</strong><small>${esc(m.where || '')}</small></div>
-    <div><span>Média das placas</span><strong>${esc(fmtMetric(m, avg))}</strong><small>agora</small></div>
-    <div><span>Pico no período</span><strong>${topPk ? esc(fmtMetric(m, topPk.v)) : '—'}</strong><small>${topPk ? esc(topPk.label) + ' · ' + fmtDay(topPk.t) + ' às ' + fmtTime(topPk.t) : (ui.dLoading ? 'carregando…' : '')}</small></div>
-    <div><span>Placas acima da atenção</span><strong>${nWarn}</strong><small>de ${rows.length}</small></div>`;
-}
-function renderPortBoard(t){
-  const box = $('#dBoard'); if (!box || t.type !== 'pon') return;
-  const s = ui.dSeries && ui.dSeries.key === ui.detail && ui.dSeries.win === ui.dWin ? ui.dSeries.board : null;
-  const now = Date.now(), t0 = now - ui.dWin * HOUR;
-  $('#dBoardWin').textContent = winSpan(ui.dWin);
-  box.innerHTML = boardMetrics(t).map(x => {
-    if (!x.m || !x.b || x.b.v == null){
-      return `<div class="pb none"><label>${x.label}</label><span>${x.m && !x.m.missing ? 'Sem leitura desta placa' : 'Não coletada no Zabbix'}</span></div>`;
-    }
-    const th = TH[x.id], w = cfg[th.w], c = cfg[th.c], v = x.b.v;
-    const cls = v >= c ? 'is-danger' : v >= w ? 'is-warn' : '';
-    const badge = v >= c ? ['badge--danger','Alerta'] : v >= w ? ['badge--warn','Atenção'] : ['badge--ok','Normal'];
-    const arr = s ? (s[x.id] || []) : null;
-    let pk = null; if (arr) for (const a of arr) if (!pk || a[1] > pk[1]) pk = a;
-    return `<div class="pb ${cls}" data-open="${esc(x.m.key)}" role="button" tabindex="0" aria-label="${x.label} da placa ${t.slot}: ${esc(fmtMetric(x.m, v))}. Ver todas as placas">
-      <label>${x.label}</label>
-      <div class="pb-v"><strong>${esc(fmtMetric(x.m, v))}</strong><span class="badge ${badge[0]}">${badge[1]}</span></div>
-      ${arr ? (arr.length > 1 ? metricSpark(x.m, arr, t0, now) : '<small>sem histórico no período</small>') : (ui.dLoading ? '<small>carregando…</small>' : '')}
-      <small>${pk ? 'pico ' + esc(fmtMetric(x.m, pk[1])) + ' · ' + new Date(pk[0]).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }) + ' ' + fmtTime(pk[0]) : 'atenção ' + w + ' · alerta ' + c + (x.m.unit === '%' ? '%' : ' °C')}</small></div>`;
-  }).join('');
-}
-function renderOptical(t){
-  const box = $('#dOpt'); if (!box) return;
-  const sec = $('#dOptSec'), o = byId[t.olt], op = t.opt;
-  if (t.type !== 'pon'){
-    const has = op && (op.tx || op.rx);
-    if (sec) sec.hidden = !has;
-    if (!has) return;
-    box.innerHTML = `<div class="d-stats">
-      <div><span>RX do módulo</span><strong>${esc(op.rx ? fmtDbm(op.rx.v) : '—')}</strong><small>recebido do equipamento vizinho</small></div>
-      <div><span>TX do módulo</span><strong>${esc(op.tx ? fmtDbm(op.tx.v) : '—')}</strong><small>enviado pela OLT</small></div></div>`;
-    return;
-  }
-  if (sec) sec.hidden = false;
-  if (!op || (!op.tx && !op.onuRx)){
-    const coleta = o.optSource === 'zte';
-    box.innerHTML = `<div class="opt-none"><b>${coleta ? 'Sem leitura de sinal desta porta' : 'Não coletado no Zabbix'}</b><span>${coleta
-      ? 'O Zabbix já coleta o sinal desta OLT, mas não tem leitura desta PON. Ela pode estar sem ONUs ou a primeira coleta ainda não chegou.'
-      : 'O Zabbix ainda não tem os itens de RX e TX desta OLT. Rode o provisionar-zabbix.py (versão 2) no servidor para criar.'}</span></div>`;
-    return;
-  }
-  const cells = [];
-  cells.push(['TX da porta', op.tx ? fmtDbm(op.tx.v) : '—', op.tx ? 'laser da OLT' + (txSev(op.tx.v) ? ' · fora da faixa usual' : '') : 'sem leitura', txSev(op.tx && op.tx.v)]);
-  const r = op.onuRx;
-  if (r){
-    cells.push(['RX da pior ONU', fmtDbm(r.worst.v), r.worst.onu != null && isFinite(r.worst.onu) ? 'ONU ' + r.worst.onu : '', rxSev(r.worst.v)]);
-    cells.push(['RX médio das ONUs', fmtDbm(r.avg), r.n + ' ONUs com leitura', rxSev(r.avg)]);
-    cells.push([`ONUs abaixo de ${fmtDbm(cfg.rxCrit)}`, String(r.low), (r.warn ? r.warn + ' em atenção · ' : '') + 'de ' + r.n + (r.over ? ` · ${r.over} acima de −8 dBm` : ''), r.low ? 'is-danger' : r.warn ? 'is-warn' : '']);
-  } else {
-    cells.push(['RX das ONUs', '—', 'sem leitura', '']);
-  }
-  const worst = r && r.list ? r.list.slice(0, 12) : [];
-  box.innerHTML = `<div class="d-stats">${cells.map(([l, v, sm, cls]) => `<div class="${cls}"><span>${esc(l)}</span><strong>${esc(v)}</strong><small>${esc(sm)}</small></div>`).join('')}</div>
-    ${worst.length ? `<div class="onu-h">ONUs com o sinal mais fraco</div><div class="onu-list">${worst.map(x => `<span class="onu ${rxSev(x.v)}"><b>ONU ${esc(x.onu)}</b>${esc(fmtDbmShort(x.v))}</span>`).join('')}${r.n > worst.length ? `<span class="onu more">+${r.n - worst.length} ONUs</span>` : ''}</div>` : ''}
-    <div class="opt-chart" id="dOptChart"></div>`;
-  renderOptChart(t);
-}
-function renderOptChart(t){
-  const box = $('#dOptChart'); if (!box || !t.opt) return;
-  const z = t.opt.z || {};
-  if (!z.worst && !z.avg){ box.innerHTML = ''; return; }
-  const s = ui.dSeries && ui.dSeries.key === ui.detail && ui.dSeries.win === ui.dWin ? ui.dSeries.opt : null;
-  if (!s){ box.innerHTML = `<small class="muted">${ui.dLoading ? 'Carregando o histórico do sinal…' : ''}</small>`; return; }
-  const w = z.worst ? (s[String(z.worst.itemid)] || []) : [], a = z.avg ? (s[String(z.avg.itemid)] || []) : [];
-  if (w.length < 2 && a.length < 2){ box.innerHTML = `<small class="muted">Sem histórico do sinal neste período.</small>`; return; }
-  const W = Math.max(300, Math.round(box.clientWidth || 520)), H = 150, PL = 46, PR = 14, PT = 10, PB = 24, iw = W - PL - PR, ih = H - PT - PB;
-  const t1 = Date.now(), t0 = t1 - ui.dWin * HOUR;
-  const vals = [...w, ...a].map(x => x[1]);
-  const lo = Math.floor(Math.min(cfg.rxCrit - 2, ...vals) - 1), hi = Math.ceil(Math.max(-12, ...vals) + 1);
-  const X = tt => PL + clamp((tt - t0) / (t1 - t0), 0, 1) * iw, Y = v => PT + ih - (clamp(v, lo, hi) - lo) / (hi - lo) * ih;
-  const path = arr => arr.length > 1 ? linePath(arr.map(x => [X(x[0]), Y(x[1])])) : '';
-  let grid = '';
-  const step = (hi - lo) > 16 ? 5 : 2;
-  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) grid += `<line class="chart-grid" x1="${PL}" x2="${PL + iw}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="chart-axis" x="${PL - 8}" y="${(Y(v) + 3.5).toFixed(1)}" text-anchor="end">${fmtDbmShort(v)}</text>`;
-  const thr = (v, cls) => v > lo && v < hi ? `<line class="${cls}" x1="${PL}" x2="${PL + iw}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/>` : '';
-  box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Sinal RX da pior ONU e média, ${winSpan(ui.dWin)}">
-      ${grid}${thr(cfg.rxWarn, 'chart-thr warn')}${thr(cfg.rxCrit, 'chart-thr')}
-      <path class="chart-in" d="${path(a)}"/><path class="chart-out" d="${path(w)}"/>
-    </svg>
-    <div class="chart-legend" style="margin-top:var(--s-2)"><span><i class="sw out"></i>RX da pior ONU</span><span><i class="sw in"></i>RX médio</span><span><i class="thr-sw"></i>Alerta ${esc(fmtDbm(cfg.rxCrit))}</span><span class="dim">${s.kind === 'trend' ? 'pior valor de cada hora' : 'a cada 5 min'}</span></div>`;
-}
-async function zOptSeries(t, winH){
-  const z = t.opt && t.opt.z; if (!z || (!z.worst && !z.avg)) return null;
-  const items = [z.worst, z.avg].filter(Boolean);
-  const from = Math.floor((Date.now() - winH * HOUR) / 1000);
-  const out = Object.fromEntries(items.map(i => [String(i.itemid), []]));
-  let kind = winH >= TREND_FROM ? 'trend' : 'history';
-  if (kind === 'history'){
-    const rows = await zbx('history.get', { history:0, itemids:items.map(i => String(i.itemid)), time_from:from, output:['itemid','clock','value'], sortfield:'clock', sortorder:'ASC', limit:100000 });
-    for (const r of rows || []) if (out[String(r.itemid)]) out[String(r.itemid)].push([+r.clock * 1000, +r.value]);
-    if (winH >= 12 && Object.values(out).every(a => a.length < 2)) kind = 'trend';
-  }
-  if (kind === 'trend'){
-    for (const k in out) out[k] = [];
-    const rows = await zbx('trend.get', { itemids:items.map(i => String(i.itemid)), time_from:from, output:['itemid','clock','value_min','value_avg'], limit:20000 });
-    const worstId = z.worst ? String(z.worst.itemid) : null;
-    for (const r of rows || []){ const k = String(r.itemid); if (out[k]) out[k].push([+r.clock * 1000, k === worstId ? +r.value_min : +r.value_avg]); }
-    for (const k in out) out[k].sort((x, y) => x[0] - y[0]);
-  }
-  out.kind = kind;
-  return out;
-}
-function renderIface(t){
-  const box = $('#dIface'); if (!box) return;
-  const val = it => {
-    if (!it || it.lastvalue === '' || it.lastvalue == null) return null;
-    const v = +it.lastvalue; if (!isFinite(v)) return null;
-    const u = String(it.units || '').trim();
-    return nf(v, v > 0 && v < 0.1 ? 3 : v % 1 ? 2 : 0) + (u ? (u.startsWith('/') ? u : ' ' + u) : '');
-  };
-  const z = t.zx || {};
-  const cells = [
-    ['Estado', t.active ? 'Com link' : 'Sem link', t.oper != null ? 'ifOperStatus ' + t.oper : ''],
-    ['Velocidade da porta', t.speedRaw ? fmtBps(t.speedRaw) : '—', t.type === 'pon' ? 'limite do painel ' + fmtBps(t.capD) : ''],
-  ];
-  const err = [['Erros de entrada', z.inErr], ['Erros de saída', z.outErr], ['Descartes de entrada', z.inDisc], ['Descartes de saída', z.outDisc]].filter(e => e[1]);
-  for (const [l, it] of err){ const v = val(it); cells.push([l, v == null ? '—' : v, it.lastclock ? 'lido ' + fmtTime(+it.lastclock * 1000) : '']); }
-  cells.push(['Última leitura', t.lastClock ? fmtTimeS(t.lastClock) : '—', t.lastClock ? fmtDay(t.lastClock) : '']);
-  if (!err.length) cells.push(['Erros e descartes', 'não coletados', 'sem itens no Zabbix']);
-  box.innerHTML = cells.map(([l, v, sm]) => `<div><span>${esc(l)}</span><strong>${esc(v)}</strong><small>${esc(sm)}</small></div>`).join('');
-}
 function updateDetail(full){
   const t = targets.get(ui.detail), dr = $('#drawer');
   if (!t){ closeDetail(); return; }
-  if (t.type === 'health'){ updateHealthDetail(t, full); return; }
   const o = byId[t.olt];
   const nowBox = (dir) => {
     const v = dir === 'down' ? t.down : t.up, p = dir === 'down' ? t.pd : t.pu, cap = dir === 'down' ? t.capD : t.capU, sev = dir === 'down' ? t.sevD : t.sevU;
-    const bad = dir === 'down' ? t.badD : t.badU;
-    if (bad != null) return `<div class="nowbox is-warn"><label><i class="sw ${dir === 'down' ? 'in' : 'out'}"></i>${dir === 'down' ? 'Download agora' : 'Upload agora'}</label><strong>Leitura inválida</strong>
-      <small>O Zabbix informou ${esc(fmtBps(bad))}, acima do máximo físico da porta (${esc(fmtBps(physMax(t, dir) / 1.05))}). Confira esse item no Zabbix.</small></div>`;
     return `<div class="nowbox ${sev === 'crit' ? 'is-danger' : sev === 'warn' ? 'is-warn' : ''}"><label><i class="sw ${dir === 'down' ? 'in' : 'out'}"></i>${dir === 'down' ? 'Download agora' : 'Upload agora'}</label><strong>${bpsHTML(v)}</strong>
       ${dmHTML(dir, v, p, sev)}<small>${fmtPct(p)} de ${esc(fmtBps(cap))}</small></div>`;
   };
@@ -2064,17 +1586,13 @@ function updateDetail(full){
         <button class="close-btn" type="button" data-act="close" aria-label="Fechar">${ICON.x}</button></div>
       <div class="d-tags">${tags.join('')}</div>
       <div class="d-now" id="dNow"></div>
-      <section><div class="d-sec-h"><h3>Utilização no período</h3><div class="seg" role="group" aria-label="Período">${WINDOWS.map(([w, l]) => `<button type="button" data-win="${w}" aria-pressed="${ui.dWin === w}">${l}</button>`).join('')}</div></div>
+      <section><div class="d-sec-h"><h3>Utilização no período</h3><div class="seg" role="group" aria-label="Período">${[6, 24, 48].map(w => `<button type="button" data-win="${w}" aria-pressed="${ui.dWin === w}">${w} h</button>`).join('')}</div></div>
         <div class="chart-box" id="dChart"></div><div id="dLegend"></div></section>
       <div class="d-stats" id="dStats"></div>
-      ${t.type === 'pon' ? `<section><div class="d-sec-h"><h3>Placa ${t.slot} · saúde</h3><small class="muted" id="dBoardWin"></small></div><div class="pb-grid" id="dBoard"></div></section>` : ''}
-      <section id="dOptSec"><div class="d-sec-h"><h3>${t.type === 'pon' ? 'Sinal óptico' : 'Sinal óptico do módulo'}</h3><small class="muted">${t.type === 'pon' ? `RX atenção ${fmtDbm(cfg.rxWarn)} · alerta ${fmtDbm(cfg.rxCrit)}` : ''}</small></div><div id="dOpt"></div></section>
-      <section><div class="d-sec-h"><h3>Interface</h3></div><div class="d-stats" id="dIface"></div></section>
       ${loc}
       <section id="dAlerts"></section>`;
   }
   $('#dNow').innerHTML = nowBox('down') + nowBox('up');
-  renderPortBoard(t); renderOptical(t); renderIface(t);
   const rel = [...alerts.active.values()].filter(a => a.target === t.key).concat(alerts.history.filter(a => a.target === t.key)).slice(0, 6);
   $('#dAlerts').innerHTML = rel.length ? `<div class="d-sec-h"><h3>Alertas desta porta</h3></div><ul class="d-list">${rel.map(a => `<li><b>${a.dir === 'down' ? '↓ Download' : '↑ Upload'}</b><span class="mono">pico ${fmtPct(a.peak)}</span><span class="muted">${fmtTime(a.since)}${a.ended ? '–' + fmtTime(a.ended) + ' (' + fmtDur(a.ended - a.since) + ')' : ' · ainda ativo'}</span></li>`).join('')}</ul>` : '';
   if (ui.dSeries && Date.now() - ui.dSeries.at > 120000 && !ui.dLoading) loadSeries();
@@ -2083,8 +1601,6 @@ function renderChartArea(){
   const box = $('#dChart'), leg = $('#dLegend'), st = $('#dStats');
   const t = targets.get(ui.detail);
   if (!box || !t) return;
-  if (t.type === 'health') return renderHealthArea(t);
-  renderPortBoard(t); renderOptChart(t);
   const s = ui.dSeries;
   if (!s || s.key !== ui.detail || s.win !== ui.dWin){
     box.innerHTML = `<div class="empty" style="margin:0">${ui.dLoading ? 'Carregando histórico…' : 'Sem histórico.'}</div>`; leg.innerHTML = ''; st.innerHTML = ''; return;
@@ -2097,18 +1613,17 @@ function renderChartArea(){
   const c = chartSVG(W, s.d, s.u, t.capD, t.capU, t0, now, s.win);
   box.innerHTML = c.svg + `<div class="tip" hidden></div>`;
   const lastD = s.d[s.d.length - 1][1], lastU = s.u.length ? s.u[s.u.length - 1][1] : null;
-  leg.innerHTML = `<div class="chart-legend" style="margin-top:var(--s-3)"><span><i class="sw in"></i>Download — agora ${esc(fmtBps(lastD))}</span><span><i class="sw out"></i>Upload — agora ${esc(fmtBps(lastU))}</span><span><i class="thr-sw"></i>Limite ${cfg.thr}%</span><span class="dim">${s.kind === 'trend' ? 'pico de cada hora · ' + s.d.length + ' horas' : s.d.length + ' amostras'}</span></div>
+  leg.innerHTML = `<div class="chart-legend" style="margin-top:var(--s-3)"><span><i class="sw in"></i>Download — agora ${esc(fmtBps(lastD))}</span><span><i class="sw out"></i>Upload — agora ${esc(fmtBps(lastU))}</span><span><i class="thr-sw"></i>Limite ${cfg.thr}%</span><span class="dim">${s.d.length} amostras</span></div>
     ${c.ymax < cfg.thr / 100 ? `<p class="scale-note">Escala até ${nf(c.ymax * 100, 0)}% para mostrar a curva; o limite de ${cfg.thr}% fica acima do pico do período (${fmtPct(c.peak)}).</p>` : ''}`;
   const stat = (arr, cap) => { let pk = arr[0], sum = 0; for (const a of arr){ if (a[1] > pk[1]) pk = a; sum += a[1]; } return { pk, avg:sum / arr.length, cap }; };
   const sd = stat(s.d, t.capD), su = s.u.length ? stat(s.u, t.capU) : null;
-  if (s.kind === 'trend' && s.dAvg && s.dAvg.length) sd.avg = s.dAvg.reduce((a, x) => a + x[1], 0) / s.dAvg.length;
   let above = 0;
   const T = cfg.thr / 100;
   for (let i = 1; i < s.d.length; i++){ const dt = s.d[i][0] - s.d[i - 1][0]; const pu = valueAt(s.u, s.d[i][0]); if (s.d[i][1] / t.capD >= T || (pu != null && pu / t.capU >= T)) above += dt; }
   st.innerHTML = `<div><span>Pico de download</span><strong>${esc(fmtBps(sd.pk[1]))} · ${fmtPct(sd.pk[1] / t.capD)}</strong><small>${fmtDay(sd.pk[0])} às ${fmtTime(sd.pk[0])}</small></div>
-    <div><span>Média de download</span><strong>${esc(fmtBps(sd.avg))} · ${fmtPct(sd.avg / t.capD)}</strong><small>${winSpan(s.win)}</small></div>
+    <div><span>Média de download</span><strong>${esc(fmtBps(sd.avg))} · ${fmtPct(sd.avg / t.capD)}</strong><small>últimas ${s.win} h</small></div>
     <div><span>Pico de upload</span><strong>${su ? esc(fmtBps(su.pk[1])) + ' · ' + fmtPct(su.pk[1] / t.capU) : '—'}</strong><small>${su ? fmtDay(su.pk[0]) + ' às ' + fmtTime(su.pk[0]) : ''}</small></div>
-    <div><span>${s.kind === 'trend' ? 'Horas com pico ≥ ' + cfg.thr + '%' : 'Tempo acima de ' + cfg.thr + '%'}</span><strong>${s.kind === 'trend' ? (above ? Math.round(above / HOUR) + ' h' : 'nenhuma') : (above ? esc(fmtDur(above)) : 'nenhum')}</strong><small>em qualquer direção</small></div>`;
+    <div><span>Tempo acima de ${cfg.thr}%</span><strong>${above ? esc(fmtDur(above)) : 'nenhum'}</strong><small>em qualquer direção</small></div>`;
   const svg = box.querySelector('svg'), tip = box.querySelector('.tip'), g = svg.querySelector('.hover'), hit = svg.querySelector('.hit');
   const geo = c.geo;
   const move = ev => {
@@ -2125,7 +1640,7 @@ function renderChartArea(){
     hd.setAttribute('cx', cx); hd.setAttribute('cy', geo.Y(pt[1] / geo.capD));
     if (vu != null){ hu.setAttribute('cx', cx); hu.setAttribute('cy', geo.Y(vu / geo.capU)); hu.setAttribute('visibility', 'visible'); } else hu.setAttribute('visibility', 'hidden');
     tip.hidden = false;
-    tip.innerHTML = `<b>${esc(fmtDay(pt[0]))} · ${esc(fmtTime(pt[0]))}${s.kind === 'trend' ? ' · pico da hora' : ''}</b><span class="mono"><i class="sw in"></i> ↓ ${esc(fmtBps(pt[1]))} · ${fmtPct(pt[1] / geo.capD)}</span><span class="mono"><i class="sw out"></i> ↑ ${esc(fmtBps(vu))} · ${fmtPct(vu != null ? vu / geo.capU : null)}</span>`;
+    tip.innerHTML = `<b>${esc(fmtDay(pt[0]))} · ${esc(fmtTime(pt[0]))}</b><span class="mono"><i class="sw in"></i> ↓ ${esc(fmtBps(pt[1]))} · ${fmtPct(pt[1] / geo.capD)}</span><span class="mono"><i class="sw out"></i> ↑ ${esc(fmtBps(vu))} · ${fmtPct(vu != null ? vu / geo.capU : null)}</span>`;
     const px = cx * (r.width / geo.W), w = tip.offsetWidth;
     tip.style.left = clamp(px + 12, 0, r.width - w) + 'px';
     if (px + 12 + w > r.width) tip.style.left = clamp(px - w - 12, 0, r.width - w) + 'px';
@@ -2137,7 +1652,7 @@ function renderChartArea(){
 /* ---------- configurações ---------- */
 function fillForm(c){
   $('#fThr').value = c.thr; $('#fWarn').value = c.warn; $('#fCapD').value = c.capDown; $('#fCapU').value = c.capUp;
-  $('#fCpu').value = `${c.cpuWarn} / ${c.cpuCrit}`; $('#fMem').value = `${c.memWarn} / ${c.memCrit}`; $('#fTemp').value = `${c.tempWarn} / ${c.tempCrit}`; $('#fRx').value = `${c.rxWarn} / ${c.rxCrit}`;
+  $('#fCpu').value = `${c.cpuWarn} / ${c.cpuCrit}`; $('#fMem').value = `${c.memWarn} / ${c.memCrit}`; $('#fTemp').value = `${c.tempWarn} / ${c.tempCrit}`;
   $('#fInt').value = c.interval; $('#fSound').checked = !!c.sound; $('#fNotify').checked = !!c.notify;
 }
 function openSettings(){
@@ -2169,11 +1684,6 @@ function readForm(){
   [next.cpuWarn, next.cpuCrit] = pair($('#fCpu').value, 'CPU');
   [next.memWarn, next.memCrit] = pair($('#fMem').value, 'Memória');
   [next.tempWarn, next.tempCrit] = pair($('#fTemp').value, 'Temperatura');
-  { const m = String($('#fRx').value).match(/^\s*(-?\d+(?:[.,]\d+)?)\s*[\/;]\s*(-?\d+(?:[.,]\d+)?)\s*$/);
-    if (!m) throw new Error('Sinal RX: use o formato "atenção / alerta", por exemplo -25 / -28.');
-    const a = +m[1].replace(',', '.'), b = +m[2].replace(',', '.');
-    if (!(b < a)) throw new Error('Sinal RX: o alerta precisa ser mais baixo (mais negativo) que a atenção.');
-    next.rxWarn = a; next.rxCrit = b; }
   next.interval = n('#fInt', 'Atualização', 10, 600);
   next.sound = $('#fSound').checked; next.notify = $('#fNotify').checked;
   return next;
@@ -2236,14 +1746,13 @@ function bind(){
       return;
     }
     const win = e.target.closest('[data-win]');
-    if (win){ ui.dWin = +win.dataset.win; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin, heatMetric:ui.heatMetric }); for (const b of win.parentElement.children) b.setAttribute('aria-pressed', String(b === win)); loadSeries(); }
+    if (win){ ui.dWin = +win.dataset.win; for (const b of win.parentElement.children) b.setAttribute('aria-pressed', String(b === win)); loadSeries(); }
   });
   document.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('hist')) ui.histOpen = e.target.open; }, true);
-  $('#chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; ui.filter = b.dataset.f; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin, heatMetric:ui.heatMetric }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
+  $('#chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; ui.filter = b.dataset.f; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
   $('#q').addEventListener('input', e => { ui.q = e.target.value; renderPons(byId[ui.active], false); });
-  $('#sort').addEventListener('change', e => { ui.sort = e.target.value; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin, heatMetric:ui.heatMetric }); renderPons(byId[ui.active], true); });
-  $('#metricSeg').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (!b) return; ui.heatMetric = b.dataset.m; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin, heatMetric:ui.heatMetric }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
-  $('#viewSeg').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; ui.view = b.dataset.v; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view, dWin:ui.dWin, heatMetric:ui.heatMetric }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
+  $('#sort').addEventListener('change', e => { ui.sort = e.target.value; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view }); renderPons(byId[ui.active], true); });
+  $('#viewSeg').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; ui.view = b.dataset.v; store(STORE_UI, { filter:ui.filter, sort:ui.sort, view:ui.view }); renderChips(byId[ui.active]); renderPons(byId[ui.active], true); });
   $('#scrim').addEventListener('click', closeDetail);
   $('#setScrim').addEventListener('click', closeSettings);
   $('#setClose').addEventListener('click', closeSettings);
@@ -2255,7 +1764,6 @@ function bind(){
   document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && ui.tv) setTv(false); });
   document.addEventListener('visibilitychange', async () => { if (ui.tv && document.visibilityState === 'visible' && navigator.wakeLock){ try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } });
   document.addEventListener('keydown', e => {
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role="button"][data-open]')){ e.preventDefault(); openDetail(e.target.dataset.open); return; }
     if (e.key !== 'Escape') return;
     if (!$('#settings').hidden) closeSettings();
     else if (ui.detail) closeDetail();
