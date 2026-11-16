@@ -1,0 +1,5 @@
+{
+  "_comentario": "Opcional. Só use se a tela mostrar 'PON não mapeada'. Renomeie para cto_map.json. Chave = número da CTO como na tag cto do Zabbix.",
+  "012": {"olt": "vilanatal", "pon": "1/10/13"},
+  "041": {"olt": "casqueiro", "pon": "1/3/7"}
+}
