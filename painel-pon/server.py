@@ -391,8 +391,7 @@ def filter_ok(flt, prob, ctx):
 
 
 # -------------------------------------------------------------------- ixc ---
-ADDR_KEYS = [("endereco", "logradouro", "rua"), ("numero",), ("complemento",), ("bairro",),
-             ("referencia", "ponto_referencia")]
+ADDR_KEYS = [("bairro",), ("referencia", "ponto_referencia")]
 
 
 class IxcCtos:
