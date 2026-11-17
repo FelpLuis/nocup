@@ -97,15 +97,17 @@ def vincular_location(bloco, cab, sistema, tipo):
     mod, pat = padrao(cab)
     ind = re.search(r"\n([ \t]+)\S", bloco)
     indent = ind.group(1) if ind else "        "
-    tem_auth = re.search(r"\bauth_request\s+/_auth\s*;", bloco)
+    if "_portal_auth" in bloco:
+        return bloco
+    tem_auth = re.search(r"\bauth_request\s+/_auth\w*\s*;", bloco)
     proxy = "proxy_pass" in bloco
     sis = sistema_da_location(pat, sistema)
     if not tem_auth and not (tipo == "proxy" and pat == "/" and mod == ""):
         return bloco
     pagina = bool(re.search(r"error_page\s+401", bloco)) or (pat == "/" and mod == "")
     # tira o login antigo
-    corpo = re.sub(r"[ \t]*\bauth_request\s+/_auth\s*;[ \t]*\n?", "", bloco)
-    corpo = re.sub(r"[ \t]*\berror_page\s+401\s*=\s*@\w+\s*;[ \t]*\n?", "", corpo)
+    corpo = re.sub(r"[ \t]*\bauth_request\s+/_auth\w*\s*;[ \t]*\n?", "", bloco)
+    corpo = re.sub(r"[ \t]*\berror_page\s+40[13]\s*=\s*@\w+\s*;[ \t]*\n?", "", corpo)
     # trava antiga "só o usuário X" (ex.: TVs só para o noc): agora quem decide é a
     # permissão do sistema no portal
     corpo = re.sub(r"[ \t]*\bif\s*\(\s*\$\w*user\s*!=?\s*[^)]*\)\s*\{\s*return\s+403\s*;\s*\}[ \t]*\n?", "", corpo)
@@ -118,8 +120,7 @@ def vincular_location(bloco, cab, sistema, tipo):
 
 
 def vincular_server(srv, sistema, tipo):
-    if "/_portal_auth" in srv:
-        return srv
+    ja = "/_portal_auth" in srv          # rodada anterior: só converte o que sobrou do login antigo
     # 1. locations: remove as do login antigo, protege as demais
     locs = blocos(srv, r"^[ \t]*location\b[^{]*\{")
     partes, pos = [], 0
@@ -129,7 +130,7 @@ def vincular_server(srv, sistema, tipo):
         mod, pat = padrao(cab)
         partes.append(srv[pos:ini])
         bloco = srv[ini:fim]
-        if pat == "/_auth" or eh_login(mod, pat):
+        if "portal" not in bloco and (pat.startswith("/_auth") or eh_login(mod, pat)):
             # apaga a linha inteira (e o \n seguinte)
             if fim < len(srv) and srv[fim] == "\n":
                 fim += 1
@@ -140,6 +141,8 @@ def vincular_server(srv, sistema, tipo):
     partes.append(srv[pos:])
     srv = "".join(partes)
 
+    if ja:
+        return srv
     # 2. include do portal + rotas de entrada/saída, logo depois do server_name
     m = re.search(r"^([ \t]*)server_name[^;]*;[^\n]*\n", srv, re.M)
     if not m:
@@ -167,8 +170,6 @@ def vincular_server(srv, sistema, tipo):
 
 
 def vincular(texto, sistema, tipo):
-    if "/_portal_auth" in texto:
-        return texto, False
     servers = [b for b in blocos(texto, r"^[ \t]*server\s*\{") if re.search(r"listen[^;]*\bssl\b", texto[b[0]:b[1]])]
     if not servers:
         raise SystemExit("nenhum bloco server { listen ... ssl } no arquivo")
@@ -178,7 +179,8 @@ def vincular(texto, sistema, tipo):
         out.append(vincular_server(texto[ini:fim], sistema, tipo))
         pos = fim
     out.append(texto[pos:])
-    return "".join(out), True
+    novo = "".join(out)
+    return novo, novo != texto
 
 
 def main(argv):
