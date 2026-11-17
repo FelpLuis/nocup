@@ -84,6 +84,11 @@ PORT = env("PORT", "8447", int)
 DATA_DIR = Path(env("DATA_DIR", str(BASE / "data")))
 HISTORY_KEEP = env("HISTORY_KEEP", "200", int)
 LOGIN = env("LOGIN", "1") == "1"
+# Login único pelo Portal NOC (portal.updown.com.br): o nginx confere a sessão no portal
+# (auth_request) e repassa o usuário no cabeçalho X-Portal-User. PORTAL=1 liga — o
+# vincular-portal.sh do repositório já deixa assim. Com ele, o usuário e as permissões
+# vêm do portal e o login próprio desta tela deixa de ser usado.
+PORTAL = env("PORTAL", "0") == "1"
 # Conta do site (padrão: NOC). A senha fica só como hash PBKDF2; troque com: python3 server.py senha
 LOGIN_USUARIO_NOME = env("LOGIN_USUARIO", "NOC").strip()
 LOGIN_USUARIO = LOGIN_USUARIO_NOME.lower()
@@ -599,9 +604,15 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def login_on(self):
-        return LOGIN and USERS.any()
+        return PORTAL or (LOGIN and USERS.any())
 
     def session(self):
+        if PORTAL:
+            # Só confia no cabeçalho quando vem do nginx desta máquina.
+            u = (self.headers.get("X-Portal-User") or "").strip()
+            if u and self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+                return {"user": u, "portal": True}
+            return None
         return read_session(self.headers.get("Cookie")) if self.login_on() else {"user": None}
 
     def can_edit(self, sess):

@@ -94,6 +94,11 @@ WPP_MEDIA = env("WPP_MEDIA", "Wpp PON")
 # Login: por padrão usa os mesmos usuários do Painel das OLTs (painel-auth).
 # LOGIN=0 desliga. BASIC_AUTH=usuario:senha[,usuario2:senha2] adiciona contas locais.
 LOGIN = env("LOGIN", "1") == "1"
+# Login único pelo Portal NOC (portal.updown.com.br): o nginx confere a sessão no portal
+# (auth_request) e repassa o usuário no cabeçalho X-Portal-User. PORTAL=1 liga — o
+# vincular-portal.sh do repositório já deixa assim. Com ele, o usuário e as permissões
+# vêm do portal e o login próprio desta tela deixa de ser usado.
+PORTAL = env("PORTAL", "0") == "1"
 USERS_FILE = Path(env("USERS_FILE", "/etc/painel-olt/users.json"))
 BASIC_AUTH = env("BASIC_AUTH", "")
 SESSION_HOURS = env("SESSION_HOURS", "12", int)          # sem "manter conectado"
@@ -1123,9 +1128,15 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def login_on(self):
-        return LOGIN and USERS.any()
+        return PORTAL or (LOGIN and USERS.any())
 
     def session(self):
+        if PORTAL:
+            # Só confia no cabeçalho quando vem do nginx desta máquina.
+            u = (self.headers.get("X-Portal-User") or "").strip()
+            if u and self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+                return {"user": u, "portal": True}
+            return None
         return read_session(self.headers.get("Cookie")) if self.login_on() else {"user": None}
 
     # ---- GET ----
