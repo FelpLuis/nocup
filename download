@@ -1,5 +1,4 @@
 config.env
-state.json
-cto_map.json
 secret.key
+data/
 __pycache__/

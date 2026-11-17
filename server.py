@@ -1,33 +1,41 @@
 #!/usr/bin/env python3
 """
-UpDown NOC — Painel de alertas GPON (PON down / CTO down) para TV.
+UPDOWN NOC — Documentação de equipamentos (documentacao.noc.updown.com.br)
 
-Lê o Zabbix próprio (API JSON-RPC com token) a cada POLL_SECONDS e expõe:
-  GET /              -> tela da TV (static/index.html)
-  GET /api/state     -> estado consolidado (JSON)
-  GET /healthz       -> "ok"
+Site editável com a documentação das interfaces de roteadores, switches e DWDM,
+separados por site e rack, com o status atual de cada interface lido do Zabbix.
 
-Fontes no Zabbix:
-  * Host "IXC - CTO" (template "UpDown - IXC - Sessões por CTO"):
-      sessoesCTO[NNN], clientesCTO[NNN], causaCTO[NNN]  (tag cto: NNN)
-      ixc.cto.quedas, ixc.cto.quedas.lista e o item mestre JSON
-      problemas ativos com tag "cto" (queda parcial / queda total)
-  * Grupo "GPON/ONUs": onu.olt, onu.porta, onu.estado (Template PPPoE ONU)
-  * Grupo "OLTs UpDown": itens de status operacional das portas gpon-olt (se existirem)
+  GET  /                  -> site (static/index.html)
+  GET  /api/dados         -> documentação (data/equipamentos.json) + rev + usuário
+  PUT  /api/dados         -> salva a documentação (precisa de login; controle de versão por "rev")
+  GET  /api/zabbix        -> cache do Zabbix (status, velocidade, Rx/Tx, sysName, sysLocation...)
+  POST /api/zabbix/sync   -> lê o Zabbix agora
+  GET  /api/historico     -> lista das últimas versões salvas
+  GET  /healthz           -> "ok"
+
+Os dados ficam em DATA_DIR (padrão /opt/documentacao-noc/data):
+  equipamentos.json   documentação (o que a equipe edita)
+  zabbix.json         cache do Zabbix (recriado a cada SYNC_MINUTES)
+  historico/          cópia de cada versão anterior (mantém HISTORY_KEEP)
 
 Só usa a biblioteca padrão do Python 3.8+.
 """
+import base64
+import hashlib
+import hmac
 import json
 import os
 import re
+import secrets
+import shutil
 import ssl
 import sys
 import threading
 import time
-import traceback
 import urllib.request
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse, quote
 
 BASE = Path(__file__).resolve().parent
 
@@ -68,710 +76,275 @@ def env(name, default=None, cast=str):
 ZBX_URL = env("ZABBIX_URL", "http://127.0.0.1:19090").rstrip("/")
 ZBX_TOKEN = env("ZABBIX_TOKEN", "")
 ZBX_VERIFY_TLS = env("ZABBIX_VERIFY_TLS", "1") == "1"
-CTO_HOST = env("CTO_HOST", "IXC - CTO")
-ONU_GROUP = env("ONU_GROUP", "GPON/ONUs")
-OLT_GROUP = env("OLT_GROUP", "OLTs UpDown")
-POLL_SECONDS = env("POLL_SECONDS", "30", int)
+SYNC_MINUTES = env("SYNC_MINUTES", "5", int)
 LISTEN = env("LISTEN", "0.0.0.0")
-PORT = env("PORT", "8445", int)
-# PON é considerada DOWN quando todas as ONUs monitoradas nela estão fora
-# e há pelo menos PON_MIN_ONUS ONUs monitoradas.
-PON_MIN_ONUS = env("PON_MIN_ONUS", "2", int)   # (não usado: amostra de ONUs não define PON down)
-# PON também é DOWN quando TODAS as CTOs conhecidas dela estão down
-# (com pelo menos PON_MIN_CTOS CTOs mapeadas).
-PON_MIN_CTOS = env("PON_MIN_CTOS", "2", int)
-SHOW_PARTIAL = env("SHOW_PARTIAL", "0") == "1"
-# Quantos segundos uma alerta resolvida fica na faixa "Normalizadas".
-RECOVERED_KEEP = env("RECOVERED_KEEP", "180", int)
-# Quantas coletas seguidas a CTO precisa estar com 0 sessões para virar alerta.
-CONFIRM_POLLS = env("CONFIRM_POLLS", "1", int)
-MASSIVE_MIN = env("MASSIVE_MIN", "5", int)
-# "CTOs" do IXC que não são caixa de verdade: ficam fora da tela (lista separada por vírgula)
-CTO_IGNORAR = env("CTO_IGNORAR", "ERRO,CLIENTES FUSIONADOS,EQUIPAMENTO COM CLIENTE")
-# Mesmo critério do WhatsApp: só entra o que as ações desta mídia enviariam
-WPP_MEDIA = env("WPP_MEDIA", "Wpp PON")
-# Login: por padrão usa os mesmos usuários do Painel das OLTs (painel-auth).
-# LOGIN=0 desliga. BASIC_AUTH=usuario:senha[,usuario2:senha2] adiciona contas locais.
+PORT = env("PORT", "8447", int)
+DATA_DIR = Path(env("DATA_DIR", str(BASE / "data")))
+HISTORY_KEEP = env("HISTORY_KEEP", "200", int)
 LOGIN = env("LOGIN", "1") == "1"
 USERS_FILE = Path(env("USERS_FILE", "/etc/painel-olt/users.json"))
 BASIC_AUTH = env("BASIC_AUTH", "")
-SESSION_HOURS = env("SESSION_HOURS", "12", int)          # sem "manter conectado"
-SESSION_TV_DAYS = env("SESSION_TV_DAYS", "90", int)      # com "manter conectado nesta TV"
-OLT_NAMES = {
-    "casqueiro": "C300 Casqueiro",
-    "vilanatal": "C350 Vila Natal",
-}
-for part in env("OLT_NAMES", "").split(","):
-    if "=" in part:
-        k, v = part.split("=", 1)
-        OLT_NAMES[k.strip().lower()] = v.strip()
+SESSION_HOURS = env("SESSION_HOURS", "12", int)
+SESSION_TV_DAYS = env("SESSION_TV_DAYS", "90", int)
+# Quem pode editar (vazio = todos os usuários com login). Ex.: EDITORES=luis,ana
+EDITORES = {u.strip().lower() for u in env("EDITORES", "").split(",") if u.strip()}
 
-STATE_FILE = BASE / "state.json"
-CTO_MAP_FILE = BASE / "cto_map.json"   # opcional: {"012": {"olt": "vilanatal", "pon": "1/10/13"}}
-
-PON_RE = re.compile(r"(\d+/\d+/\d+)")
-CTO_KEY_RE = re.compile(r"^(sessoes|clientes|causa)CTO\[(.+)\]$")
+DOC_FILE = DATA_DIR / "equipamentos.json"
+ZBX_FILE = DATA_DIR / "zabbix.json"
+HIST_DIR = DATA_DIR / "historico"
+MAX_BODY = 8 * 1024 * 1024
 
 
-# ------------------------------------------------------------- zabbix api ---
+# ------------------------------------------------------------------ dados ---
+def write_atomic(path, obj):
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+class Store:
+    def __init__(self):
+        self.lock = threading.Lock()
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        HIST_DIR.mkdir(parents=True, exist_ok=True)
+        if not DOC_FILE.exists():
+            seed = BASE / "dados-iniciais.json"
+            if seed.exists():
+                shutil.copy(seed, DOC_FILE)
+                log(f"dados: criado {DOC_FILE} a partir de dados-iniciais.json")
+            else:
+                write_atomic(DOC_FILE, {"rev": 1, "devices": []})
+
+    def read(self):
+        with self.lock:
+            return json.loads(DOC_FILE.read_text(encoding="utf-8"))
+
+    def save(self, doc, rev, user):
+        """Grava se rev bate com a versão atual. Retorna (ok, rev_atual)."""
+        with self.lock:
+            cur = json.loads(DOC_FILE.read_text(encoding="utf-8"))
+            cur_rev = int(cur.get("rev", 1))
+            if int(rev) != cur_rev:
+                return False, cur_rev, cur.get("updated_by"), cur.get("updated")
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            shutil.copy(DOC_FILE, HIST_DIR / f"{stamp}-rev{cur_rev}.json")
+            doc["rev"] = cur_rev + 1
+            doc["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+            doc["updated_by"] = user or "anônimo"
+            write_atomic(DOC_FILE, doc)
+            hist = sorted(HIST_DIR.glob("*.json"))
+            for old in hist[:-HISTORY_KEEP] if len(hist) > HISTORY_KEEP else []:
+                old.unlink(missing_ok=True)
+            return True, doc["rev"], doc["updated_by"], doc["updated"]
+
+    def history(self):
+        out = []
+        for f in sorted(HIST_DIR.glob("*.json"), reverse=True)[:50]:
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+                out.append({"arquivo": f.name, "rev": d.get("rev"), "updated": d.get("updated"),
+                            "updated_by": d.get("updated_by")})
+            except Exception:
+                continue
+        return out
+
+
+def valid_doc(doc):
+    if not isinstance(doc, dict) or not isinstance(doc.get("devices"), list):
+        return "formato inválido: falta a lista devices"
+    if len(doc["devices"]) > 500:
+        return "equipamentos demais"
+    for d in doc["devices"]:
+        if not isinstance(d, dict) or not isinstance(d.get("name"), str) or not isinstance(d.get("ports"), list):
+            return "equipamento sem nome ou sem lista de interfaces"
+        if len(d["ports"]) > 5000:
+            return f"interfaces demais em {d['name']}"
+        for p in d["ports"]:
+            if not isinstance(p, dict):
+                return f"interface inválida em {d['name']}"
+            p.pop("z", None)   # dados do Zabbix não são gravados na documentação
+    return None
+
+
+# ----------------------------------------------------------------- zabbix ---
 class Zabbix:
     def __init__(self, url, token, verify=True):
         self.url = url + "/api_jsonrpc.php"
         self.token = token
-        self.ctx = None if verify else ssl._create_unverified_context()
-        self.legacy_auth = False
-        self._id = 0
+        self.ctx = None
+        if url.startswith("https") and not verify:
+            self.ctx = ssl._create_unverified_context()
 
     def call(self, method, params):
-        self._id += 1
-        body = {"jsonrpc": "2.0", "method": method, "params": params, "id": self._id}
-        headers = {"Content-Type": "application/json-rpc"}
-        if self.legacy_auth:
-            body["auth"] = self.token
-        else:
-            headers["Authorization"] = "Bearer " + self.token
-        req = urllib.request.Request(self.url, data=json.dumps(body).encode(), headers=headers)
+        body = json.dumps({"jsonrpc": "2.0", "method": method, "params": params, "id": 1}).encode()
+        req = urllib.request.Request(self.url, data=body, headers={
+            "Content-Type": "application/json-rpc", "Authorization": "Bearer " + self.token})
         with urllib.request.urlopen(req, timeout=60, context=self.ctx) as r:
-            resp = json.loads(r.read().decode("utf-8"))
-        if "error" in resp:
-            err = resp["error"]
-            msg = f"{err.get('message')} {err.get('data')}"
-            # Zabbix < 6.4 não aceita header Bearer: tenta com "auth" no corpo
-            if not self.legacy_auth and "authoriz" in msg.lower():
-                self.legacy_auth = True
-                return self.call(method, params)
-            raise RuntimeError(f"Zabbix {method}: {msg}")
-        return resp["result"]
+            res = json.loads(r.read().decode("utf-8"))
+        if "error" in res:
+            raise RuntimeError(f"{method}: {res['error'].get('data') or res['error'].get('message')}")
+        return res["result"]
 
 
-# --------------------------------------------------------------- helpers ---
-def olt_key(text):
-    """'OLT C350 VILA NATAL' / 'vilanatal' -> 'vilanatal'."""
-    t = re.sub(r"[^a-z0-9]", "", (text or "").lower())
-    for k in OLT_NAMES:
-        if k in t:
-            return k
-    return t or "?"
+IF_RX = re.compile(r"^Interface (.+?): (Status Operacional|Operational status|Velocidade|Speed|RxPower|TxPower|"
+                   r"Bits Recebidos|Bits received|Bits Enviados|Bits sent)$")
+CAMPO = {"Status Operacional": "st", "Operational status": "st", "Velocidade": "sp", "Speed": "sp",
+         "RxPower": "rx", "TxPower": "tx", "Bits Recebidos": "in", "Bits received": "in",
+         "Bits Enviados": "out", "Bits sent": "out"}
+OPER = {"1": "UP", "2": "DOWN", "3": "DOWN", "5": "DOWN", "7": "DOWN"}
+IGNORAR_IF = re.compile(r"(-mpls|-gre)$|^Console", re.I)
+# OLTs ZTE (template do painel das OLTs): sinal do módulo por porta e resumo das ONUs por PON
+PORTA_RX = re.compile(r"^Porta (\d+/\d+/\d+): (RX|TX) do módulo$")
+PON_RX = re.compile(r"^PON (\d+/\d+/\d+): (ONUs com leitura de sinal|RX médio das ONUs|ONUs com sinal baixo|RX da pior ONU)$")
+PON_CAMPO = {"ONUs com leitura de sinal": "onus", "RX médio das ONUs": "rxm", "ONUs com sinal baixo": "low",
+             "RX da pior ONU": "worst"}
 
 
-def olt_name(key):
-    return OLT_NAMES.get(key, key.upper())
-
-
-def pon_of(porta):
-    """'gpon-onu_1/10/13:2' -> '1/10/13'."""
-    m = PON_RE.search(porta or "")
-    return m.group(1) if m else None
-
-
-def to_int(v, default=None):
+def fmt_speed(v):
     try:
-        return int(float(v))
-    except Exception:
-        return default
+        n = int(float(v))
+    except (TypeError, ValueError):
+        return ""
+    if n >= 10 ** 9:
+        g = n / 10 ** 9
+        return f"{g:.0f}G" if abs(g - round(g)) < 0.05 else f"{g:.1f}G".replace(".", ",")
+    if n >= 10 ** 6:
+        return f"{n // 10 ** 6}M"
+    return ""
 
 
-def onu_online(estado):
-    e = (estado or "").strip().lower()
-    if not e:
-        return None
-    return e.startswith("funcion") or e in ("online", "working", "ok", "1", "up")
+def fmt_dbm(v):
+    try:
+        return f"{float(v):.2f}"
+    except (TypeError, ValueError):
+        return ""
 
 
-def find_cto_pon_pairs(obj, out):
-    """Procura recursivamente no JSON mestre do IXC por pares CTO -> OLT/PON."""
-    if isinstance(obj, dict):
-        lower = {str(k).lower(): v for k, v in obj.items()}
-        cto = None
-        for k in ("cto", "id_cto", "cto_id", "caixa", "nome_cto", "nome"):
-            if k in lower and isinstance(lower[k], (str, int)):
-                cto = str(lower[k]).strip()
-                break
-        pon = None
-        for k in ("pon", "porta_pon", "porta", "interface", "gpon", "pon_porta"):
-            if k in lower and isinstance(lower[k], (str, int)):
-                pon = pon_of(str(lower[k]))
-                if pon:
-                    break
-        if cto and pon:
-            olt = None
-            for k in ("olt", "olt_nome", "nome_olt", "transmissor"):
-                if k in lower and isinstance(lower[k], str):
-                    olt = olt_key(lower[k])
-                    break
-            out[cto] = {"pon": pon, "olt": olt}
-        for v in obj.values():
-            find_cto_pon_pairs(v, out)
-    elif isinstance(obj, list):
-        for v in obj:
-            find_cto_pon_pairs(v, out)
-    # Chaves no formato {"012": {...}}
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if isinstance(v, dict) and str(k) not in out:
-                lower = {str(a).lower(): b for a, b in v.items()}
-                for pk in ("pon", "porta_pon", "porta", "interface"):
-                    p = pon_of(str(lower.get(pk, "")))
-                    if p:
-                        out[str(k)] = {"pon": p, "olt": olt_key(str(lower.get("olt", ""))) if lower.get("olt") else None}
-                        break
-
-
-def _norm_txt(t):
-    import unicodedata
-    t = unicodedata.normalize("NFKD", str(t or "")).encode("ascii", "ignore").decode()
-    return re.sub(r"[\s_\-]+", " ", t).strip().upper()
-
-
-IGNORE_CTOS = [_norm_txt(x) for x in CTO_IGNORAR.split(",") if x.strip()]
-
-
-def cto_ignored(*texts):
-    """True se a CTO (ou o nome do problema) for uma das 'CTOs' que não são caixa."""
-    for t in texts:
-        n = _norm_txt(t)
-        if n and any(ig == n or re.search(r"(^|\W)" + re.escape(ig) + r"($|\W)", n) for ig in IGNORE_CTOS):
-            return True
-    return False
-
-
-def cto_has_onu_down(clientes, causa):
-    """False se a CTO não tem cliente ou se a OLT não tem nenhuma ONU dela fora do ar."""
-    if (clientes or 0) <= 0:
-        return False
-    t = _norm_txt(causa)
-    if not t:
-        return True                      # sem causa informada: confia no problema do Zabbix
-    if re.search(r"NENHUMA ONU", t):
-        return False
-    n = [int(x) for x in re.findall(r"(\d+)\s*ONU", t)]
-    return not n or sum(n) > 0
-
-
-def norm_cto(c, known):
-    """Casa '12', 'CTO 012', '012' com a chave usada no Zabbix."""
-    c = str(c).strip()
-    if c in known:
-        return c
-    m = re.search(r"(\d+)", c)
-    if m:
-        n = m.group(1)
-        for cand in (n, n.zfill(3), n.lstrip("0") or "0"):
-            if cand in known:
-                return cand
-    return c
-
-
-# ------------------------------------------------- critério da mídia Wpp ---
-CTO_NAME_RE = re.compile(r"\bCTO\s*[:#\-]?\s*([0-9][\w\-.]*|[A-Z][\w\-.]*\d[\w\-.]*)", re.I)
-
-
-def _cmp_text(op, have, want):
-    have, want = (have or "").lower(), (want or "").lower()
-    return {0: have == want, 1: have != want, 2: want in have, 3: want not in have}.get(op, True)
-
-
-def _cmp_num(op, have, want):
-    return {0: have == want, 1: have != want, 5: have >= want, 6: have <= want}.get(op, True)
-
-
-def condition_ok(c, prob, ctx):
-    """Avalia uma condição de ação do Zabbix (eventsource 0 = triggers) para um problema."""
-    t, op, val = int(c["conditiontype"]), int(c["operator"]), c.get("value", "")
-    tags = prob.get("tags", [])
-    if t == 3:                                    # nome do evento / trigger
-        return _cmp_text(op, prob["name"], val)
-    if t == 4:                                    # severidade
-        return _cmp_num(op, int(prob["severity"]), int(val))
-    if t == 2:                                    # trigger
-        return (prob["objectid"] == val) == (op == 0)
-    if t == 25:                                   # nome da tag
-        hit = any(_cmp_text(0 if op in (0, 1) else 2, x["tag"], val) for x in tags)
-        return hit if op in (0, 2) else not hit
-    if t == 26:                                   # valor da tag (value2 = nome da tag)
-        vals = [x["value"] for x in tags if x["tag"] == c.get("value2", "")]
-        hit = any(_cmp_text(0 if op in (0, 1) else 2, v, val) for v in vals)
-        return hit if op in (0, 2) else not hit
-    if t == 16:                                   # problema suprimido
-        sup = str(prob.get("suppressed", "0")) == "1"
-        return sup if op == 10 else not sup
-    if t in (0, 1, 13):                           # grupo, host, template
-        h = ctx.get(prob["objectid"], {})
-        pool = {0: h.get("groups", set()), 1: h.get("hosts", set()), 13: h.get("templates", set())}[t]
-        return (val in pool) == (op == 0)
-    return True                                   # janela de tempo etc.: não restringe
-
-
-def filter_ok(flt, prob, ctx):
-    conds = flt.get("conditions", []) or []
-    if not conds:
-        return True
-    res = {c.get("formulaid") or str(i): condition_ok(c, prob, ctx) for i, c in enumerate(conds)}
-    ev = int(flt.get("evaltype", 0))
-    if ev == 1:
-        return all(res.values())
-    if ev == 2:
-        return any(res.values())
-    if ev == 3 and flt.get("formula"):
-        expr = re.sub(r"\b([A-Z]{1,3})\b", lambda m: str(res.get(m.group(1), True)), flt["formula"])
-        expr = expr.replace("and", " and ").replace("or", " or ").replace("not", " not ")
-        if re.fullmatch(r"[\sTrueFalsandotr()]*", expr):
-            try:
-                return bool(eval(expr, {"__builtins__": {}}, {}))
-            except Exception:
-                pass
-        return all(res.values())
-    by_type = {}                                  # 0 = e/ou: mesmo tipo OU, tipos diferentes E
-    for i, c in enumerate(conds):
-        by_type.setdefault(c["conditiontype"], []).append(res[c.get("formulaid") or str(i)])
-    return all(any(v) for v in by_type.values())
-
-
-# ----------------------------------------------------------------- engine ---
-class Engine:
-    def __init__(self):
-        self.zbx = Zabbix(ZBX_URL, ZBX_TOKEN, ZBX_VERIFY_TLS)
+class ZabbixSync:
+    def __init__(self, store):
+        self.store = store
+        self.zbx = Zabbix(ZBX_URL, ZBX_TOKEN, ZBX_VERIFY_TLS) if ZBX_TOKEN else None
         self.lock = threading.Lock()
-        self.state = {"updated": None, "ok": False, "error": "Aguardando primeira coleta…",
-                      "summary": {}, "alerts": [], "recovered": [], "olts": []}
-        self.persist = {"first_seen": {}, "down_streak": {}, "recovered": []}
-        self.ids = {}
-        self.wpp, self.wpp_t = None, 0
-        self.debug = {}
+        self.wake = threading.Event()
+        self.err = None
+
+    def cache(self):
         try:
-            self.persist.update(json.loads(STATE_FILE.read_text()))
-        except Exception:
-            pass
+            return json.loads(ZBX_FILE.read_text(encoding="utf-8"))
+        except (FileNotFoundError, ValueError):
+            return {"synced": None, "hosts": {}}
 
-    # ---- ids (cacheados) ----
-    def resolve_ids(self):
-        if self.ids:
-            return self.ids
-        h = self.zbx.call("host.get", {"output": ["hostid", "name"], "filter": {"host": [CTO_HOST]}})
-        if not h:
-            h = self.zbx.call("host.get", {"output": ["hostid", "name"], "filter": {"name": [CTO_HOST]}})
-        groups = self.zbx.call("hostgroup.get", {"output": ["groupid", "name"],
-                                                 "filter": {"name": [ONU_GROUP, OLT_GROUP]}})
-        g = {x["name"]: x["groupid"] for x in groups}
-        self.ids = {
-            "cto_host": h[0]["hostid"] if h else None,
-            "onu_group": g.get(ONU_GROUP),
-            "olt_group": g.get(OLT_GROUP),
-        }
-        log("ids:", self.ids)
-        return self.ids
-
-    # ---- ações do Zabbix que mandam para a mídia Wpp PON (cache de 10 min) ----
-    def wpp_rules(self):
-        if self.wpp is not None and time.time() - self.wpp_t < 600:
-            return self.wpp
-        z = self.zbx
-        r = {"ok": False, "actions": [], "err": None}
-        try:
-            mts = z.call("mediatype.get", {"output": ["mediatypeid", "name"]})
-            mt = [m for m in mts if m["name"].strip().lower() == WPP_MEDIA.strip().lower()]
-            if not mt:
-                raise RuntimeError(f"mídia '{WPP_MEDIA}' não encontrada (ou o token não pode ler mídias)")
-            mid = mt[0]["mediatypeid"]
-            acts = z.call("action.get", {
-                "output": ["actionid", "name", "status", "eventsource"],
-                "filter": {"eventsource": 0, "status": 0},
-                "selectFilter": "extend", "selectOperations": "extend",
-            })
-            for a in acts:
-                if any(str((op.get("opmessage") or {}).get("mediatypeid")) == str(mid)
-                       for op in a.get("operations", [])):
-                    r["actions"].append({"name": a["name"], "filter": a.get("filter") or {}})
-            r["ok"] = bool(r["actions"])
-            if not r["ok"]:
-                r["err"] = f"nenhuma ação ativa envia para a mídia '{WPP_MEDIA}' (ou o token não pode ler ações)"
-        except Exception as e:
-            r["err"] = str(e)
-        if r["ok"]:
-            log("critério Wpp PON: " + ", ".join(a["name"] for a in r["actions"]))
-        else:
-            log("critério Wpp PON indisponível (" + str(r["err"]) + ") — usando os problemas do host " + CTO_HOST)
-        self.wpp, self.wpp_t = r, time.time()
-        return r
-
-    def host_ctx(self, problems, need):
-        """triggerid -> {hosts, groups, templates} só se alguma condição usa host/grupo/template."""
-        if not need or not problems:
-            return {}
-        z = self.zbx
-        trg = z.call("trigger.get", {"triggerids": list({p["objectid"] for p in problems}),
-                                     "output": ["triggerid"], "selectHosts": ["hostid"]})
-        hostids = list({h["hostid"] for t in trg for h in t["hosts"]})
-        try:
-            hosts = z.call("host.get", {"hostids": hostids, "output": ["hostid"],
-                                        "selectHostGroups": ["groupid"], "selectParentTemplates": ["templateid"]})
-        except Exception:
-            hosts = z.call("host.get", {"hostids": hostids, "output": ["hostid"],
-                                        "selectGroups": ["groupid"], "selectParentTemplates": ["templateid"]})
-        hinfo = {h["hostid"]: h for h in hosts}
-        ctx = {}
-        for t in trg:
-            c = ctx.setdefault(t["triggerid"], {"hosts": set(), "groups": set(), "templates": set()})
-            for h in t["hosts"]:
-                c["hosts"].add(h["hostid"])
-                hi = hinfo.get(h["hostid"], {})
-                c["groups"].update(g["groupid"] for g in hi.get("hostgroups", hi.get("groups", [])))
-                c["templates"].update(x["templateid"] for x in hi.get("parentTemplates", []))
-        return ctx
-
-    # ---- coleta ----
-    def collect(self):
-        ids = self.resolve_ids()
-        z = self.zbx
-        now = int(time.time())
-
-        # 1) CTOs ------------------------------------------------------------
-        ctos = {}
-        global_items = {}
-        cto_map = {}
-        problems = []
-        criterio = ""
-        if ids["cto_host"]:
-            items = z.call("item.get", {
-                "hostids": ids["cto_host"],
-                "output": ["key_", "lastvalue", "lastclock", "value_type"],
-                "search": {"key_": "CTO["}, "monitored": True,
-            })
-            for it in items:
-                m = CTO_KEY_RE.match(it["key_"])
-                if not m:
-                    continue
-                kind, cto = m.group(1), m.group(2)
-                if cto_ignored(cto):
-                    continue
-                c = ctos.setdefault(cto, {"cto": cto})
-                c[kind] = it["lastvalue"]
-                c["clock"] = max(c.get("clock", 0), to_int(it["lastclock"], 0))
-
-            gitems = z.call("item.get", {
-                "hostids": ids["cto_host"], "output": ["key_", "name", "lastvalue", "lastclock", "value_type"],
-                "search": {"key_": "ixc."}, "monitored": True,
-            })
-            for it in gitems:
-                global_items[it["key_"]] = it["lastvalue"]
-                if it["value_type"] == "4" and it["lastvalue"][:1] in "[{":
-                    try:
-                        find_cto_pon_pairs(json.loads(it["lastvalue"]), cto_map)
-                    except Exception:
-                        pass
-            lista = global_items.get("ixc.cto.quedas.lista", "") or ""
-            for line in re.split(r"[\n;|]+", lista):
-                m = CTO_NAME_RE.search(line)
-                pn = pon_of(line)
-                if m and pn and not cto_ignored(m.group(1), line):
-                    k = olt_key(line)
-                    cto_map.setdefault(m.group(1), {"pon": pn, "olt": k if k in OLT_NAMES else None})
-            self.debug["lista"] = lista[:3000]
-            self.debug["itens_ixc"] = {k: (v[:1500] if isinstance(v, str) else v) for k, v in global_items.items()}
-
-        # Problemas ativos no Zabbix: o que a mídia Wpp PON enviaria
-        rules = self.wpp_rules()
-        if rules["ok"]:
-            problems = z.call("problem.get", {
-                "output": ["eventid", "objectid", "name", "clock", "severity", "suppressed"],
-                "selectTags": "extend", "recent": False,
-            })
-            need = any(int(c["conditiontype"]) in (0, 1, 13)
-                       for a in rules["actions"] for c in a["filter"].get("conditions", []))
-            ctx = self.host_ctx(problems, need)
-            problems = [p for p in problems if any(filter_ok(a["filter"], p, ctx) for a in rules["actions"])]
-            criterio = "Ações da mídia " + WPP_MEDIA + ": " + ", ".join(a["name"] for a in rules["actions"])
-        elif ids["cto_host"]:
-            problems = z.call("problem.get", {
-                "hostids": ids["cto_host"], "output": ["eventid", "objectid", "name", "clock", "severity"],
-                "selectTags": "extend", "recent": False,
-            })
-            criterio = f"Problemas ativos do host {CTO_HOST} (sem acesso às ações da mídia {WPP_MEDIA})"
-        self.debug["criterio"] = criterio
-        self.debug["wpp"] = {"ok": rules["ok"], "erro": rules["err"],
-                             "acoes": [{"nome": a["name"], "filtro": a["filter"]} for a in rules["actions"]]}
-        self.debug["problemas_no_criterio"] = [{"nome": p["name"], "desde": p["clock"],
-                                                "tags": p.get("tags", [])} for p in problems[:80]]
-
-        # mapa manual tem prioridade
-        if CTO_MAP_FILE.exists():
-            try:
-                for k, v in json.loads(CTO_MAP_FILE.read_text()).items():
-                    cto_map[k] = {"pon": pon_of(v.get("pon", "")), "olt": olt_key(v.get("olt", "")) if v.get("olt") else None}
-            except Exception as e:
-                log("cto_map.json inválido:", e)
-        cto_map = {norm_cto(k, ctos): v for k, v in cto_map.items()}
-
-        prob_by_cto = {}       # cto -> problemas de CTO fora do ar
-        parcial_by_cto = {}    # cto -> problemas de queda parcial
-        massive = []
-        for p in problems:
-            tags = {t["tag"]: t["value"] for t in p.get("tags", [])}
-            name = p["name"]
-            if re.search(r"massiva", name, re.I):
-                massive.append(p)
-                continue
-            cto = tags.get("cto")
-            if not cto:
-                m = CTO_NAME_RE.search(name)
-                cto = m.group(1) if m else None
-            if not cto or cto_ignored(cto, name):
-                continue
-            cto = norm_cto(cto, ctos)
-            dest = parcial_by_cto if re.search(r"parcial", name, re.I) else prob_by_cto
-            dest.setdefault(cto, []).append(p)
-        # Na queda massiva o Zabbix manda uma mensagem só com a lista: as CTOs dela também entram
-        if massive:
-            mclock = min(to_int(p["clock"], now) for p in massive)
-            for line in re.split(r"[\n;|,]+", global_items.get("ixc.cto.quedas.lista", "") or ""):
-                m = CTO_NAME_RE.search(line)
-                if m and not cto_ignored(m.group(1), line):
-                    c = norm_cto(m.group(1), ctos)
-                    prob_by_cto.setdefault(c, [{"clock": str(mclock), "name": "Queda massiva"}])
-
-        # 2) ONUs -> PONs ----------------------------------------------------
-        pons = {}   # (olt, pon) -> {"onus": n, "online": n}
-        if ids["onu_group"]:
-            items = z.call("item.get", {
-                "groupids": ids["onu_group"], "output": ["hostid", "key_", "lastvalue"],
-                "filter": {"key_": ["onu.olt", "onu.porta", "onu.estado", "pppoe.status", "onu.motivo_desconexao"]},
-                "monitored": True,
-            })
-            per_host = {}
-            for it in items:
-                per_host.setdefault(it["hostid"], {})[it["key_"]] = it["lastvalue"]
-            for hv in per_host.values():
-                pon = pon_of(hv.get("onu.porta"))
-                if not pon:
-                    continue
-                key = (olt_key(hv.get("onu.olt")), pon)
-                if "onu.motivo_desconexao" in hv:
-                    # igual ao trigger "Cliente {HOST.NAME} desconectado": motivo preenchido = desconectado
-                    st = len((hv.get("onu.motivo_desconexao") or "").strip()) == 0
-                else:
-                    st = onu_online(hv.get("onu.estado"))
-                if st is None:
-                    ps = hv.get("pppoe.status")
-                    st = None if ps in (None, "") else ps == "1"
-                if st is None:
-                    continue
-                p = pons.setdefault(key, {"onus": 0, "online": 0, "oper": None})
-                p["onus"] += 1
-                p["online"] += 1 if st else 0
-
-        # 3) Status operacional das PONs nas OLTs (se o template coletar) ---
-        if ids["olt_group"]:
-            items = {}
-            for pattern in ({"key_": "net.if.status"}, {"key_": "OperStatus"}, {"name": "Operational status"}):
-                for it in z.call("item.get", {
-                    "groupids": ids["olt_group"], "output": ["itemid", "key_", "name", "lastvalue"],
-                    "selectHosts": ["name"], "monitored": True, "search": pattern,
-                }):
-                    items[it["itemid"]] = it
-            for it in items.values():
-                txt = it["name"] + " " + it["key_"]
-                if not re.search(r"gpon|pon", txt, re.I) or not re.search(r"oper", txt, re.I):
-                    continue
-                pon = pon_of(txt)
-                if not pon:
-                    continue
-                key = (olt_key(it["hosts"][0]["name"]), pon)
-                v = to_int(it["lastvalue"])
-                p = pons.setdefault(key, {"onus": 0, "online": 0, "oper": None})
-                p["oper"] = v   # 1 up, 2 down, 7 lowerLayerDown
-
-        # 4) Monta alertas --------------------------------------------------
-        fs = self.persist["first_seen"]
-        streak = self.persist["down_streak"]
-        alerts = {}
-        cto_down = {}
-        clientes_afetados = 0
-
-        def since_for(aid, plist):
-            if plist:
-                t = min(to_int(p["clock"], now) for p in plist)
-                fs[aid] = min(fs.get(aid, t), t)
-            return fs.setdefault(aid, now)
-
-        for cto in sorted(set(prob_by_cto) | set(parcial_by_cto)):
-            c = ctos.get(cto, {})
-            cli = to_int(c.get("clientes"), 0) or 0
-            ses = to_int(c.get("sessoes"), 0) or 0
-            # Só alerta CTO que tem cliente e tem ONU fora do ar na OLT
-            if not cto_has_onu_down(cli, c.get("causa")):
-                continue
-            loc = cto_map.get(cto, {})
-            base = {"cto": cto, "title": f"CTO {cto}", "olt": loc.get("olt"),
-                    "olt_name": olt_name(loc["olt"]) if loc.get("olt") else None,
-                    "pon": loc.get("pon"), "clientes": cli, "causa": (c.get("causa") or "").strip()}
-            if cto in prob_by_cto:
-                aid = f"cto:{cto}"
-                alerts[aid] = {**base, "id": aid, "kind": "cto", "sessoes": ses,
-                               "since": since_for(aid, prob_by_cto[cto]), "problema": prob_by_cto[cto][0]["name"]}
-                cto_down[cto] = alerts[aid]
-                clientes_afetados += max(cli - ses, 0)
-            elif SHOW_PARTIAL:
-                aid = f"parcial:{cto}"
-                alerts[aid] = {**base, "id": aid, "kind": "parcial", "sessoes": ses,
-                               "since": since_for(aid, parcial_by_cto[cto]), "problema": parcial_by_cto[cto][0]["name"]}
-
-        # CTO mapeada sem OLT: se só uma OLT tem essa PON, assume ela
-        olts_by_pon = {}
-        for (o, p) in pons:
-            olts_by_pon.setdefault(p, set()).add(o)
-        for loc in cto_map.values():
-            if loc.get("pon") and not loc.get("olt") and len(olts_by_pon.get(loc["pon"], ())) == 1:
-                loc["olt"] = next(iter(olts_by_pon[loc["pon"]]))
-        for a in alerts.values():
-            loc = cto_map.get(a.get("cto"), {})
-            if loc.get("olt") and not a.get("olt"):
-                a["olt"], a["olt_name"] = loc["olt"], olt_name(loc["olt"])
-
-        # CTOs por PON (pelo mapa)
-        ctos_by_pon = {}
-        for cto, loc in cto_map.items():
-            if loc.get("pon") and cto in ctos:
-                ctos_by_pon.setdefault((loc.get("olt"), loc["pon"]), []).append(cto)
-        # garante que PONs com CTO mapeada apareçam no grid
-        for (o, p) in ctos_by_pon:
-            if o:
-                pons.setdefault((o, p), {"onus": 0, "online": 0, "oper": None})
-
-        pon_alerts = {}
-        for (o, p), info in pons.items():
-            # Só PON INTEIRA fora: a OLT diz que a porta caiu e a PON tem cliente,
-            # ou todas as CTOs com cliente desta PON estão fora do ar.
-            # Algumas ONUs monitoradas desconectadas NÃO bastam (são só uma amostra dos clientes).
-            pcs = sorted(x for x in set(ctos_by_pon.get((o, p), []))
-                         if (to_int(ctos.get(x, {}).get("clientes"), 0) or 0) > 0)
-            cli_pon = sum(to_int(ctos.get(x, {}).get("clientes"), 0) or 0 for x in pcs)
-            has_clients = cli_pon > 0 or info["onus"] > 0
-            reasons = []
-            if info["oper"] in (2, 7) and has_clients:
-                reasons.append("Porta PON DOWN na OLT")
-            if len(pcs) >= PON_MIN_CTOS and all(x in cto_down for x in pcs):
-                reasons.append(f"Todas as {len(pcs)} CTOs da PON fora do ar")
-            if reasons and info["onus"]:
-                reasons.append(f"{info['onus'] - info['online']}/{info['onus']} clientes monitorados desconectados")
-            info["ctos"] = pcs
-            info["clientes"] = cli_pon or info["onus"]
-            if reasons:
-                aid = f"pon:{o}:{p}"
-                affected = [x for x in pcs if x in cto_down]
-                pon_alerts[aid] = {
-                    "id": aid, "kind": "pon", "title": f"PON {p}", "olt": o, "olt_name": olt_name(o),
-                    "pon": p, "ctos": affected,
-                    "clientes": cli_pon or None, "clientes_monitorados": info["onus"],
-                    "onus": info["onus"], "onus_online": info["online"],
-                    "causa": " · ".join(reasons), "since": since_for(aid, []),
-                }
-                # As CTOs da PON down ficam agrupadas no card da PON
-                for x in affected:
-                    alerts.pop(f"cto:{x}", None)
-                    since = cto_down[x]["since"]
-                    pon_alerts[aid]["since"] = min(pon_alerts[aid]["since"], since)
-        alerts.update(pon_alerts)
-
-        # 5) Normalizadas (saíram do painel) --------------------------------
-        prev = {a["id"]: a for a in self.state.get("alerts", [])}
-        rec = [r for r in self.persist.get("recovered", []) if now - r["until"] < RECOVERED_KEEP]
-        for aid, a in prev.items():
-            if aid not in alerts:
-                rec.insert(0, {**a, "until": now})
-                fs.pop(aid, None)
-        for aid in list(fs):
-            if aid not in alerts:
-                fs.pop(aid, None)
-        self.persist["recovered"] = rec[:12]
-
-        # 6) Grid de PONs por OLT --------------------------------------------
-        olts = {}
-        partial_pons = {(a["olt"], a["pon"]) for a in alerts.values() if a["kind"] == "parcial" and a.get("pon")}
-        cto_down_pons = {(a["olt"], a["pon"]) for a in alerts.values() if a["kind"] == "cto" and a.get("pon")}
-        down_pons = {(a["olt"], a["pon"]) for a in pon_alerts.values()}
-        for (o, p), info in pons.items():
-            st = "ok"
-            if (o, p) in down_pons:
-                st = "down"
-            elif (o, p) in cto_down_pons:
-                st = "cto"
-            elif (o, p) in partial_pons:
-                st = "parcial"
-            elif not info.get("clientes"):
-                st = "vaga"  # sem cliente: nunca é alerta
-            olts.setdefault(o, []).append({
-                "pon": p, "status": st, "onus": info["onus"], "online": info["online"],
-                "ctos": len(info.get("ctos", [])),
-            })
-
-        def pon_sort(x):
-            return [int(n) for n in x["pon"].split("/")]
-
-        olt_list = [{"key": k, "name": olt_name(k), "pons": sorted(v, key=pon_sort)}
-                    for k, v in sorted(olts.items()) if k and k != "?"]
-
-        order = {"pon": 0, "cto": 1, "parcial": 2}
-        alert_list = sorted(alerts.values(), key=lambda a: (order[a["kind"]], a["since"]))
-        quedas = to_int(global_items.get("ixc.cto.quedas"), None)
-        ncto_down = sum(1 for a in alerts.values() if a["kind"] == "cto") + \
-            sum(len(a["ctos"]) for a in pon_alerts.values())
-
-        state = {
-            "updated": now, "ok": True, "error": None,
-            "summary": {
-                "ctos_total": len(ctos),
-                "ctos_down": ncto_down,
-                "ctos_parcial": sum(1 for a in alerts.values() if a["kind"] == "parcial"),
-                "clientes_afetados": clientes_afetados,
-                "pons_total": sum(1 for v in pons.values() if v.get("clientes")),
-                "pons_down": len(pon_alerts),
-                "onus_monitoradas": sum(p["onus"] for p in pons.values()),
-                "massiva": bool(massive),
-                "massiva_nome": massive[0]["name"] if massive else None,
-                "criterio": criterio,
-                "quedas_ixc": quedas,
-                "cto_map": len(cto_map),
-            },
-            "alerts": alert_list,
-            "recovered": self.persist["recovered"],
-            "olts": olt_list,
-            "poll_seconds": POLL_SECONDS,
-        }
+    def run(self):
+        if not self.zbx:
+            self.err = "ZABBIX_TOKEN não configurado"
+            return False
         with self.lock:
-            self.state = state
-        try:
-            STATE_FILE.write_text(json.dumps(self.persist))
-        except Exception:
-            pass
+            try:
+                doc = self.store.read()
+                names = sorted({n for d in doc.get("devices", []) for n in d.get("zabbix_hosts", []) if n})
+                if not names:
+                    self.err = "nenhum equipamento ligado a um host do Zabbix (campo zabbix_hosts)"
+                    return False
+                hosts = self.zbx.call("host.get", {"output": ["hostid", "host", "name", "status"],
+                                                   "selectInterfaces": ["ip"],
+                                                   "filter": {"name": names}})
+                found = {h["name"] for h in hosts}
+                extra = [n for n in names if n not in found]
+                if extra:   # aceita também o nome técnico (host)
+                    hosts += self.zbx.call("host.get", {"output": ["hostid", "host", "name", "status"],
+                                                        "selectInterfaces": ["ip"], "filter": {"host": extra}})
+                ids = [h["hostid"] for h in hosts]
+                items = self.zbx.call("item.get", {"hostids": ids, "output": ["hostid", "name", "key_", "lastvalue"],
+                                                   "filter": {"status": 0}}) if ids else []
+                by = {h["hostid"]: {"hostid": h["hostid"], "name": h["name"], "host": h["host"],
+                                    "ip": (h.get("interfaces") or [{}])[0].get("ip", ""), "ifs": {},
+                                    "sysname": "", "location": "", "model": "", "version": "", "ping": ""}
+                      for h in hosts}
+                for it in items:
+                    H = by.get(it["hostid"])
+                    if not H:
+                        continue
+                    k, v = it["key_"], str(it.get("lastvalue", "")).strip()
+                    if k == "system.name":
+                        H["sysname"] = v
+                    elif k == "system.location":
+                        H["location"] = v
+                    elif k == "system.descr.modelo":
+                        H["model"] = v
+                    elif k == "system.descr.versao":
+                        H["version"] = v
+                    elif k == "icmpping":
+                        H["ping"] = v
+                    mp = PORTA_RX.match(it["name"])
+                    if mp:
+                        H.setdefault("_porta", {}).setdefault(mp.group(1), {})[mp.group(2).lower()] = fmt_dbm(v)
+                        continue
+                    mp = PON_RX.match(it["name"])
+                    if mp:
+                        c = PON_CAMPO[mp.group(2)]
+                        H.setdefault("_pon", {}).setdefault(mp.group(1), {})[c] = fmt_dbm(v) if c in ("rxm", "worst") else v
+                        continue
+                    m = IF_RX.match(it["name"])
+                    if not m:
+                        continue
+                    full = m.group(1)
+                    mm = re.match(r"^(\S+?)(?:\((.*)\))?$", full)
+                    nome, alias = (mm.group(1), mm.group(2) or "") if mm else (full, "")
+                    if IGNORAR_IF.search(nome):
+                        continue
+                    e = H["ifs"].setdefault(nome, {"i": nome, "a": ""})
+                    if alias and not e["a"]:
+                        e["a"] = alias
+                    campo = CAMPO[m.group(2)]
+                    if campo == "st":
+                        e["st"] = OPER.get(v, "")
+                    elif campo == "sp":
+                        e["sp"] = fmt_speed(v)
+                    elif campo in ("rx", "tx"):
+                        e[campo] = fmt_dbm(v)
+                    else:
+                        try:
+                            e[campo] = int(float(v))
+                        except ValueError:
+                            pass
+                for H in by.values():   # OLT: junta sinal do módulo e ONUs na interface gpon_/xgei_/gei_ da mesma posição
+                    porta, pon = H.pop("_porta", {}), H.pop("_pon", {})
+                    for nome, e in H["ifs"].items():
+                        pos = nome.split("_", 1)[1] if "_" in nome else None
+                        if pos in porta:
+                            for c in ("rx", "tx"):
+                                if porta[pos].get(c) and not e.get(c):
+                                    e[c] = porta[pos][c]
+                        if pos in pon and nome.startswith("gpon"):
+                            e.update({k: v for k, v in pon[pos].items() if v != ""})
+                out = {"synced": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                       "hosts": {H["name"]: dict(H, ifs=list(H["ifs"].values())) for H in by.values()},
+                       "nao_encontrados": [n for n in names if n not in {h["name"] for h in hosts}
+                                           and n not in {h["host"] for h in hosts}]}
+                # o mesmo host também fica acessível pelo nome técnico
+                for H in by.values():
+                    if H["host"] != H["name"]:
+                        out["hosts"].setdefault(H["host"], out["hosts"][H["name"]])
+                write_atomic(ZBX_FILE, out)
+                self.err = None
+                n_if = sum(len(H["ifs"]) for H in by.values())
+                log(f"zabbix: ok: {len(by)} hosts, {n_if} interfaces"
+                    + (f"; não encontrados: {', '.join(out['nao_encontrados'])}" if out["nao_encontrados"] else ""))
+                return True
+            except Exception as e:
+                self.err = str(e)[:300]
+                log(f"zabbix: Falha: {self.err}")
+                return False
 
     def loop(self):
         while True:
-            t0 = time.time()
-            try:
-                self.collect()
-                s = self.state["summary"]
-                log(f"ok: {s['ctos_down']} CTO down, {s['pons_down']} PON down, "
-                    f"{s['ctos_parcial']} parcial ({time.time() - t0:.1f}s)")
-            except Exception as e:
-                traceback.print_exc()
-                self.ids = {} if "hostid" in str(e) else self.ids
-                with self.lock:
-                    self.state = {**self.state, "ok": False,
-                                  "error": f"Falha ao consultar o Zabbix: {e}"}
-            time.sleep(max(5, POLL_SECONDS - (time.time() - t0)))
-
-
-ENGINE = None
+            self.run()
+            self.wake.wait(SYNC_MINUTES * 60)
+            self.wake.clear()
 
 
 # ------------------------------------------------------------------ login ---
-import base64
-import hashlib
-import hmac
-import secrets
-from urllib.parse import parse_qs, urlparse, quote
-
-COOKIE = "painel_pon"
+COOKIE = "doc_noc"
 SECRET_FILE = BASE / "secret.key"
 
 
@@ -931,9 +504,10 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "same-origin")
+        if self.path.split("?")[0] in ("/", "/index.html"):
+            self.send_header("Cache-Control", "no-cache")
         super().end_headers()
 
-    # ---- util ----
     def ip(self):
         return self.headers.get("X-Real-IP") or self.client_address[0]
 
@@ -964,6 +538,21 @@ class Handler(SimpleHTTPRequestHandler):
     def session(self):
         return read_session(self.headers.get("Cookie")) if self.login_on() else {"user": None}
 
+    def can_edit(self, sess):
+        if not sess:
+            return False
+        return not EDITORES or (sess.get("user") or "") in EDITORES
+
+    def body_json(self, limit):
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > limit:
+            return None, "requisição grande demais"
+        raw = self.rfile.read(n).decode("utf-8", "replace")
+        try:
+            return json.loads(raw or "{}"), None
+        except ValueError:
+            return None, "JSON inválido"
+
     # ---- GET ----
     def do_GET(self):
         url = urlparse(self.path)
@@ -986,27 +575,59 @@ class Handler(SimpleHTTPRequestHandler):
             if path.startswith("/api/"):
                 return self.send_json(401, {"error": "login"})
             return self.redirect("/login?next=" + quote(self.path, safe="/?=&"))
-        if path == "/api/state":
-            with ENGINE.lock:
-                st = dict(ENGINE.state)
-            st["user"] = sess.get("user")
-            st["login"] = self.login_on()
-            return self.send_json(200, st)
-        if path == "/api/debug":
-            with ENGINE.lock:
-                d = {"criterio": ENGINE.debug.get("criterio"), "wpp": ENGINE.debug.get("wpp"),
-                     "problemas_no_criterio": ENGINE.debug.get("problemas_no_criterio"),
-                     "lista_queda_massiva": ENGINE.debug.get("lista"),
-                     "itens_ixc": ENGINE.debug.get("itens_ixc"),
-                     "resumo": ENGINE.state.get("summary")}
-            return self.send_json(200, d)
-        if path == "/api/me":
-            return self.send_json(200, {"user": sess.get("user"), "login": self.login_on()})
+        if path == "/api/dados":
+            doc = STORE.read()
+            return self.send_json(200, {"doc": doc, "rev": doc.get("rev", 1), "user": sess.get("user"),
+                                        "login": self.login_on(), "can_edit": self.can_edit(sess) or not self.login_on()})
+        if path == "/api/zabbix":
+            c = SYNC.cache()
+            c["erro"] = SYNC.err
+            c["intervalo_min"] = SYNC_MINUTES
+            return self.send_json(200, c)
+        if path == "/api/historico":
+            return self.send_json(200, {"versoes": STORE.history()})
+        if path.startswith("/api/historico/"):
+            nome = path.rsplit("/", 1)[-1]
+            f = HIST_DIR / nome
+            if not re.fullmatch(r"[\w.-]+\.json", nome) or not f.exists():
+                return self.send_json(404, {"error": "versão não encontrada"})
+            return self.send_json(200, json.loads(f.read_text(encoding="utf-8")))
+        if path.startswith("/api/"):
+            return self.send_json(404, {"error": "não encontrado"})
         return super().do_GET()
 
-    # ---- POST /login ----
+    # ---- PUT /api/dados ----
+    def do_PUT(self):
+        if urlparse(self.path).path != "/api/dados":
+            return self.send_json(404, {"error": "não encontrado"})
+        sess = self.session()
+        if not sess:
+            return self.send_json(401, {"error": "login"})
+        if self.login_on() and not self.can_edit(sess):
+            return self.send_json(403, {"error": "Seu usuário pode só consultar a documentação."})
+        body, err = self.body_json(MAX_BODY)
+        if err:
+            return self.send_json(400, {"error": err})
+        doc, rev = body.get("doc"), body.get("rev")
+        err = valid_doc(doc)
+        if err or rev is None:
+            return self.send_json(400, {"error": err or "falta rev"})
+        ok, cur, by, when = STORE.save(doc, rev, sess.get("user"))
+        if not ok:
+            return self.send_json(409, {"error": "conflito", "rev": cur, "updated_by": by, "updated": when})
+        log(f"dados: rev {cur} salva por '{by}' de {self.ip()}")
+        threading.Thread(target=SYNC.run, daemon=True).start()   # novo host ligado? atualiza o cache
+        return self.send_json(200, {"ok": True, "rev": cur, "updated_by": by, "updated": when})
+
+    # ---- POST /login, /api/zabbix/sync ----
     def do_POST(self):
-        if urlparse(self.path).path != "/login":
+        path = urlparse(self.path).path
+        if path == "/api/zabbix/sync":
+            if not self.session():
+                return self.send_json(401, {"error": "login"})
+            ok = SYNC.run()
+            return self.send_json(200 if ok else 502, {"ok": ok, "erro": SYNC.err, "synced": SYNC.cache().get("synced")})
+        if path != "/login":
             return self.send_json(404, {"error": "não encontrado"})
         n = int(self.headers.get("Content-Length") or 0)
         if n > 4096:
@@ -1051,18 +672,18 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
-    global ENGINE
+    global STORE, SYNC
+    STORE = Store()
+    SYNC = ZabbixSync(STORE)
     if not ZBX_TOKEN:
-        print("Defina ZABBIX_TOKEN no config.env", file=sys.stderr)
-        sys.exit(1)
-    ENGINE = Engine()
+        log("zabbix: ZABBIX_TOKEN vazio no config.env — o site abre, mas sem o status do Zabbix")
     if LOGIN and not USERS.any():
-        log(f"login: nenhum usuário em {USERS_FILE} nem em BASIC_AUTH — tela ABERTA sem login")
+        log(f"login: nenhum usuário em {USERS_FILE} nem em BASIC_AUTH — site ABERTO sem login")
     elif LOGIN:
         log(f"login: usando usuários de {USERS_FILE}" + (" + BASIC_AUTH" if USERS.local else ""))
-    threading.Thread(target=ENGINE.loop, daemon=True).start()
+    threading.Thread(target=SYNC.loop, daemon=True).start()
     srv = ThreadingHTTPServer((LISTEN, PORT), Handler)
-    log(f"Painel PON/CTO em http://{LISTEN}:{PORT}  (Zabbix {ZBX_URL})")
+    log(f"Documentação NOC em http://{LISTEN}:{PORT}  (dados em {DATA_DIR}, Zabbix {ZBX_URL})")
     srv.serve_forever()
 
 
