@@ -1,0 +1,4 @@
+config.env
+secret.key
+data/
+__pycache__/
