@@ -11,7 +11,7 @@
 #   4. publica no nginx em https://documentacao.noc.updown.com.br (gera o certificado com certbot se faltar)
 #   5. confere se o site respondeu; se algo falhar, desfaz e volta como estava
 #
-# Login: mesmos usuários do Painel das OLTs (/etc/painel-olt/users.json).
+# Login: usuário NOC (senha guardada só como hash no config.env).
 # Pode rodar de novo para atualizar (git pull && sudo bash instalar-documentacao.sh).
 set -euo pipefail
 
@@ -216,14 +216,10 @@ else
 fi
 
 # Login ------------------------------------------------------------------------
-if [ -f /etc/painel-olt/users.json ]; then
-  if sudo -u www-data test -r /etc/painel-olt/users.json; then
-    ok "Login com os usuários do Painel das OLTs (python3 /opt/painel-olt/painel-auth.py adduser NOME)"
-  else
-    info "Atenção: www-data não consegue ler /etc/painel-olt/users.json — o site vai abrir SEM login"
-  fi
+if grep -qP '^LOGIN_SENHA_HASH=pbkdf2_sha256\$' "$DEST/config.env"; then
+  ok "Login: usuário $(grep -oP '^LOGIN_USUARIO=\K.*' "$DEST/config.env" || echo NOC) (trocar a senha: sudo -u www-data python3 $DEST/server.py senha)"
 else
-  info "Atenção: não achei /etc/painel-olt/users.json (rode o instalar-login.sh) — o site vai abrir SEM login"
+  info "Atenção: LOGIN_SENHA_HASH vazio no config.env — o site vai abrir SEM login"
 fi
 
 sleep 3

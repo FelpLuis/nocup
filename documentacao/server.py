@@ -11,6 +11,8 @@ separados por site e rack, com o status atual de cada interface lido do Zabbix.
   GET  /api/zabbix        -> cache do Zabbix (status, velocidade, Rx/Tx, sysName, sysLocation...)
   POST /api/zabbix/sync   -> lê o Zabbix agora
   GET  /api/historico     -> lista das últimas versões salvas
+  GET  /api/cofre         -> cofre de acessos (só o conteúdo cifrado no navegador)
+  PUT  /api/cofre         -> salva o cofre cifrado
   GET  /healthz           -> "ok"
 
 Os dados ficam em DATA_DIR (padrão /opt/documentacao-noc/data):
@@ -82,7 +84,13 @@ PORT = env("PORT", "8447", int)
 DATA_DIR = Path(env("DATA_DIR", str(BASE / "data")))
 HISTORY_KEEP = env("HISTORY_KEEP", "200", int)
 LOGIN = env("LOGIN", "1") == "1"
-USERS_FILE = Path(env("USERS_FILE", "/etc/painel-olt/users.json"))
+# Conta do site (padrão: NOC). A senha fica só como hash PBKDF2; troque com: python3 server.py senha
+LOGIN_USUARIO_NOME = env("LOGIN_USUARIO", "NOC").strip()
+LOGIN_USUARIO = LOGIN_USUARIO_NOME.lower()
+LOGIN_SENHA_HASH = env("LOGIN_SENHA_HASH", "")
+# Usuários extras do Painel das OLTs (vazio = só a conta acima)
+_uf = env("USERS_FILE", "")
+USERS_FILE = Path(_uf) if _uf else None
 BASIC_AUTH = env("BASIC_AUTH", "")
 SESSION_HOURS = env("SESSION_HOURS", "12", int)
 SESSION_TV_DAYS = env("SESSION_TV_DAYS", "90", int)
@@ -90,6 +98,8 @@ SESSION_TV_DAYS = env("SESSION_TV_DAYS", "90", int)
 EDITORES = {u.strip().lower() for u in env("EDITORES", "").split(",") if u.strip()}
 
 DOC_FILE = DATA_DIR / "equipamentos.json"
+COFRE_FILE = DATA_DIR / "cofre.json"          # só o conteúdo CIFRADO no navegador (AES-GCM); o servidor nunca vê as senhas
+COFRE_HIST = DATA_DIR / "historico-cofre"
 ZBX_FILE = DATA_DIR / "zabbix.json"
 HIST_DIR = DATA_DIR / "historico"
 MAX_BODY = 8 * 1024 * 1024
@@ -147,6 +157,51 @@ class Store:
             except Exception:
                 continue
         return out
+
+
+class Cofre:
+    """Guarda o cofre de acessos já cifrado pelo navegador. Não tem como decifrar: não conhece a senha mestra."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        COFRE_HIST.mkdir(parents=True, exist_ok=True)
+
+    def read(self):
+        with self.lock:
+            try:
+                return json.loads(COFRE_FILE.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                return {"rev": 0, "blob": None}
+
+    def save(self, blob, rev, user):
+        with self.lock:
+            try:
+                cur = json.loads(COFRE_FILE.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                cur = {"rev": 0}
+            if int(rev) != int(cur.get("rev", 0)):
+                return False, cur.get("rev", 0), cur.get("updated_by")
+            if COFRE_FILE.exists():
+                shutil.copy(COFRE_FILE, COFRE_HIST / f"{time.strftime('%Y%m%d-%H%M%S')}-rev{cur.get('rev', 0)}.json")
+                hist = sorted(COFRE_HIST.glob("*.json"))
+                for old in hist[:-50] if len(hist) > 50 else []:
+                    old.unlink(missing_ok=True)
+            novo = {"rev": int(cur.get("rev", 0)) + 1, "blob": blob, "updated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                    "updated_by": user or "anônimo"}
+            write_atomic(COFRE_FILE, novo)
+            os.chmod(COFRE_FILE, 0o600)
+            return True, novo["rev"], novo["updated_by"]
+
+
+def valid_blob(b):
+    if not isinstance(b, dict) or b.get("alg") != "AES-GCM" or b.get("kdf") != "PBKDF2-SHA256":
+        return "cofre em formato inválido"
+    for k in ("salt", "iv", "ct"):
+        if not isinstance(b.get(k), str) or not re.fullmatch(r"[A-Za-z0-9+/=]+", b[k]):
+            return "cofre em formato inválido"
+    if not isinstance(b.get("iter"), int) or b["iter"] < 100000:
+        return "cofre com derivação de chave fraca demais"
+    return None
 
 
 def valid_doc(doc):
@@ -392,6 +447,8 @@ class Users:
                 self.local[u.strip().lower()] = pw
 
     def get(self):
+        if USERS_FILE is None:
+            return {}
         try:
             m = USERS_FILE.stat().st_mtime_ns
             if m != self.mtime:
@@ -403,10 +460,12 @@ class Users:
         return self.data
 
     def any(self):
-        return bool(self.get() or self.local)
+        return bool(self.get() or self.local or (LOGIN_USUARIO and LOGIN_SENHA_HASH))
 
     def check(self, user, pw):
         user = (user or "").strip().lower()
+        if LOGIN_USUARIO and LOGIN_SENHA_HASH and user == LOGIN_USUARIO:
+            return _check_pbkdf2(pw or "", LOGIN_SENHA_HASH)
         if user in self.local:
             return hmac.compare_digest(self.local[user].encode(), (pw or "").encode())
         info = self.get().get(user)
@@ -414,6 +473,9 @@ class Users:
         return ok and bool(info)
 
     def sv(self, user):
+        if LOGIN_USUARIO and LOGIN_SENHA_HASH and user == LOGIN_USUARIO:
+            # muda quando a senha muda: derruba as sessões abertas
+            return int(hashlib.sha256(LOGIN_SENHA_HASH.encode()).hexdigest()[:7], 16)
         if user in self.local:
             return 0
         info = self.get().get(user)
@@ -482,6 +544,10 @@ def read_session(cookie_header):
         except Exception:
             return None
     return None
+
+
+def exibir(user):
+    return LOGIN_USUARIO_NOME if user and user == LOGIN_USUARIO else user
 
 
 def safe_next(n):
@@ -577,13 +643,18 @@ class Handler(SimpleHTTPRequestHandler):
             return self.redirect("/login?next=" + quote(self.path, safe="/?=&"))
         if path == "/api/dados":
             doc = STORE.read()
-            return self.send_json(200, {"doc": doc, "rev": doc.get("rev", 1), "user": sess.get("user"),
+            return self.send_json(200, {"doc": doc, "rev": doc.get("rev", 1), "user": exibir(sess.get("user")),
                                         "login": self.login_on(), "can_edit": self.can_edit(sess) or not self.login_on()})
         if path == "/api/zabbix":
             c = SYNC.cache()
             c["erro"] = SYNC.err
             c["intervalo_min"] = SYNC_MINUTES
             return self.send_json(200, c)
+        if path == "/api/cofre":
+            c = COFRE.read()
+            return self.send_json(200, {"rev": c.get("rev", 0), "blob": c.get("blob"), "updated": c.get("updated"),
+                                        "updated_by": c.get("updated_by"),
+                                        "can_edit": self.can_edit(sess) or not self.login_on()})
         if path == "/api/historico":
             return self.send_json(200, {"versoes": STORE.history()})
         if path.startswith("/api/historico/"):
@@ -598,7 +669,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ---- PUT /api/dados ----
     def do_PUT(self):
-        if urlparse(self.path).path != "/api/dados":
+        path = urlparse(self.path).path
+        if path not in ("/api/dados", "/api/cofre"):
             return self.send_json(404, {"error": "não encontrado"})
         sess = self.session()
         if not sess:
@@ -608,11 +680,21 @@ class Handler(SimpleHTTPRequestHandler):
         body, err = self.body_json(MAX_BODY)
         if err:
             return self.send_json(400, {"error": err})
+        if path == "/api/cofre":
+            blob, rev = body.get("blob"), body.get("rev")
+            err = valid_blob(blob)
+            if err or rev is None:
+                return self.send_json(400, {"error": err or "falta rev"})
+            ok, cur, by = COFRE.save(blob, rev, exibir(sess.get("user")))
+            if not ok:
+                return self.send_json(409, {"error": "conflito", "rev": cur, "updated_by": by})
+            log(f"cofre: rev {cur} salva por '{by}' de {self.ip()}")
+            return self.send_json(200, {"ok": True, "rev": cur, "updated_by": by})
         doc, rev = body.get("doc"), body.get("rev")
         err = valid_doc(doc)
         if err or rev is None:
             return self.send_json(400, {"error": err or "falta rev"})
-        ok, cur, by, when = STORE.save(doc, rev, sess.get("user"))
+        ok, cur, by, when = STORE.save(doc, rev, exibir(sess.get("user")))
         if not ok:
             return self.send_json(409, {"error": "conflito", "rev": cur, "updated_by": by, "updated": when})
         log(f"dados: rev {cur} salva por '{by}' de {self.ip()}")
@@ -671,16 +753,32 @@ class Handler(SimpleHTTPRequestHandler):
         return self.send_json(200, {"ok": True, "user": user, "next": nxt}, [("Set-Cookie", cookie)])
 
 
+def gerar_hash():
+    import getpass
+    s1 = getpass.getpass("Nova senha do site: ")
+    s2 = getpass.getpass("Repita a senha: ")
+    if not s1 or s1 != s2:
+        print("As senhas não conferem.", file=sys.stderr)
+        sys.exit(1)
+    salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", s1.encode(), salt, 200000)
+    print("LOGIN_SENHA_HASH=pbkdf2_sha256$200000$" + _b64e(salt) + "$" + _b64e(dk))
+
+
 def main():
-    global STORE, SYNC
+    global STORE, SYNC, COFRE
+    if len(sys.argv) > 1 and sys.argv[1] == "senha":
+        return gerar_hash()
     STORE = Store()
     SYNC = ZabbixSync(STORE)
+    COFRE = Cofre()
     if not ZBX_TOKEN:
         log("zabbix: ZABBIX_TOKEN vazio no config.env — o site abre, mas sem o status do Zabbix")
     if LOGIN and not USERS.any():
-        log(f"login: nenhum usuário em {USERS_FILE} nem em BASIC_AUTH — site ABERTO sem login")
+        log("login: nenhuma conta configurada (LOGIN_SENHA_HASH vazio) — site ABERTO sem login")
     elif LOGIN:
-        log(f"login: usando usuários de {USERS_FILE}" + (" + BASIC_AUTH" if USERS.local else ""))
+        log(f"login: conta '{LOGIN_USUARIO}'" + (f" + usuários de {USERS_FILE}" if USERS_FILE else "")
+            + (" + BASIC_AUTH" if USERS.local else ""))
     threading.Thread(target=SYNC.loop, daemon=True).start()
     srv = ThreadingHTTPServer((LISTEN, PORT), Handler)
     log(f"Documentação NOC em http://{LISTEN}:{PORT}  (dados em {DATA_DIR}, Zabbix {ZBX_URL})")

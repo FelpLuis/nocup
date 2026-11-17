@@ -144,6 +144,53 @@ td.act{width:70px;text-align:center}
 .modal .field{margin-bottom:10px}
 #toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--panel-solid);border:1px solid var(--cyan);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;z-index:70;pointer-events:none}
 #toast.on{opacity:1;transform:translate(-50%,0)}
+/* cofre */
+#vault{position:fixed;inset:0;z-index:65;display:none;background:rgba(2,2,14,.78);backdrop-filter:blur(6px)}
+#vault.on{display:block}
+#vault .vbox{position:absolute;inset:24px;max-width:1280px;margin:0 auto;background:var(--panel-solid);border:1px solid var(--line);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+#vault .vhd{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line2)}
+#vault .vhd img{width:30px;height:30px}
+#vault .vhd h3{margin:0;font-size:18px}
+#vault .vhd small{color:var(--ink3);font-size:12px;display:block}
+#vault .vbody{flex:1;overflow:auto;padding:18px 20px}
+.vlock{max-width:420px;margin:40px auto;text-align:center}
+.vlock img{width:72px;height:72px;margin-bottom:10px}
+.vlock h4{margin:6px 0 6px;font-size:20px}
+.vlock p{color:var(--ink2);font-size:13px;line-height:1.5;margin:0 0 16px}
+.vlock input{width:100%;background:rgba(5,5,26,.7);border:1px solid var(--line2);border-radius:10px;padding:11px 12px;font-size:14px;margin-bottom:10px;outline:none}
+.vlock input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(11,187,239,.15)}
+.vlock .err{color:var(--down);font-size:13px;min-height:18px;margin-bottom:8px}
+.vlock .btn{width:100%;justify-content:center;padding:11px}
+.vtool{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.vtool input[type=search],.vtool select{background:rgba(5,5,26,.6);border:1px solid var(--line2);border-radius:9px;padding:8px 10px;font-size:13px;outline:none}
+.vtool input[type=search]{flex:1;min-width:220px;max-width:360px}
+.vcat{margin:6px 0 10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;margin-bottom:18px}
+.ventry{background:rgba(5,5,26,.55);border:1px solid var(--line2);border-radius:12px;padding:12px 14px;font-size:13px}
+.ventry.hl{border-color:var(--cyan);box-shadow:0 0 16px rgba(11,187,239,.25)}
+.ventry h5{margin:0 0 8px;font-size:14px;display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+.ventry h5 span{word-break:break-word}
+.vrow{display:grid;grid-template-columns:78px 1fr auto;gap:6px;align-items:center;padding:3px 0;border-top:1px dashed rgba(255,255,255,.05)}
+.vrow:first-of-type{border-top:none}
+.vrow .k{color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.vrow .v{font-family:'JetBrains Mono',monospace;font-size:12px;word-break:break-all}
+.vrow .v a{color:var(--cyan);text-decoration:none}
+.vrow .v a:hover{text-decoration:underline}
+.vrow .acts{display:flex;gap:4px}
+.lk{background:none;border:1px solid var(--line2);color:var(--ink2);font-size:11px;padding:2px 7px;border-radius:6px;cursor:pointer}
+.lk:hover{border-color:var(--cyan);color:#fff}
+.vnote{color:var(--ink2);font-size:12px;white-space:pre-wrap;margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.06)}
+.vdevs{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.vdevs span{font-size:11px;padding:2px 7px;border-radius:999px;background:rgba(11,187,239,.12);border:1px solid var(--line);cursor:pointer}
+.vform{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vform .field.full{grid-column:1/-1}
+.vform .devpick{display:flex;flex-wrap:wrap;gap:6px;max-height:120px;overflow:auto;padding:6px;border:1px solid var(--line2);border-radius:8px}
+.vform .devpick label{font-size:12px;display:flex;gap:4px;align-items:center;color:var(--ink2)}
+.vform .extra{display:grid;grid-template-columns:1fr 1.4fr auto auto;gap:6px;align-items:center;margin-bottom:6px}
+.vform .extra input{width:100%;background:rgba(5,5,26,.6);border:1px solid var(--line2);border-radius:8px;padding:6px 8px;font-size:12px}
+.vempty{color:var(--ink3);text-align:center;padding:40px}
+.dev-acc{display:flex;flex-direction:column;gap:6px}
+.dev-acc .ventry{padding:10px 12px}
 .hidden{display:none!important}
 .sites{display:flex;gap:6px;flex-wrap:wrap}
 .chip{padding:5px 10px;border-radius:999px;border:1px solid var(--line2);background:rgba(5,5,26,.55);font-size:12px;cursor:pointer;transition:.2s;white-space:nowrap}
@@ -179,6 +226,7 @@ td.opt .lo{color:var(--part)}
     </div>
     <div class="spacer"></div>
     <div class="save-state"><span class="dot" id="dot"></span><span id="saveTxt">Carregando…</span></div>
+    <button class="btn" id="bCofre" title="Cofre de acessos (senhas cifradas)">Cofre</button>
     <button class="btn ghost" id="bSync" title="Ler o Zabbix agora">Ler Zabbix</button>
     <button class="edit-only btn" id="bImport" title="Importar uma planilha no mesmo formato (uma aba por equipamento)">Importar XLSX</button>
     <input type="file" id="fImport" accept=".xlsx,.xls" class="hidden">
@@ -235,6 +283,15 @@ td.opt .lo{color:var(--part)}
     <div class="foot"><span id="footL"></span><span id="footR"></span></div>
   </section>
 </div>
+<div id="vault" role="dialog" aria-modal="true" aria-label="Cofre de acessos"><div class="vbox">
+  <div class="vhd"><img src="/monograma.svg" alt=""><div><h3>Cofre de acessos</h3><small id="vSub">Plataformas, links, usuários e senhas do NOC</small></div><div class="spacer"></div>
+    <span class="save-state hidden" id="vState"><span class="dot dirty"></span>Alterações não salvas</span>
+    <button class="btn primary hidden" id="vSave">Salvar cofre</button>
+    <button class="btn hidden" id="vLockBtn">Trancar</button>
+    <button class="btn ghost" id="vClose">Fechar</button></div>
+  <div class="vbody" id="vBody"></div>
+</div></div>
+<input type="file" id="vFile" accept=".json,application/json" class="hidden">
 <div id="tip"></div>
 <div id="boot"><div><img src="/logo-updown.png" alt=""><span id="bootTxt">Carregando a documentação…</span></div></div>
 <div id="toast"></div>
@@ -381,6 +438,7 @@ function renderDetail(){
       ${d._zh?`<div class="field full"><label>Zabbix agora · sysName / sysLocation / versão</label><div class="ro mono">${esc(d._zh.sysname||'—')} · ${esc(d._zh.location||'—')} · ${esc(d._zh.version||'—')}${d._zh.ip&&d._zh.ip!==d.mgmt?' · IP no Zabbix '+esc(d._zh.ip):''}</div></div>`:((d.zabbix_hosts||[]).length?`<div class="field full"><div class="ro" style="color:var(--part)">Host não encontrado no Zabbix: confira o nome acima.</div></div>`:'')}
       <div class="field full"><label>Notas</label><textarea data-f="notes" placeholder="Localização no rack, contrato, serial…">${esc(d.notes)}</textarea></div>
     </div>
+    ${devAccessHtml(d)}
     <div>
       <div class="sub">Status das ${n} interfaces · ${phys} físicas</div>
       ${n?`<div class="statbar">${ST_KEYS.filter(k=>c[k]).map(k=>`<div title="${STATUS[k].l}: ${c[k]}" style="flex:${c[k]};background:${STATUS[k].c}"></div>`).join('')}</div>
@@ -390,6 +448,7 @@ function renderDetail(){
   `;
   requestAnimationFrame(()=>document.querySelectorAll('.svc i').forEach(i=>i.style.width=i.dataset.w+'%'));
   if(!CAN_EDIT) $('#detail').querySelectorAll('input,textarea').forEach(el=>el.readOnly=true);
+  bindDevAccess();
   $('#detail').querySelectorAll('[data-f]').forEach(el=>el.addEventListener('input',()=>{
     if(el.dataset.f==='zabbix_hosts'){ d.zabbix_hosts=el.value.split('\n').map(s=>s.trim()).filter(Boolean); markDirty(); return; }
     d[el.dataset.f]=el.value; markDirty();
@@ -546,15 +605,15 @@ $('#bSave').onclick=save;
 let siteSel = '';
 function renderSites(){
   const sites=[...new Set(S.devices.map(d=>d.site||'Sem site'))];
-  $('#sites').innerHTML = `<span class="chip ${siteSel===''?'on':''}" data-s="">Todos</span>` + sites.map(s=>`<span class="chip ${siteSel===s?'on':''}" data-s="${esc(s)}">${esc(s.split(' · ').pop().replace(/^POP /,''))}</span>`).join('');
-  $('#sites').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ siteSel=c.dataset.s; renderSites(); R3.focusSite(siteSel); const k=S.devices.findIndex(d=>(d.site||'Sem site')===siteSel); if(siteSel&&k>=0&&k!==cur){ cur=k; renderTabs(); renderDetail(); renderFilters(); renderTable(); R3.select(k,undefined,true); } });
+  $('#sites').innerHTML = `<span class="chip ${siteSel===''?'on':''}" data-s="">Todos</span><span class="chip ${siteSel==='__cofre'?'on':''}" data-s="__cofre">Cofre</span>` + sites.map(s=>`<span class="chip ${siteSel===s?'on':''}" data-s="${esc(s)}">${esc(s.split(' · ').pop().replace(/^POP /,''))}</span>`).join('');
+  $('#sites').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ siteSel=c.dataset.s; renderSites(); if(siteSel==='__cofre'){ R3.focusSafe(); return; } R3.focusSite(siteSel); const k=S.devices.findIndex(d=>(d.site||'Sem site')===siteSel); if(siteSel&&k>=0&&k!==cur){ cur=k; renderTabs(); renderDetail(); renderFilters(); renderTable(); R3.select(k,undefined,true); } });
 }
 /* ---------- legend ---------- */
 $('#legend3d').innerHTML = ST_KEYS.slice(0,4).map(k=>`<span><span class="sw" style="background:${STATUS[k].c}"></span>${k==='PARCIAL'?'Proto down':STATUS[k].l}</span>`).join('');
 
 /* ================= 3D RACKS ================= */
 const R3 = (function(){
-  const stage=$('#stage'); const noop={init(){},select(){},rebuild(){},rebuildAll(){},relabel(){},focusPort(){},focusSite(){}};
+  const stage=$('#stage'); const noop={focusSafe(){},safeState(){},init(){},select(){},rebuild(){},rebuildAll(){},relabel(){},focusPort(){},focusSite(){}};
   if(!window.THREE) { stage.insertAdjacentHTML('beforeend','<div class="empty-msg">Visualização 3D indisponível</div>'); return noop; }
   let renderer; try{ renderer=new THREE.WebGLRenderer({antialias:true,alpha:true}); }catch(e){ stage.insertAdjacentHTML('beforeend','<div class="empty-msg">WebGL indisponível neste navegador</div>'); return noop; }
   renderer.setPixelRatio(Math.min(2,devicePixelRatio)); stage.appendChild(renderer.domElement);
@@ -595,6 +654,36 @@ const R3 = (function(){
     g.fillStyle='#0BBBEF'; g.font='600 34px Space Grotesk, sans-serif'; g.fillText('SITE · '+n+(n>1?' RACKS':' RACK'),10,52);
     g.fillStyle='#eef0ff'; g.font='700 84px Space Grotesk, sans-serif'; g.fillText(name,8,150); }); }
 
+  // cofre 3D
+  let safe=null; const SAFE_X=8;
+  function buildSafe(){
+    const g=new THREE.Group(); g.position.set(SAFE_X,0,2); world.add(g);
+    const metal=new THREE.MeshStandardMaterial({color:0x1A1818,metalness:.85,roughness:.3});
+    const dark=new THREE.MeshStandardMaterial({color:0x0c0b1e,metalness:.6,roughness:.5});
+    const W2=10,H2=12,D2=9;
+    const base=new THREE.Mesh(new THREE.BoxGeometry(W2+1.2,.8,D2+1.2),metal); base.position.y=.4; g.add(base);
+    // corpo aberto na frente (5 faces)
+    const t=.5;
+    [[W2,t,D2,0,.8+H2-t/2,0],[W2,t,D2,0,.8+t/2,0],[t,H2,D2,-W2/2+t/2,.8+H2/2,0],[t,H2,D2,W2/2-t/2,.8+H2/2,0],[W2,H2,t,0,.8+H2/2,-D2/2+t/2]].forEach(([a,b,c,x,y,z])=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(a,b,c),metal); m.position.set(x,y,z); m.userData={safe:true}; g.add(m); });
+    const inner=new THREE.Mesh(new THREE.BoxGeometry(W2-1.2,H2-1.2,.1),new THREE.MeshBasicMaterial({color:0x9B00FF,transparent:true,opacity:.35})); inner.position.set(0,.8+H2/2,-D2/2+.8); g.add(inner);
+    for(let i=0;i<3;i++){ const sh=new THREE.Mesh(new THREE.BoxGeometry(W2-1.4,.12,D2-1.6),dark); sh.position.set(0,.8+2.6+i*3.2,-.2); g.add(sh);
+      const fol=new THREE.Mesh(new THREE.BoxGeometry(2.2,2.2,.25),new THREE.MeshStandardMaterial({color:i%2?0x0BBBEF:0x9B00FF,emissive:i%2?0x0BBBEF:0x9B00FF,emissiveIntensity:.35})); fol.position.set(-2+i*1.6,.8+3.8+i*3.2,-1.5); g.add(fol); }
+    // porta com dobradiça na esquerda
+    const hinge=new THREE.Group(); hinge.position.set(-W2/2,.8+H2/2,D2/2); g.add(hinge);
+    const door=new THREE.Mesh(new THREE.BoxGeometry(W2,H2,.7),metal); door.position.set(W2/2,0,.35); door.userData={safe:true}; hinge.add(door);
+    const plate=new THREE.Mesh(new THREE.BoxGeometry(W2-1.4,H2-1.4,.08),dark); plate.position.set(W2/2,0,.74); plate.userData={safe:true}; hinge.add(plate);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.7,.12,12,48),new THREE.MeshBasicMaterial({color:0x0BBBEF})); ring.position.set(W2/2,.6,.8); hinge.add(ring);
+    const dial=new THREE.Mesh(new THREE.CylinderGeometry(1.35,1.35,.35,40),new THREE.MeshStandardMaterial({color:0x2a2840,metalness:.9,roughness:.25})); dial.rotation.x=Math.PI/2; dial.position.set(W2/2,.6,.95); dial.userData={safe:true}; hinge.add(dial);
+    const tick=new THREE.Mesh(new THREE.BoxGeometry(.14,.7,.1),new THREE.MeshBasicMaterial({color:0x9B00FF})); tick.position.set(0,.9,.2); dial.add(tick); tick.rotation.x=-Math.PI/2;
+    [-1,1].forEach(s=>{ const h=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,2.2,12),new THREE.MeshStandardMaterial({color:0xb9bccf,metalness:.95,roughness:.2})); h.rotation.z=Math.PI/2+s*.6; h.position.set(W2/2,-2.6,1); h.userData={safe:true}; hinge.add(h); });
+    const logo=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({map:canvasTex(256,256,(c,w,h)=>{ if(MONO.complete&&MONO.naturalWidth) c.drawImage(MONO,8,8,240,240); }),transparent:true})); logo.position.set(W2/2,3.6,.8); hinge.add(logo);
+    const edge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W2+.1,H2+.1,D2+.1)),new THREE.LineBasicMaterial({color:0x0BBBEF,transparent:true,opacity:.6})); edge.position.y=.8+H2/2; g.add(edge);
+    const lab=new THREE.Mesh(new THREE.PlaneGeometry(W2+1.5,(W2+1.5)*160/768),new THREE.MeshBasicMaterial({map:canvasTex(768,160,(c,w,h)=>{ c.fillStyle='rgba(20,0,117,.85)'; c.fillRect(0,0,w,h); const gr=c.createLinearGradient(0,0,w,0); gr.addColorStop(0,'#0BBBEF'); gr.addColorStop(1,'#9B00FF'); c.fillStyle=gr; c.fillRect(0,h-8,w,8);
+      c.fillStyle='#a9adda'; c.font='500 30px Space Grotesk, sans-serif'; c.fillText('ACESSOS',28,52); c.fillStyle='#eef0ff'; c.font='700 60px Space Grotesk, sans-serif'; c.fillText('Cofre',28,120); if(MONO.complete&&MONO.naturalWidth) c.drawImage(MONO,w-142,14,118,118); }),transparent:true}));
+    lab.position.set(0,.8+H2+2.4,D2/2); g.add(lab);
+    const glow=new THREE.Mesh(new THREE.PlaneGeometry(W2+8,D2+8),new THREE.MeshBasicMaterial({color:0x9B00FF,transparent:true,opacity:.18,depthWrite:false})); glow.rotation.x=-Math.PI/2; glow.position.y=.02; g.add(glow);
+    safe={g,hinge,dial,ring,glow,open:0,target:0};
+  }
   function layout(){
     // group devices: site -> rack -> [k]
     const order=[]; const map={};
@@ -665,7 +754,7 @@ const R3 = (function(){
   }
   let bounds={min:0,max:0};
   function rebuildAll(){
-    clearWorld(); const L=layout(); let x=0;
+    clearWorld(); buildSafe(); const L=layout(); let x=SAFE_X+16;
     L.forEach(st=>{ const x0=x; st.racks.forEach(rk=>{ const need=rk.ks.reduce((a,k)=>a+unitsOf(S.devices[k]),0)+1; const n=Math.max(MINSLOTS,need); const R=buildRack(x+W/2,rk,n); racks[st.site+'||'+rk.rack]=R; let slot=1; rk.ks.forEach(k=>{ slot+=buildDev(k,R.g,slot,n); }); x+=W+1.5+RACK_GAP; });
       const x1=x-RACK_GAP; const cx=(x0+x1)/2, wd=x1-x0;
       const plate=new THREE.Mesh(new THREE.PlaneGeometry(wd+6,D+16),new THREE.MeshBasicMaterial({color:0x140075,transparent:true,opacity:.35,depthWrite:false})); plate.rotation.x=-Math.PI/2; plate.position.set(cx,.01,2); world.add(plate);
@@ -675,6 +764,7 @@ const R3 = (function(){
       sites[st.site]={cx,wd,h:Math.max(...st.racks.map(r=>racks[st.site+'||'+r.rack].H))};
       x+=SITE_GAP; });
     const total=x-SITE_GAP-RACK_GAP; world.position.x=-total/2; bounds={min:-total/2,max:total/2};
+    if(safe) safe.target=V.key?1:0;
     rimL.position.set(bounds.min-10,14,10); rimR.position.set(bounds.max+10,8,14);
     computeLinks();
   }
@@ -703,16 +793,17 @@ const R3 = (function(){
   el.addEventListener('pointerleave',()=>tip(null));
   el.addEventListener('wheel',e=>{ e.preventDefault(); camT.dist=Math.max(14,Math.min(260,camT.dist*(1+e.deltaY*.001))); },{passive:false});
   const ray=new THREE.Raycaster(), mv=new THREE.Vector2();
-  function pick(e){ const r=el.getBoundingClientRect(); mv.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(mv,cam); const hits=ray.intersectObjects(world.children,true).filter(h=>h.object.userData&&h.object.userData.k!==undefined); return hits[0]&&hits[0].object.userData; }
+  function pick(e){ const r=el.getBoundingClientRect(); mv.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(mv,cam); const hits=ray.intersectObjects(world.children,true).filter(h=>h.object.userData&&(h.object.userData.k!==undefined||h.object.userData.safe)); return hits[0]&&hits[0].object.userData; }
   let hovLed=null;
   function hover(e){ if(drag) return; const u=pick(e); el.style.cursor=u?'pointer':'grab';
     if(hovLed){ hovLed.scale.set(1,1,1); hovLed=null; }
+    if(u&&u.safe){ tip(e,`<b>Cofre de acessos</b><div class="t">${V.key?'Aberto':'Trancado'} · clique para ${V.key?'ver':'abrir'}</div>`); return; }
     if(u&&u.port){ const p=S.devices[u.k].ports[u.idx]; if(!p) return; const led=devs[u.k].leds.find(l=>l.userData.idx===u.idx); if(led){ led.scale.set(1.5,1.5,2); hovLed=led; }
       const z=p.z; tip(e,`<b>${esc(p.i)} <span style="color:${STATUS[p.st].c}">${STATUS[p.st].l}</span></b><div>${esc(p.d)||'—'}</div><div class="t">${esc(p.s)} · ${physSpeed(p.i)}</div>${z?`<div class="t">Zabbix: <span style="color:${z.st?STATUS[z.st].c:'inherit'}">${z.st||'—'}</span>${z.sp?' · '+z.sp:''}${z.rx?' · Rx '+z.rx+' / Tx '+z.tx+' dBm':''}${z.onus?' · '+z.onus+' ONUs, RX médio '+z.rxm+', pior '+z.worst+' dBm'+(+z.low?', '+z.low+' com sinal baixo':''):''}${isDiv(p)?' <span style="color:#ffb020">diverge do documentado</span>':''}</div>`:'<div class="t">Não monitorada no Zabbix</div>'}<div class="t">${esc(S.devices[u.k].name)} · ${esc(rackName(S.devices[u.k]))}</div>`); }
     else if(u){ const d=S.devices[u.k], c=counts(d.ports); tip(e,`<b>${esc(d.name)}</b><div class="t">${esc(d.model)} · ${esc(d.mgmt||'')}</div><div class="t">${esc(d.site)} · rack ${esc(rackName(d))}</div><div>${d.ports.length} interfaces · <span style="color:${STATUS.UP.c}">${c.UP} up</span> · <span style="color:${STATUS.DOWN.c}">${c.DOWN} down</span></div>`); }
     else tip(null);
   }
-  function click(e){ const u=pick(e); if(!u) return; if(u.port){ select(u.k,{port:u.idx}); flashRow(u.idx); } else select(u.k); }
+  function click(e){ const u=pick(e); if(!u) return; if(u.safe){ openVault(); return; } if(u.port){ select(u.k,{port:u.idx}); flashRow(u.idx); } else select(u.k); }
   function tip(e,h){ const t=$('#tip'); if(!e){ t.style.opacity=0; return; } t.innerHTML=h; t.style.opacity=1; const x=Math.min(innerWidth-t.offsetWidth-12,e.clientX+14), y=Math.min(innerHeight-t.offsetHeight-12,e.clientY+14); t.style.left=x+'px'; t.style.top=y+'px'; }
   function flashRow(idx){ if(!document.querySelector(`#tb tr[data-i="${idx}"]`)){ ['#q','#fSt','#fSvc','#fTp','#fZ'].forEach(s=>$(s).value=''); renderTable(); } const tr=document.querySelector(`#tb tr[data-i="${idx}"]`); if(!tr) return; tr.scrollIntoView({block:'center',behavior:'smooth'}); tr.classList.remove('flash'); void tr.offsetWidth; tr.classList.add('flash'); }
   function updBtns(){ $('#bSpin').style.borderColor=auto?'var(--cyan)':''; $('#bLinks').style.borderColor=linkGrp.visible?'var(--cyan)':''; }
@@ -734,6 +825,8 @@ const R3 = (function(){
     });
     if(focusLed){ focusLed.scale.set(1.7,1.7,2.4); }
     ledMats.UP.emissiveIntensity=.7+.25*Math.sin(time*2); ledMats.DOWN.emissiveIntensity=.5+.5*Math.abs(Math.sin(time*2.5));
+    if(safe){ safe.open+=(safe.target-safe.open)*.06; safe.hinge.rotation.y=-safe.open*1.25; safe.dial.rotation.y=safe.open*4+(safe.target?0:Math.sin(time*.7)*.5);
+      safe.ring.material.color.setHex(safe.target?0x2fd67b:0x0BBBEF); safe.glow.material.opacity=.14+.08*Math.sin(time*2); }
     linkGrp.children.forEach(o=>{ if(o.userData.curve){ const u=(time*o.userData.speed+o.userData.off)%1; o.position.copy(o.userData.curve.getPoint(u)); } });
     parts.rotation.y=time*.01; parts.position.y=Math.sin(time*.3)*.5;
     rimL.intensity=1.1+.4*Math.sin(time*.8); rimR.intensity=1.1+.4*Math.cos(time*.7);
@@ -749,9 +842,178 @@ const R3 = (function(){
     rebuildAll(){ rebuildAll(); },
     relabel(){ const k=selK; rebuildAll(); selK=k; },
     focusPort(k,idx){ if(focusLed) focusLed.scale.set(1,1,1); focusLed=devs[k]?devs[k].leds.find(l=>l.userData.idx===idx)||null:null; },
-    focusSite(s){ focusSite(s); }
+    focusSite(s){ focusSite(s); },
+    focusSafe(){ camT.x=SAFE_X+world.position.x; camT.y=8; camT.dist=44; camT.phi=1.22; camT.theta=.35; tourHold=performance.now()+20000; },
+    safeState(o){ if(safe) safe.target=o?1:0; }
   };
 })();
+
+/* ---------- cofre de acessos (cifrado no navegador; o servidor só guarda o conteúdo cifrado) ---------- */
+const V = {key:null, salt:null, iter:600000, rev:0, blob:null, data:null, dirty:false, canEdit:false, meta:null, q:'', cat:'', edit:null, hl:null, show:new Set(), t:null};
+const VCATS = ['Equipamentos de rede (SSH)','Servidores e infraestrutura','Monitoramento','Sistemas e painéis','Telefonia','Operadoras e fornecedores','E-mails','Outros'];
+const hasCrypto = !!(window.crypto && crypto.subtle && window.isSecureContext);
+function b64e(buf){ const a=new Uint8Array(buf); let s=''; for(let i=0;i<a.length;i+=0x8000) s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000)); return btoa(s); }
+function b64d(s){ return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
+async function vDerive(pw, salt, iter){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+async function vLoad(){ try { const r = await api('GET','/api/cofre'); V.rev=r.rev; V.blob=r.blob; V.canEdit=!!r.can_edit; V.meta=r; } catch(e) {} }
+async function vEncrypt(){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, V.key, new TextEncoder().encode(JSON.stringify(V.data)));
+  return {alg:'AES-GCM', kdf:'PBKDF2-SHA256', iter:V.iter, salt:b64e(V.salt), iv:b64e(iv), ct:b64e(ct)};
+}
+async function vSaveNow(){
+  if(!V.key || !V.dirty) return true;
+  try {
+    const blob = await vEncrypt();
+    const r = await api('PUT','/api/cofre',{rev:V.rev, blob});
+    V.rev = r.rev; V.blob = blob; V.dirty = false; vRender(); toast('Cofre salvo (cifrado)'); return true;
+  } catch(e) {
+    if (e.status===409) toast('Outra pessoa salvou o cofre antes. Tranque, abra de novo e refaça a alteração.');
+    else toast('Não foi possível salvar o cofre: '+e.message);
+    return false;
+  }
+}
+function vDirty(){ V.dirty=true; vRender(); }
+function vLock(){ V.key=null; V.data=null; V.edit=null; V.show.clear(); V.dirty=false; clearTimeout(V.t); vRender(); R3.safeState(false); if(booted) renderDetail(); }
+function vTouch(){ clearTimeout(V.t); if(V.key) V.t=setTimeout(async()=>{ if(V.dirty) await vSaveNow(); vLock(); toast('Cofre trancado por inatividade'); }, 10*60*1000); }
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{ if(V.key) vTouch(); }));
+async function openVault(hlId){
+  V.hl = hlId || null;
+  $('#vault').classList.add('on'); await vLoad(); vRender();
+  if (V.hl) setTimeout(()=>{ const el=document.querySelector(`.ventry[data-id="${V.hl}"]`); if(el) el.scrollIntoView({block:'center',behavior:'smooth'}); }, 80);
+}
+function closeVault(){ $('#vault').classList.remove('on'); }
+$('#vClose').onclick=closeVault;
+$('#vLockBtn').onclick=async()=>{ if(V.dirty && !(await vSaveNow())) return; vLock(); };
+$('#vSave').onclick=vSaveNow;
+$('#vault').addEventListener('click',e=>{ if(e.target.id==='vault') closeVault(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && $('#vault').classList.contains('on') && !$('#modal').classList.contains('on')) closeVault(); });
+window.addEventListener('beforeunload', e => { if (V.dirty) { e.preventDefault(); e.returnValue=''; } });
+
+function devName(id){ const d=S.devices.find(x=>x.id===id); return d?d.name:'(equipamento removido)'; }
+function vRender(){
+  const body=$('#vBody'); const un=!!V.key;
+  $('#vLockBtn').classList.toggle('hidden',!un); $('#vSave').classList.toggle('hidden',!(un&&V.dirty)); $('#vState').classList.toggle('hidden',!(un&&V.dirty));
+  $('#vSub').textContent = un ? `${V.data.entradas.length} acessos · trancamento automático após 10 min parado` : 'Plataformas, links, usuários e senhas do NOC';
+  if(!hasCrypto){ body.innerHTML=`<div class="vlock"><img src="/monograma.svg" alt=""><h4>Cofre indisponível aqui</h4><p>O cofre cifra as senhas no navegador e isso só funciona em HTTPS. Abra pelo endereço https://documentacao.noc.updown.com.br.</p></div>`; return; }
+  if(!un){
+    const novo=!V.blob;
+    body.innerHTML=`<form class="vlock" id="vForm" autocomplete="off"><img src="/monograma.svg" alt=""><h4>${novo?'Criar o cofre':'Cofre trancado'}</h4>
+      <p>${novo?'Escolha a senha mestra. As senhas do cofre são cifradas no seu navegador com ela (AES-256); o servidor guarda só o conteúdo cifrado. <b>Se a senha mestra for esquecida, o cofre não pode ser aberto por ninguém.</b>':'Digite a senha mestra para abrir. Ela não é a senha do site.'}</p>
+      <input type="password" id="vPw" placeholder="Senha mestra" autocomplete="${novo?'new-password':'current-password'}">
+      ${novo?'<input type="password" id="vPw2" placeholder="Repita a senha mestra" autocomplete="new-password">':''}
+      <div class="err" id="vErr"></div><button class="btn primary" type="submit" id="vGo">${novo?'Criar cofre':'Abrir cofre'}</button></form>`;
+    $('#vPw').focus();
+    $('#vForm').onsubmit=async ev=>{ ev.preventDefault(); const pw=$('#vPw').value; const err=$('#vErr'); err.textContent='';
+      if(novo){ if(pw.length<10) return err.textContent='Use pelo menos 10 caracteres.'; if(pw!==$('#vPw2').value) return err.textContent='As senhas não conferem.';
+        if(!V.canEdit) return err.textContent='Seu usuário pode só consultar.'; }
+      $('#vGo').disabled=true; $('#vGo').textContent=novo?'Criando…':'Abrindo…';
+      try{
+        if(novo){ V.salt=crypto.getRandomValues(new Uint8Array(16)); V.iter=600000; V.key=await vDerive(pw,V.salt,V.iter); V.data={entradas:[]}; V.dirty=true; await vSaveNow(); }
+        else { V.salt=b64d(V.blob.salt); V.iter=V.blob.iter; const k=await vDerive(pw,V.salt,V.iter);
+          const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(V.blob.iv)},k,b64d(V.blob.ct)); V.key=k; V.data=JSON.parse(new TextDecoder().decode(pt)); if(!Array.isArray(V.data.entradas)) V.data.entradas=[]; }
+        vTouch(); R3.safeState(true); vRender(); renderDetail();
+      }catch(e){ V.key=null; err.textContent=novo?('Não foi possível criar: '+e.message):'Senha mestra incorreta.'; $('#vGo').disabled=false; $('#vGo').textContent=novo?'Criar cofre':'Abrir cofre'; }
+    };
+    return;
+  }
+  const q=V.q.toLowerCase(); const list=V.data.entradas.filter(e=>(!V.cat||e.categoria===V.cat)&&(!q||[e.plataforma,e.url,e.usuario,e.notas,(e.extras||[]).map(x=>x.rotulo+' '+(x.secreto?'':x.valor)).join(' '),(e.devices||[]).map(devName).join(' ')].join(' ').toLowerCase().includes(q)));
+  const cats=[...VCATS, ...new Set(V.data.entradas.map(e=>e.categoria).filter(c=>!VCATS.includes(c)))];
+  const ed=V.canEdit;
+  body.innerHTML=`<div class="vtool"><input type="search" id="vQ" placeholder="Buscar plataforma, link, usuário, aparelho…" value="${esc(V.q)}">
+    <select id="vCat"><option value="">Todas as categorias</option>${cats.map(c=>`<option ${c===V.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    <div class="spacer"></div>${ed?`<button class="btn" id="vNew">Novo acesso</button><button class="btn" id="vImp">Importar arquivo</button><button class="btn ghost" id="vPwc">Trocar senha mestra</button>`:''}</div>
+    ${V.edit==='__new'?`<div class="vgrid"><div class="ventry hl">${vFormHtml({id:'__new',categoria:V.cat||VCATS[0],plataforma:'',url:'',usuario:'',senha:'',notas:'',devices:[],extras:[]})}</div></div>`:''}
+    ${list.length?cats.filter(c=>list.some(e=>e.categoria===c)).map(c=>`<div class="vcat">${esc(c)} · ${list.filter(e=>e.categoria===c).length}</div><div class="vgrid">${list.filter(e=>e.categoria===c).sort((a,b)=>a.plataforma.localeCompare(b.plataforma,'pt-BR',{numeric:true})).map(vEntryHtml).join('')}</div>`).join('')
+      :`<div class="vempty">${V.data.entradas.length?'Nada encontrado com esse filtro.':'Cofre vazio. Use "Importar arquivo" para trazer os acessos do arquivo cofre-importar.json ou "Novo acesso".'}</div>`}`;
+  $('#vQ').oninput=e=>{ V.q=e.target.value; const p=e.target.selectionStart; vRender(); const n=$('#vQ'); n.focus(); n.setSelectionRange(p,p); };
+  $('#vCat').onchange=e=>{ V.cat=e.target.value; vRender(); };
+  if(ed){ $('#vNew').onclick=()=>{ V.edit='__new'; vRender(); }; $('#vImp').onclick=()=>$('#vFile').click(); $('#vPwc').onclick=vChangePw; }
+  body.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>vAct(b.dataset.act,b.dataset.id,b));
+  body.querySelectorAll('.vdevs span[data-dev]').forEach(s=>s.onclick=()=>{ const k=S.devices.findIndex(d=>d.id===s.dataset.dev); if(k>=0){ closeVault(); select(k); } });
+  body.querySelectorAll('form.vform').forEach(f=>f.onsubmit=ev=>{ ev.preventDefault(); vSubmit(f); });
+  body.querySelectorAll('[data-addx]').forEach(b=>b.onclick=()=>{ const box=b.parentElement.querySelector('.xs'); box.insertAdjacentHTML('beforeend',vExtraRow({rotulo:'',valor:'',secreto:false})); box.lastElementChild.querySelector('[data-delx]').onclick=ev=>ev.target.closest('.extra').remove(); });
+  body.querySelectorAll('[data-delx]').forEach(b=>b.onclick=()=>b.closest('.extra').remove());
+}
+function linkHtml(u){ if(!u) return '—'; if(/^https?:\/\//i.test(u)) return `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u.replace(/^https?:\/\//,''))}</a>`; return esc(u); }
+function vEntryHtml(e){
+  if(V.edit===e.id) return `<div class="ventry hl" data-id="${e.id}">${vFormHtml(e)}</div>`;
+  const sh=V.show.has(e.id); const ed=V.canEdit;
+  const row=(k,v,copy,secret)=> v?`<div class="vrow"><span class="k">${k}</span><span class="v">${secret&&!sh?'••••••••':(k==='Link'?linkHtml(v):esc(v))}</span><span class="acts">${secret?`<button class="lk" data-act="show" data-id="${e.id}">${sh?'ocultar':'mostrar'}</button>`:''}${copy?`<button class="lk" data-act="copy" data-id="${e.id}" data-v="${esc(k)}">copiar</button>`:''}</span></div>`:'';
+  return `<div class="ventry ${V.hl===e.id?'hl':''}" data-id="${e.id}"><h5><span>${esc(e.plataforma)}</span>${ed?`<span class="acts"><button class="lk" data-act="edit" data-id="${e.id}">editar</button><button class="lk" data-act="del" data-id="${e.id}">excluir</button></span>`:''}</h5>
+    ${row('Link',e.url,true,false)}${row('Usuário',e.usuario,true,false)}${row('Senha',e.senha,true,true)}
+    ${(e.extras||[]).map((x,i)=>x.valor?`<div class="vrow"><span class="k">${esc(x.rotulo)}</span><span class="v">${x.secreto&&!sh?'••••••••':esc(x.valor)}</span><span class="acts"><button class="lk" data-act="copyx" data-id="${e.id}" data-i="${i}">copiar</button></span></div>`:'').join('')}
+    ${e.notas?`<div class="vnote">${esc(e.notas)}</div>`:''}
+    ${(e.devices||[]).length?`<div class="vdevs">${e.devices.map(id=>`<span data-dev="${esc(id)}" title="Abrir o equipamento">${esc(devName(id))}</span>`).join('')}</div>`:''}</div>`;
+}
+function vExtraRow(x){ return `<div class="extra"><input placeholder="Rótulo (ex.: Token)" value="${esc(x.rotulo)}" data-xr><input placeholder="Valor" value="${esc(x.valor)}" data-xv><label style="font-size:11px;color:var(--ink3);display:flex;gap:3px;align-items:center"><input type="checkbox" data-xs ${x.secreto?'checked':''}>secreto</label><button type="button" class="lk" data-delx>remover</button></div>`; }
+function vFormHtml(e){
+  return `<form class="vform" data-id="${e.id}" autocomplete="off">
+    <div class="field"><label>Plataforma</label><input name="plataforma" value="${esc(e.plataforma)}" required></div>
+    <div class="field"><label>Categoria</label><input name="categoria" list="vcats" value="${esc(e.categoria)}"><datalist id="vcats">${VCATS.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div class="field full"><label>Link de acesso (https://… ou ssh://IP)</label><input name="url" class="mono" value="${esc(e.url)}"></div>
+    <div class="field"><label>Usuário</label><input name="usuario" class="mono" value="${esc(e.usuario)}"></div>
+    <div class="field"><label>Senha</label><input name="senha" type="text" class="mono" value="${esc(e.senha)}"></div>
+    <div class="field full"><label>Outros campos (token, código, telefone…)</label><div class="xs">${(e.extras||[]).map(vExtraRow).join('')}</div><button type="button" class="lk" data-addx>adicionar campo</button></div>
+    <div class="field full"><label>Notas</label><textarea name="notas" rows="3">${esc(e.notas)}</textarea></div>
+    <div class="field full"><label>Aparelhos ligados a este acesso</label><div class="devpick">${S.devices.map(d=>`<label><input type="checkbox" name="dev" value="${esc(d.id)}" ${(e.devices||[]).includes(d.id)?'checked':''}>${esc(d.name)}</label>`).join('')}</div></div>
+    <div class="field full" style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn ghost" data-act="cancel" data-id="${e.id}">Cancelar</button><button class="btn primary" type="submit">Aplicar</button></div></form>`;
+}
+function vSubmit(f){
+  const id=f.dataset.id; const g=n=>f.querySelector(`[name="${n}"]`).value.trim();
+  const e={id:id==='__new'?Math.random().toString(16).slice(2,12):id, plataforma:g('plataforma')||'(sem nome)', categoria:g('categoria')||'Outros', url:g('url'), usuario:g('usuario'), senha:f.querySelector('[name="senha"]').value, notas:f.querySelector('[name="notas"]').value.trim(),
+    devices:[...f.querySelectorAll('[name="dev"]:checked')].map(c=>c.value),
+    extras:[...f.querySelectorAll('.extra')].map(r=>({rotulo:r.querySelector('[data-xr]').value.trim(),valor:r.querySelector('[data-xv]').value,secreto:r.querySelector('[data-xs]').checked})).filter(x=>x.rotulo||x.valor)};
+  if(id==='__new') V.data.entradas.push(e); else { const i=V.data.entradas.findIndex(x=>x.id===id); V.data.entradas[i]=e; }
+  V.edit=null; V.hl=e.id; vDirty(); renderDetail();
+}
+async function copyText(t){ try{ await navigator.clipboard.writeText(t); toast('Copiado'); } catch(e){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); toast('Copiado'); }catch(_){ toast('Não foi possível copiar'); } ta.remove(); } }
+function vAct(act,id,btn){
+  const e=V.data.entradas.find(x=>x.id===id);
+  if(act==='show'){ V.show.has(id)?V.show.delete(id):V.show.add(id); vRender(); }
+  else if(act==='copy'){ const k=btn.dataset.v; copyText(k==='Link'?e.url:k==='Usuário'?e.usuario:e.senha); }
+  else if(act==='copyx'){ copyText(e.extras[+btn.dataset.i].valor); }
+  else if(act==='edit'){ V.edit=id; vRender(); }
+  else if(act==='cancel'){ V.edit=null; vRender(); }
+  else if(act==='del'){ confirmBox('Excluir acesso?', `${e.plataforma} sai do cofre (fica no histórico cifrado do servidor).`, 'Excluir', ()=>{ V.data.entradas=V.data.entradas.filter(x=>x.id!==id); vDirty(); renderDetail(); }); }
+}
+$('#vFile').onchange=async ev=>{
+  const f=ev.target.files[0]; ev.target.value=''; if(!f||!V.key) return;
+  let j; try{ j=JSON.parse(await f.text()); }catch(e){ return toast('Arquivo não é um JSON válido'); }
+  const arr=Array.isArray(j)?j:(j.entradas||[]); if(!arr.length) return toast('Nenhum acesso no arquivo');
+  const seen=new Set(V.data.entradas.map(e=>(e.plataforma+'|'+e.usuario).toLowerCase())); let n=0;
+  arr.forEach(e=>{ const key=(String(e.plataforma||'')+'|'+String(e.usuario||'')).toLowerCase(); if(seen.has(key)) return; seen.add(key);
+    V.data.entradas.push({id:Math.random().toString(16).slice(2,12), categoria:e.categoria||'Outros', plataforma:String(e.plataforma||'(sem nome)'), url:e.url||'', usuario:e.usuario||'', senha:e.senha||'', notas:e.notas||'', devices:(e.devices||[]).filter(id=>S.devices.some(d=>d.id===id)), extras:(e.extras||[]).map(x=>({rotulo:x.rotulo||'',valor:x.valor||'',secreto:!!x.secreto}))}); n++; });
+  vDirty(); renderDetail(); toast(`${n} acessos importados${arr.length-n?' ('+(arr.length-n)+' já existiam)':''}. Clique em Salvar cofre.`);
+};
+function vChangePw(){
+  modal(`<h3>Trocar senha mestra</h3><p>O cofre é cifrado de novo com a senha nova. Avise a equipe.</p>
+    <div class="field"><label>Senha nova</label><input type="password" id="np1" autocomplete="new-password"></div>
+    <div class="field"><label>Repita</label><input type="password" id="np2" autocomplete="new-password"></div><div style="color:var(--down);font-size:13px" id="npE"></div>
+    <div class="acts"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="npOk">Trocar</button></div>`);
+  $('#npOk').onclick=async()=>{ const a=$('#np1').value; if(a.length<10) return $('#npE').textContent='Use pelo menos 10 caracteres.'; if(a!==$('#np2').value) return $('#npE').textContent='As senhas não conferem.';
+    V.salt=crypto.getRandomValues(new Uint8Array(16)); V.key=await vDerive(a,V.salt,V.iter); V.dirty=true; closeModal(); if(await vSaveNow()) toast('Senha mestra trocada'); };
+}
+// acessos do aparelho na ficha
+function devAccessHtml(d){
+  if(!hasCrypto) return '';
+  if(!V.key) return `<div><div class="sub">Acesso ao aparelho</div><div class="ro">Cofre trancado. <button class="lk" id="dOpen">abrir cofre</button></div></div>`;
+  const acc=V.data.entradas.filter(e=>(e.devices||[]).includes(d.id));
+  if(!acc.length) return `<div><div class="sub">Acesso ao aparelho</div><div class="ro">Nenhum acesso do cofre ligado a este aparelho. <button class="lk" id="dOpen">abrir cofre</button></div></div>`;
+  return `<div><div class="sub">Acesso ao aparelho (cofre)</div><div class="dev-acc">${acc.map(e=>`<div class="ventry" data-id="${e.id}"><h5><span>${esc(e.plataforma)}</span><span class="acts"><button class="lk" data-dact="open" data-id="${e.id}">no cofre</button></span></h5>
+    ${e.url?`<div class="vrow"><span class="k">Link</span><span class="v">${linkHtml(e.url)}</span><span class="acts"><button class="lk" data-dact="cu" data-id="${e.id}">copiar</button></span></div>`:''}
+    ${e.usuario?`<div class="vrow"><span class="k">Usuário</span><span class="v">${esc(e.usuario)}</span><span class="acts"><button class="lk" data-dact="cus" data-id="${e.id}">copiar</button></span></div>`:''}
+    ${e.senha?`<div class="vrow"><span class="k">Senha</span><span class="v">${V.show.has(e.id)?esc(e.senha):'••••••••'}</span><span class="acts"><button class="lk" data-dact="sh" data-id="${e.id}">${V.show.has(e.id)?'ocultar':'mostrar'}</button><button class="lk" data-dact="cp" data-id="${e.id}">copiar</button></span></div>`:''}</div>`).join('')}</div></div>`;
+}
+function bindDevAccess(){
+  const o=$('#dOpen'); if(o) o.onclick=()=>openVault();
+  document.querySelectorAll('#detail [data-dact]').forEach(b=>b.onclick=()=>{ const e=V.data.entradas.find(x=>x.id===b.dataset.id); const a=b.dataset.dact;
+    if(a==='open') openVault(e.id); else if(a==='cu') copyText(e.url); else if(a==='cus') copyText(e.usuario); else if(a==='cp') copyText(e.senha); else if(a==='sh'){ V.show.has(e.id)?V.show.delete(e.id):V.show.add(e.id); renderDetail(); } });
+}
+$('#bCofre').onclick=()=>openVault();
 
 /* ---------- boot ---------- */
 let booted = false;
@@ -767,7 +1029,7 @@ let booted = false;
     if (!S.devices.length) S.devices.push({id:'d'+Date.now(),name:'NOVO EQUIPAMENTO',model:'',site:'',rack:'',role:'',mgmt:'',notes:'',zabbix_hosts:[],ports:[]});
     const want = decodeURIComponent((location.hash||'').slice(1)).toLowerCase();
     let k0 = S.devices.findIndex(d => d.name.toLowerCase().replace(/\s+/g,'-') === want); if (k0 < 0) k0 = 0;
-    R3.init();
+    R3.init(); vLoad();
     renderKPIs(); renderSites(); updSave(); select(k0,{fromUser:false}); booted = true;
     $('#boot').remove();
   } catch (e) {

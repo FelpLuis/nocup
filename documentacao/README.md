@@ -12,12 +12,23 @@ Endereço: **https://documentacao.noc.updown.com.br**
 - **Importar do Zabbix**: quando o Zabbix tem interfaces que ainda não estão na documentação, aparece o botão "Importar N interfaces do Zabbix".
 - **Exportar XLSX/CSV** (uma aba por equipamento + inventário) e **Importar XLSX** no mesmo formato da planilha DOC_SW.
 
+## Cofre de acessos
+
+O **Cofre** (botão no topo, ou o cofre no começo da cena 3D) guarda os acessos do NOC por plataforma: link, usuário, senha, campos extras (token, código…) e notas. Acessos SSH/web de aparelhos ficam **ligados aos equipamentos** e aparecem na ficha de cada um ("Acesso ao aparelho").
+
+- As senhas são **cifradas no navegador** (AES-256-GCM, chave derivada da senha mestra com PBKDF2-SHA256, 600 mil iterações). O servidor guarda só o conteúdo cifrado em `data/cofre.json` e não tem como abrir.
+- A **senha mestra** é criada na primeira vez que o cofre é aberto e não é a senha do site. **Se for esquecida, o cofre não pode ser recuperado** (guarde-a fora do site).
+- Tranca sozinho depois de 10 minutos parado. Funciona só em HTTPS.
+- **Importar arquivo** aceita o `cofre-importar.json` (formato `updown-cofre`). Depois de importar e salvar, apague o arquivo do computador.
+- Nenhuma senha vai para o Git: o cofre existe só no servidor (`data/` está no `.gitignore`).
+
 ## Onde ficam os dados
 
 | Arquivo (em `/opt/documentacao-noc/data/`) | O que é |
 |---|---|
 | `equipamentos.json` | a documentação (o que a equipe edita). Criado na 1ª vez a partir de `dados-iniciais.json` |
 | `historico/` | cópia de cada versão anterior, com data e versão (mantém as últimas 200) |
+| `cofre.json` | cofre de acessos, **só cifrado** (versões anteriores em `historico-cofre/`) |
 | `zabbix.json` | cache do Zabbix, refeito a cada 5 min (`SYNC_MINUTES`) ou no botão "Ler Zabbix" |
 
 O status do Zabbix **não é gravado** na documentação: o site mostra os dois lado a lado. Se duas pessoas editarem ao mesmo tempo, quem salvar depois recebe um aviso para recarregar (nada é sobrescrito sem querer).
@@ -43,13 +54,17 @@ O instalador copia tudo para `/opt/documentacao-noc`, pede o token do Zabbix (ou
 
 ## Login
 
-Os mesmos usuários do Painel das OLTs (`/etc/painel-olt/users.json`):
+Usuário **NOC**. A senha não fica no repositório: o `config.env` guarda só o hash (PBKDF2). Depois de 5 senhas erradas em 15 min, o IP e o usuário ficam bloqueados por 15 min.
+
+Para trocar a senha (derruba as sessões abertas):
 
 ```bash
-sudo python3 /opt/painel-olt/painel-auth.py adduser NOME
+sudo -u www-data python3 /opt/documentacao-noc/server.py senha    # gera a linha LOGIN_SENHA_HASH=...
+sudo nano /opt/documentacao-noc/config.env                          # substitui a linha
+sudo systemctl restart documentacao-noc
 ```
 
-Para deixar alguns usuários só consultando, liste quem pode editar em `EDITORES=luis,ana` no `config.env`.
+Opcional: `USERS_FILE=/etc/painel-olt/users.json` também aceita os usuários do Painel das OLTs; `EDITORES=noc` deixa os outros só consultando.
 
 ## Ligar um equipamento ao Zabbix
 
