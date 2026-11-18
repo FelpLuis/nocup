@@ -756,7 +756,10 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(403, {"error": "O cofre é pessoal: precisa entrar com o seu usuário."})
             c = COFRE.read(dono)
             return self.send_json(200, {"rev": c.get("rev", 0), "blob": c.get("blob"), "updated": c.get("updated"),
-                                        "dono": exibir(dono), "legado": COFRE.legado() is not None})
+                                        "dono": exibir(dono), "legado": COFRE.legado() is not None,
+                                        # o cofre é pessoal: o dono sempre pode criar e editar o seu
+                                        # (mantido também para páginas antigas em cache que leem este campo)
+                                        "can_edit": True})
         if path == "/api/cofre/legado":
             if not sess.get("user"):
                 return self.send_json(403, {"error": "O cofre é pessoal: precisa entrar com o seu usuário."})
