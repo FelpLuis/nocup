@@ -1049,7 +1049,7 @@ let booted = false;
     S = r.doc; REV = r.rev; CAN_EDIT = !!r.can_edit; USER = r.user;
     if (!Array.isArray(S.devices)) S.devices = [];
     document.body.classList.toggle('ro-mode', !CAN_EDIT);
-    $('#user').innerHTML = r.login ? `<span>${esc(USER||'')}</span><a href="/logout">Sair</a>` : '';
+    $('#user').innerHTML = r.login ? `<span>${esc(USER||'')}${r.admin?' <span class="badge" title="Administrador no Portal NOC">admin</span>':(!CAN_EDIT?' <span class="badge">consulta</span>':'')}</span><a href="/logout">Sair</a>` : '';
     try { ZC = await api('GET', '/api/zabbix'); } catch(e) {}
     applyZ();
     if (!S.devices.length) S.devices.push({id:'d'+Date.now(),name:'NOVO EQUIPAMENTO',model:'',site:'',rack:'',role:'',mgmt:'',notes:'',zabbix_hosts:[],ports:[]});

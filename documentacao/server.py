@@ -675,7 +675,8 @@ class Handler(SimpleHTTPRequestHandler):
             # Só confia no cabeçalho quando vem do nginx desta máquina.
             u = (self.headers.get("X-Portal-User") or "").strip()
             if u and self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
-                return {"user": u, "portal": True}
+                role = (self.headers.get("X-Portal-Role") or "").strip().lower()
+                return {"user": u, "portal": True, "role": role, "admin": role == "administrador"}
             return None
         return read_session(self.headers.get("Cookie")) if self.login_on() else {"user": None}
 
@@ -691,7 +692,9 @@ class Handler(SimpleHTTPRequestHandler):
     def can_edit(self, sess):
         if not sess:
             return False
-        return not EDITORES or (sess.get("user") or "") in EDITORES
+        if sess.get("admin"):          # administrador no Portal NOC gerencia tudo
+            return True
+        return not EDITORES or (sess.get("user") or "").lower() in EDITORES
 
     def body_json(self, limit):
         n = int(self.headers.get("Content-Length") or 0)
@@ -740,6 +743,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/dados":
             doc = STORE.read()
             return self.send_json(200, {"doc": doc, "rev": doc.get("rev", 1), "user": exibir(sess.get("user")),
+                                        "admin": bool(sess.get("admin")), "role": sess.get("role", ""),
                                         "login": self.login_on(), "can_edit": self.can_edit(sess) or not self.login_on()})
         if path == "/api/zabbix":
             c = SYNC.cache()
