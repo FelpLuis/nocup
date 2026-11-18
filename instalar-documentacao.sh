@@ -83,6 +83,13 @@ if [ ! -f "$DEST/config.env" ]; then
   fi
   [[ "$TOKEN" =~ ^[A-Za-z0-9]{16,}$ ]] || desfazer "Token inválido: esperava só letras e números"
   sed -i "s#^ZABBIX_TOKEN=.*#ZABBIX_TOKEN=$TOKEN#" "$DEST/config.env"
+  # Senha inicial aleatória da conta NOC: só o hash vai para o config.env.
+  SENHA_INICIAL="$(python3 -c 'import secrets;print(secrets.token_urlsafe(15))')"
+  HASH_INICIAL="$(SENHA="$SENHA_INICIAL" python3 -c 'import os,hashlib,secrets,base64
+e=lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+s=secrets.token_bytes(16); dk=hashlib.pbkdf2_hmac("sha256",os.environ["SENHA"].encode(),s,200000)
+print("pbkdf2_sha256$200000$"+e(s)+"$"+e(dk))')"
+  sed -i "s#^LOGIN_SENHA_HASH=.*#LOGIN_SENHA_HASH=$HASH_INICIAL#" "$DEST/config.env"
   ok "config.env criado"
 else
   ok "Mantido o config.env que já existia"
@@ -216,10 +223,19 @@ else
 fi
 
 # Login ------------------------------------------------------------------------
+# Hash que esteve publicado no config.env.example (repositório público): trocar.
+HASH_PUBLICO='pbkdf2_sha256$200000$nmDjoaNls528h0gwOuiBlQ$gbVqHsZwHo0bopcV_31fDs1h28aheaLq3Uwe0OZhZKQ'
+if [ -n "${SENHA_INICIAL:-}" ]; then
+  ok "Login: usuário NOC, senha inicial: $SENHA_INICIAL  (anote agora; não aparece de novo)"
+fi
+if grep -qF "LOGIN_SENHA_HASH=$HASH_PUBLICO" "$DEST/config.env"; then
+  info "ATENÇÃO: o config.env usa o hash de senha que estava publicado no GitHub. Troque já:"
+  info "  sudo -u www-data python3 $DEST/server.py senha   (cole a linha em $DEST/config.env e reinicie)"
+fi
 if grep -qP '^LOGIN_SENHA_HASH=pbkdf2_sha256\$' "$DEST/config.env"; then
   ok "Login: usuário $(grep -oP '^LOGIN_USUARIO=\K.*' "$DEST/config.env" || echo NOC) (trocar a senha: sudo -u www-data python3 $DEST/server.py senha)"
 else
-  info "Atenção: LOGIN_SENHA_HASH vazio no config.env — o site vai abrir SEM login"
+  info "Atenção: LOGIN_SENHA_HASH vazio no config.env — sem PORTAL=1 o site responde 503 até configurar a senha"
 fi
 
 sleep 3

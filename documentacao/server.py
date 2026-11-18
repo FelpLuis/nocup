@@ -79,11 +79,13 @@ ZBX_URL = env("ZABBIX_URL", "http://127.0.0.1:19090").rstrip("/")
 ZBX_TOKEN = env("ZABBIX_TOKEN", "")
 ZBX_VERIFY_TLS = env("ZABBIX_VERIFY_TLS", "1") == "1"
 SYNC_MINUTES = env("SYNC_MINUTES", "5", int)
-LISTEN = env("LISTEN", "0.0.0.0")
+LISTEN = env("LISTEN", "127.0.0.1")   # atrás do nginx; LISTEN=0.0.0.0 só de propósito
 PORT = env("PORT", "8447", int)
 DATA_DIR = Path(env("DATA_DIR", str(BASE / "data")))
 HISTORY_KEEP = env("HISTORY_KEEP", "200", int)
 LOGIN = env("LOGIN", "1") == "1"
+# Cookie com Secure: auto (= quando o nginx repassa X-Forwarded-Proto https) | 1 | 0
+COOKIE_SECURE = env("COOKIE_SECURE", "auto").strip().lower()
 # Login único pelo Portal NOC (portal.updown.com.br): o nginx confere a sessão no portal
 # (auth_request) e repassa o usuário no cabeçalho X-Portal-User. PORTAL=1 liga — o
 # vincular-portal.sh do repositório já deixa assim. Com ele, o usuário e as permissões
@@ -565,6 +567,10 @@ PUBLIC = {"/login", "/login.html", "/logo-updown.png", "/monograma.svg", "/healt
 
 
 class Handler(SimpleHTTPRequestHandler):
+    # Sem timeout, quem anuncia Content-Length e não manda o corpo prende a thread
+    # para sempre (slowloris). 30 s cobre qualquer cliente legítimo.
+    timeout = 30
+
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(BASE / "static"), **kw)
 
@@ -579,11 +585,21 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
         super().end_headers()
 
+    def from_proxy(self):
+        # Cabeçalhos X-Real-IP/X-Forwarded-Proto só valem vindos do nginx desta máquina.
+        return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+
     def ip(self):
-        return self.headers.get("X-Real-IP") or self.client_address[0]
+        if self.from_proxy():
+            return self.headers.get("X-Real-IP") or self.client_address[0]
+        return self.client_address[0]
 
     def secure(self):
-        return self.headers.get("X-Forwarded-Proto", "") == "https"
+        if COOKIE_SECURE in ("1", "true", "sim"):
+            return True
+        if COOKIE_SECURE in ("0", "false", "nao", "não"):
+            return False
+        return self.from_proxy() and self.headers.get("X-Forwarded-Proto", "") == "https"
 
     def send_json(self, code, obj, headers=()):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -602,6 +618,15 @@ class Handler(SimpleHTTPRequestHandler):
         for k, v in headers:
             self.send_header(k, v)
         self.end_headers()
+
+    def sem_conta(self):
+        """LOGIN=1 sem nenhuma conta (nem portal): configuração incompleta. Falha FECHADA."""
+        return LOGIN and not self.login_on()
+
+    def recusar_sem_conta(self):
+        self.send_json(503, {"error": "Login ligado (LOGIN=1) mas nenhuma conta configurada. "
+                                      "Configure a senha (python3 server.py senha), o PORTAL=1 ou, se o site "
+                                      "deve mesmo ser aberto, LOGIN=0 no config.env."})
 
     def login_on(self):
         return PORTAL or (LOGIN and USERS.any())
@@ -639,6 +664,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"ok")
             return
+        if self.sem_conta():
+            return self.recusar_sem_conta()
         if path == "/logout":
             return self.redirect("/login", [("Set-Cookie", f"{COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
                                              + ("; Secure" if self.secure() else ""))])
@@ -680,6 +707,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ---- PUT /api/dados ----
     def do_PUT(self):
+        if self.sem_conta():
+            return self.recusar_sem_conta()
         path = urlparse(self.path).path
         if path not in ("/api/dados", "/api/cofre"):
             return self.send_json(404, {"error": "não encontrado"})
@@ -714,6 +743,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ---- POST /login, /api/zabbix/sync ----
     def do_POST(self):
+        if self.sem_conta():
+            return self.recusar_sem_conta()
         path = urlparse(self.path).path
         if path == "/api/zabbix/sync":
             if not self.session():
@@ -786,7 +817,7 @@ def main():
     if not ZBX_TOKEN:
         log("zabbix: ZABBIX_TOKEN vazio no config.env — o site abre, mas sem o status do Zabbix")
     if LOGIN and not USERS.any():
-        log("login: nenhuma conta configurada (LOGIN_SENHA_HASH vazio) — site ABERTO sem login")
+        log("login: nenhuma conta configurada (LOGIN_SENHA_HASH vazio) — site FECHADO (503) até configurar a senha, PORTAL=1 ou LOGIN=0")
     elif LOGIN:
         log(f"login: conta '{LOGIN_USUARIO}'" + (f" + usuários de {USERS_FILE}" if USERS_FILE else "")
             + (" + BASIC_AUTH" if USERS.local else ""))
