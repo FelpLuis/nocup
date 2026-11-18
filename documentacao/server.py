@@ -11,8 +11,10 @@ separados por site e rack, com o status atual de cada interface lido do Zabbix.
   GET  /api/zabbix        -> cache do Zabbix (status, velocidade, Rx/Tx, sysName, sysLocation...)
   POST /api/zabbix/sync   -> lê o Zabbix agora
   GET  /api/historico     -> lista das últimas versões salvas
-  GET  /api/cofre         -> cofre de acessos (só o conteúdo cifrado no navegador)
-  PUT  /api/cofre         -> salva o cofre cifrado
+  GET  /api/cofre         -> cofre de acessos DO USUÁRIO LOGADO (só o conteúdo cifrado no navegador)
+  PUT  /api/cofre         -> salva o cofre cifrado do usuário logado
+  GET  /api/cofre/legado  -> cofre compartilhado antigo (versão anterior), para trazer ao cofre pessoal
+  DELETE /api/cofre/legado -> retira o cofre compartilhado antigo do servidor (guarda cópia cifrada)
   GET  /healthz           -> "ok"
 
 Os dados ficam em DATA_DIR (padrão /opt/documentacao-noc/data):
@@ -91,6 +93,8 @@ COOKIE_SECURE = env("COOKIE_SECURE", "auto").strip().lower()
 # vincular-portal.sh do repositório já deixa assim. Com ele, o usuário e as permissões
 # vêm do portal e o login próprio desta tela deixa de ser usado.
 PORTAL = env("PORTAL", "0") == "1"
+PORTAL_URL = env("PORTAL_URL", "https://portal.updown.com.br").rstrip("/")
+PORTAL_SISTEMA = env("PORTAL_SISTEMA", "documentacao")
 # Conta do site (padrão: NOC). A senha fica só como hash PBKDF2; troque com: python3 server.py senha
 LOGIN_USUARIO_NOME = env("LOGIN_USUARIO", "NOC").strip()
 LOGIN_USUARIO = LOGIN_USUARIO_NOME.lower()
@@ -105,7 +109,11 @@ SESSION_TV_DAYS = env("SESSION_TV_DAYS", "90", int)
 EDITORES = {u.strip().lower() for u in env("EDITORES", "").split(",") if u.strip()}
 
 DOC_FILE = DATA_DIR / "equipamentos.json"
-COFRE_FILE = DATA_DIR / "cofre.json"          # só o conteúdo CIFRADO no navegador (AES-GCM); o servidor nunca vê as senhas
+# Cofre de acessos: UM POR USUÁRIO (do portal ou da conta local). Cada arquivo guarda só o
+# conteúdo CIFRADO no navegador do dono (AES-GCM com a senha mestra dele): nem outro
+# usuário, nem o administrador, nem o servidor conseguem abrir.
+COFRES_DIR = DATA_DIR / "cofres"
+COFRE_LEGADO = DATA_DIR / "cofre.json"        # cofre compartilhado da versão anterior (se existir)
 COFRE_HIST = DATA_DIR / "historico-cofre"
 ZBX_FILE = DATA_DIR / "zabbix.json"
 HIST_DIR = DATA_DIR / "historico"
@@ -166,38 +174,69 @@ class Store:
         return out
 
 
+def _dono(user):
+    """Nome de arquivo seguro e único para o usuário (sem barras, sem '..')."""
+    u = (user or "").strip().lower()
+    base = re.sub(r"[^a-z0-9._-]+", "_", u).strip("._") or "usuario"
+    return f"{base[:60]}-{hashlib.sha256(u.encode()).hexdigest()[:10]}"
+
+
 class Cofre:
-    """Guarda o cofre de acessos já cifrado pelo navegador. Não tem como decifrar: não conhece a senha mestra."""
+    """Cofres individuais já cifrados pelo navegador. O servidor não conhece nenhuma senha mestra.
+    Cada requisição só lê ou grava o cofre do usuário da sessão; o nome nunca vem do navegador."""
 
     def __init__(self):
         self.lock = threading.Lock()
-        COFRE_HIST.mkdir(parents=True, exist_ok=True)
+        COFRES_DIR.mkdir(parents=True, exist_ok=True)
+        os.chmod(COFRES_DIR, 0o700)
+        (COFRE_HIST / "usuarios").mkdir(parents=True, exist_ok=True)
 
-    def read(self):
+    def _f(self, user):
+        return COFRES_DIR / f"{_dono(user)}.json"
+
+    def read(self, user):
         with self.lock:
             try:
-                return json.loads(COFRE_FILE.read_text(encoding="utf-8"))
+                return json.loads(self._f(user).read_text(encoding="utf-8"))
             except FileNotFoundError:
                 return {"rev": 0, "blob": None}
 
-    def save(self, blob, rev, user):
+    def save(self, user, blob, rev):
+        f = self._f(user)
         with self.lock:
             try:
-                cur = json.loads(COFRE_FILE.read_text(encoding="utf-8"))
+                cur = json.loads(f.read_text(encoding="utf-8"))
             except FileNotFoundError:
                 cur = {"rev": 0}
             if int(rev) != int(cur.get("rev", 0)):
-                return False, cur.get("rev", 0), cur.get("updated_by")
-            if COFRE_FILE.exists():
-                shutil.copy(COFRE_FILE, COFRE_HIST / f"{time.strftime('%Y%m%d-%H%M%S')}-rev{cur.get('rev', 0)}.json")
-                hist = sorted(COFRE_HIST.glob("*.json"))
-                for old in hist[:-50] if len(hist) > 50 else []:
+                return False, cur.get("rev", 0)
+            if f.exists():
+                hd = COFRE_HIST / "usuarios" / _dono(user)
+                hd.mkdir(parents=True, exist_ok=True)
+                os.chmod(hd, 0o700)
+                shutil.copy(f, hd / f"{time.strftime('%Y%m%d-%H%M%S')}-rev{cur.get('rev', 0)}.json")
+                hist = sorted(hd.glob("*.json"))
+                for old in hist[:-30] if len(hist) > 30 else []:
                     old.unlink(missing_ok=True)
-            novo = {"rev": int(cur.get("rev", 0)) + 1, "blob": blob, "updated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                    "updated_by": user or "anônimo"}
-            write_atomic(COFRE_FILE, novo)
-            os.chmod(COFRE_FILE, 0o600)
-            return True, novo["rev"], novo["updated_by"]
+            novo = {"rev": int(cur.get("rev", 0)) + 1, "dono": user, "blob": blob,
+                    "updated": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+            write_atomic(f, novo)
+            os.chmod(f, 0o600)
+            return True, novo["rev"]
+
+    def legado(self):
+        try:
+            c = json.loads(COFRE_LEGADO.read_text(encoding="utf-8"))
+            return c if c.get("blob") else None
+        except (FileNotFoundError, ValueError):
+            return None
+
+    def retirar_legado(self, user):
+        with self.lock:
+            if not COFRE_LEGADO.exists():
+                return False
+            os.replace(COFRE_LEGADO, COFRE_HIST / f"legado-compartilhado-{time.strftime('%Y%m%d-%H%M%S')}-por-{_dono(user)}.json")
+            return True
 
 
 def valid_blob(b):
@@ -640,6 +679,15 @@ class Handler(SimpleHTTPRequestHandler):
             return None
         return read_session(self.headers.get("Cookie")) if self.login_on() else {"user": None}
 
+    _aviso_t = 0
+
+    def aviso_sem_portal(self):
+        now = time.time()
+        if now - Handler._aviso_t > 600:
+            Handler._aviso_t = now
+            log("login: PORTAL=1, mas o pedido chegou sem X-Portal-User do nginx local — o site do nginx "
+                "não está ligado ao portal. Rode: sudo bash vincular-portal.sh (no repositório nocup)")
+
     def can_edit(self, sess):
         if not sess:
             return False
@@ -670,6 +718,16 @@ class Handler(SimpleHTTPRequestHandler):
             return self.redirect("/login", [("Set-Cookie", f"{COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
                                              + ("; Secure" if self.secure() else ""))])
         sess = self.session()
+        if PORTAL and not sess:
+            # Modo portal sem usuário no cabeçalho: o nginx não está ligado ao portal (ex.: reinstalado
+            # sem o vínculo). Nunca mostra o login próprio: manda para o portal e avisa no log.
+            self.aviso_sem_portal()
+            if path.startswith("/api/"):
+                return self.send_json(401, {"error": "login", "portal": PORTAL_URL})
+            volta = f"https://{self.headers.get('Host', 'documentacao.noc.updown.com.br')}/"
+            return self.redirect(f"{PORTAL_URL}/login?sistema={PORTAL_SISTEMA}&volta={quote(volta, safe=':/')}")
+        if PORTAL and path in ("/login", "/login.html"):
+            return self.redirect("/")
         if path in ("/login", "/login.html"):
             if not self.login_on() or sess:
                 return self.redirect(safe_next(parse_qs(url.query).get("next", ["/"])[0]))
@@ -689,10 +747,19 @@ class Handler(SimpleHTTPRequestHandler):
             c["intervalo_min"] = SYNC_MINUTES
             return self.send_json(200, c)
         if path == "/api/cofre":
-            c = COFRE.read()
+            dono = sess.get("user")
+            if not dono:
+                return self.send_json(403, {"error": "O cofre é pessoal: precisa entrar com o seu usuário."})
+            c = COFRE.read(dono)
             return self.send_json(200, {"rev": c.get("rev", 0), "blob": c.get("blob"), "updated": c.get("updated"),
-                                        "updated_by": c.get("updated_by"),
-                                        "can_edit": self.can_edit(sess) or not self.login_on()})
+                                        "dono": exibir(dono), "legado": COFRE.legado() is not None})
+        if path == "/api/cofre/legado":
+            if not sess.get("user"):
+                return self.send_json(403, {"error": "O cofre é pessoal: precisa entrar com o seu usuário."})
+            c = COFRE.legado()
+            if not c:
+                return self.send_json(404, {"error": "não há cofre compartilhado antigo"})
+            return self.send_json(200, {"blob": c["blob"], "updated": c.get("updated")})
         if path == "/api/historico":
             return self.send_json(200, {"versoes": STORE.history()})
         if path.startswith("/api/historico/"):
@@ -715,21 +782,27 @@ class Handler(SimpleHTTPRequestHandler):
         sess = self.session()
         if not sess:
             return self.send_json(401, {"error": "login"})
+        if path == "/api/cofre":   # cofre pessoal: qualquer usuário logado grava o SEU (EDITORES não se aplica)
+            dono = sess.get("user")
+            if not dono:
+                return self.send_json(403, {"error": "O cofre é pessoal: precisa entrar com o seu usuário."})
+            body, err = self.body_json(MAX_BODY)
+            if err:
+                return self.send_json(400, {"error": err})
+            blob, rev = body.get("blob"), body.get("rev")
+            err = valid_blob(blob)
+            if err or rev is None:
+                return self.send_json(400, {"error": err or "falta rev"})
+            ok, cur = COFRE.save(dono, blob, rev)
+            if not ok:
+                return self.send_json(409, {"error": "conflito", "rev": cur})
+            log(f"cofre: '{exibir(dono)}' salvou o próprio cofre (rev {cur}) de {self.ip()}")
+            return self.send_json(200, {"ok": True, "rev": cur})
         if self.login_on() and not self.can_edit(sess):
             return self.send_json(403, {"error": "Seu usuário pode só consultar a documentação."})
         body, err = self.body_json(MAX_BODY)
         if err:
             return self.send_json(400, {"error": err})
-        if path == "/api/cofre":
-            blob, rev = body.get("blob"), body.get("rev")
-            err = valid_blob(blob)
-            if err or rev is None:
-                return self.send_json(400, {"error": err or "falta rev"})
-            ok, cur, by = COFRE.save(blob, rev, exibir(sess.get("user")))
-            if not ok:
-                return self.send_json(409, {"error": "conflito", "rev": cur, "updated_by": by})
-            log(f"cofre: rev {cur} salva por '{by}' de {self.ip()}")
-            return self.send_json(200, {"ok": True, "rev": cur, "updated_by": by})
         doc, rev = body.get("doc"), body.get("rev")
         err = valid_doc(doc)
         if err or rev is None:
@@ -740,6 +813,20 @@ class Handler(SimpleHTTPRequestHandler):
         log(f"dados: rev {cur} salva por '{by}' de {self.ip()}")
         threading.Thread(target=SYNC.run, daemon=True).start()   # novo host ligado? atualiza o cache
         return self.send_json(200, {"ok": True, "rev": cur, "updated_by": by, "updated": when})
+
+    # ---- DELETE /api/cofre/legado ----
+    def do_DELETE(self):
+        if self.sem_conta():
+            return self.recusar_sem_conta()
+        if urlparse(self.path).path != "/api/cofre/legado":
+            return self.send_json(404, {"error": "não encontrado"})
+        sess = self.session()
+        if not sess or not sess.get("user"):
+            return self.send_json(401, {"error": "login"})
+        ok = COFRE.retirar_legado(sess["user"])
+        if ok:
+            log(f"cofre: cofre compartilhado antigo retirado por '{exibir(sess['user'])}' (cópia cifrada em historico-cofre/)")
+        return self.send_json(200, {"ok": ok})
 
     # ---- POST /login, /api/zabbix/sync ----
     def do_POST(self):
@@ -816,7 +903,9 @@ def main():
     COFRE = Cofre()
     if not ZBX_TOKEN:
         log("zabbix: ZABBIX_TOKEN vazio no config.env — o site abre, mas sem o status do Zabbix")
-    if LOGIN and not USERS.any():
+    if PORTAL:
+        log("login: pelo Portal NOC (usuário vem do nginx no cabeçalho X-Portal-User); cofre pessoal por usuário do portal")
+    elif LOGIN and not USERS.any():
         log("login: nenhuma conta configurada (LOGIN_SENHA_HASH vazio) — site FECHADO (503) até configurar a senha, PORTAL=1 ou LOGIN=0")
     elif LOGIN:
         log(f"login: conta '{LOGIN_USUARIO}'" + (f" + usuários de {USERS_FILE}" if USERS_FILE else "")
