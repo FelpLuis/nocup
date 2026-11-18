@@ -127,7 +127,8 @@ td input:focus,td select:focus{border-color:var(--cyan);background:rgba(5,5,26,.
 td.if input{font-family:'JetBrains Mono',monospace;font-size:12px}
 td.st{width:132px}
 td.st select{font-size:12px;font-weight:600;padding-left:22px;cursor:pointer;appearance:none;background-repeat:no-repeat;background-position:8px center;background-size:8px 8px}
-td.tp{width:72px;color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+td.tp{width:150px}
+td.tp select{font-size:11px;color:var(--ink2);cursor:pointer}
 td.act{width:70px;text-align:center}
 .x{background:none;border:none;color:var(--ink3);cursor:pointer;font-size:11px;padding:4px 6px;border-radius:6px}
 .x:hover{color:var(--down);background:rgba(255,77,94,.1)}
@@ -315,7 +316,17 @@ const STATUS = {
   'N/D':{c:'#454a6e',l:'Sem status'}
 };
 const ST_KEYS = Object.keys(STATUS);
-const isPhys = i => (/^(\d+GE|XGE|GE|MEth|10GE|40GE)\d/i.test(i) || /^(hundred|four-hundred)-g|^(gpon|xgei|gei)_\d/i.test(i)) && !/\.\d+/.test(i.replace(/\(.*\)/,''));
+const isPhys = i => (/^(\d+GE|XGE|GE|MEth|10GE|40GE)\d/i.test(i) || /^(hundred|four-hundred)-g|^(gpon|xgei|gei)_\d/i.test(i)
+  || /^(fast-|gigabit-|ten-gigabit-|twenty-five-g(igabit)?-|forty-gigabit-|fifty-g(igabit)?-|hundred-gigabit-|four-hundred-g(igabit)?-)ethernet-?\d/i.test(i)
+  || /^(ethernet|eth|ge|xe|et|sfp(-sfpplus)?|ether|combo|qsfp)\d/i.test(i) || /^(mgmt|management)\d*/i.test(i) || /^gpon[-_ ]?\d/i.test(i))
+  && !/\.\d+/.test(i.replace(/\(.*\)/,''));
+// Tipo de porta editável. Vazio = automático (pelo nome da interface).
+const TIPOS = {'':'Automático','RJ45':'Física · RJ45','SFP':'Física · SFP/SFP+','QSFP':'Física · QSFP','GPON':'Física · GPON','MGMT':'Física · gerência','F':'Física · outra',
+  'LAG':'Lógica · LAG/trunk','VLAN':'Lógica · VLAN','L':'Lógica · outra'};
+const TIPO_CURTO = {'RJ45':'RJ45','SFP':'SFP','QSFP':'QSFP','GPON':'GPON','MGMT':'Gerência','F':'Física','LAG':'LAG','VLAN':'VLAN','L':'Lógica'};
+const TIPOS_FIS = new Set(['RJ45','SFP','QSFP','GPON','MGMT','F']);
+const physOf = p => (p.tp && TIPOS[p.tp]) ? TIPOS_FIS.has(p.tp) : isPhys(p.i);
+const tipoTxt = p => (p.tp && TIPO_CURTO[p.tp]) || (isPhys(p.i) ? 'Física' : 'Lógica');
 const physSpeed = i => { if(/^gpon_/i.test(i)) return 'GPON'; if(/^xgei_/i.test(i)) return '10G'; if(/^gei_/i.test(i)) return '1G'; const m=i.match(/^(\d+)GE/i); if(m) return m[1]+'G'; if(/^XGE/i.test(i)) return '10G'; if(/^MEth/i.test(i)) return 'MGMT'; const p=i.match(/\((\d+\w)\)/); return p?p[1]:'1G'; };
 
 let cur = 0, dirty = false, sortK = null, sortDir = 1;
@@ -401,7 +412,7 @@ function renderKPIs(){
   const all = S.devices.flatMap(d=>d.ports);
   const c = counts(all);
   const doc = S.devices.filter(d=>d.ports.length).length;
-  const phys = all.filter(p=>isPhys(p.i)).length;
+  const phys = all.filter(physOf).length;
   const sites = new Set(S.devices.map(d=>d.site||'')).size, racks = new Set(S.devices.map(rackKey)).size;
   const mon = all.filter(p=>p.z).length, dv = all.filter(isDiv).length;
   const items = [
@@ -423,7 +434,7 @@ function renderDetail(){
   const d = S.devices[cur]; const c = counts(d.ports); const n = d.ports.length;
   const svc = {}; d.ports.forEach(p=>{ let s=(p.s||'—').trim().toUpperCase(); if(/SHUTDOWN|INTERFACE EM|^INTERACE|PHY=UP/.test(s)) return; svc[s]=(svc[s]||0)+1; });
   const top = Object.entries(svc).sort((a,b)=>b[1]-a[1]).slice(0,7); const mx = top.length?top[0][1]:1;
-  const phys = d.ports.filter(p=>isPhys(p.i)).length;
+  const phys = d.ports.filter(physOf).length;
   $('#detail').innerHTML = `
     <div class="dev-title"><div class="ic"><img src="/monograma.svg" alt="" width="30" height="30"></div>
       <div><h3>${esc(d.name)}</h3><p>${esc(d.model)} · ${esc(d.site)} · ${esc(rackName(d))}</p></div></div>
@@ -493,9 +504,9 @@ function visibleRows(){
   let rows=d.ports.map((p,idx)=>({p,idx})).filter(({p})=>
     (!q || (p.i+' '+p.d+' '+p.s+' '+p.o).toLowerCase().includes(q)) &&
     (!fs || p.st===fs) && (!fv || (p.s||'').trim()===fv) &&
-    (!ft || (ft==='F')===isPhys(p.i)) &&
+    (!ft || (ft==='F')===physOf(p)) &&
     (!fz || (fz==='div'&&isDiv(p)) || (fz==='mon'&&p.z) || (fz==='nomon'&&!p.z) || (fz==='new'&&p.src==='zabbix')));
-  const sv=(p)=> sortK==='tp'?(isPhys(p.i)?'F':'L') : sortK==='zst'?((p.z&&p.z.st)||'~') : sortK==='rx'?String((p.z&&p.z.rx)||'~') : (p[sortK]||'');
+  const sv=(p)=> sortK==='tp'?((physOf(p)?'F':'L')+tipoTxt(p)) : sortK==='zst'?((p.z&&p.z.st)||'~') : sortK==='rx'?String((p.z&&p.z.rx)||'~') : (p[sortK]||'');
   if(sortK){ rows.sort((a,b)=> sv(a.p).localeCompare(sv(b.p),'pt-BR',{numeric:true})*sortDir); }
   return rows;
 }
@@ -504,7 +515,7 @@ function renderTable(){
   $('#emptyMsg').classList.toggle('hidden', d.ports.length>0);
   $('#tb').innerHTML = rows.map(({p,idx})=>`<tr data-i="${idx}">
     <td class="if"><input data-k="i" value="${esc(p.i)}" title="${p.src==='zabbix'?'Importada do Zabbix':''}"></td>
-    <td class="tp">${isPhys(p.i)?'Física':'Lógica'}</td>
+    <td class="tp"><select data-k="tp" title="Tipo da porta (Automático = pelo nome da interface)">${Object.entries(TIPOS).map(([k,l])=>`<option value="${k}" ${(p.tp||'')===k?'selected':''}>${k?l:'Auto · '+(isPhys(p.i)?'Física':'Lógica')}</option>`).join('')}</select></td>
     <td><input data-k="d" value="${esc(p.d)}"></td>
     <td><input data-k="s" value="${esc(p.s)}"></td>
     <td><input data-k="o" value="${esc(p.o)}"></td>
@@ -521,7 +532,8 @@ $('#tb').addEventListener('input', e=>{
   const el=e.target, tr=el.closest('tr'); if(!tr) return; const p=S.devices[cur].ports[+tr.dataset.i];
   p[el.dataset.k]=el.value; markDirty();
   if(el.dataset.k==='st'){ el.setAttribute('style',stBg(el.value)); }
-  if(el.dataset.k==='i'){ tr.querySelector('.tp').textContent=isPhys(p.i)?'Física':'Lógica'; }
+  if(el.dataset.k==='tp'){ if(!el.value) delete p.tp; }
+  if(el.dataset.k==='i'||el.dataset.k==='tp'){ const s=tr.querySelector('td.tp select'); if(s&&s.options[0]) s.options[0].textContent='Auto · '+(isPhys(p.i)?'Física':'Lógica'); }
   debounceRefresh();
 });
 $('#tb').addEventListener('click', e=>{
@@ -574,15 +586,15 @@ function offer(filename, data){
 $('#bXlsx').onclick=()=>{
   if(!window.XLSX) return toast('Biblioteca XLSX não carregou');
   const wb=XLSX.utils.book_new();
-  S.devices.forEach(d=>{ const ws=XLSX.utils.aoa_to_sheet([['INTERFACE','DESTINO','SERVIÇO','OBSERVAÇÃO','STATUS','ZABBIX STATUS','VELOCIDADE','RX dBm','TX dBm'],...d.ports.map(p=>[p.i,p.d,p.s,p.o,p.st,(p.z&&p.z.st)||'',(p.z&&p.z.sp)||'',(p.z&&p.z.rx)||'',(p.z&&p.z.tx)||''])]); ws['!cols']=[{wch:24},{wch:40},{wch:16},{wch:30},{wch:10},{wch:12},{wch:10},{wch:9},{wch:9}]; XLSX.utils.book_append_sheet(wb,ws,d.name.slice(0,31).replace(/[\\\/\?\*\[\]:]/g,'-')); });
+  S.devices.forEach(d=>{ const ws=XLSX.utils.aoa_to_sheet([['INTERFACE','DESTINO','SERVIÇO','OBSERVAÇÃO','STATUS','ZABBIX STATUS','VELOCIDADE','RX dBm','TX dBm','TIPO'],...d.ports.map(p=>[p.i,p.d,p.s,p.o,p.st,(p.z&&p.z.st)||'',(p.z&&p.z.sp)||'',(p.z&&p.z.rx)||'',(p.z&&p.z.tx)||'',p.tp||''])]); ws['!cols']=[{wch:24},{wch:40},{wch:16},{wch:30},{wch:10},{wch:12},{wch:10},{wch:9},{wch:9}]; XLSX.utils.book_append_sheet(wb,ws,d.name.slice(0,31).replace(/[\\\/\?\*\[\]:]/g,'-')); });
   const inv=XLSX.utils.aoa_to_sheet([['EQUIPAMENTO','MODELO','SITE','RACK','FUNÇÃO','IP GERÊNCIA','HOST ZABBIX','SYSNAME','SYSLOCATION','VERSÃO','NOTAS','INTERFACES'],...S.devices.map(d=>[d.name,d.model,d.site,d.rack||'',d.role,d.mgmt,(d.zabbix_hosts||[]).join(' + '),(d._zh&&d._zh.sysname)||'',(d._zh&&d._zh.location)||'',(d._zh&&d._zh.version)||'',d.notes,d.ports.length])]);
   XLSX.utils.book_append_sheet(wb,inv,'INVENTARIO');
   offer('DOC_SW_UPDOWN_'+new Date().toISOString().slice(0,10)+'.xlsx', new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})]));
 };
 $('#bCsv').onclick=()=>{
   const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
-  const lines=[['SITE','RACK','EQUIPAMENTO','INTERFACE','DESTINO','SERVIÇO','OBSERVAÇÃO','STATUS','ZABBIX','VELOCIDADE','RX','TX'].map(q).join(';')];
-  S.devices.forEach(d=>d.ports.forEach(p=>lines.push([d.site,d.rack||'',d.name,p.i,p.d,p.s,p.o,p.st,(p.z&&p.z.st)||'',(p.z&&p.z.sp)||'',(p.z&&p.z.rx)||'',(p.z&&p.z.tx)||''].map(q).join(';'))));
+  const lines=[['SITE','RACK','EQUIPAMENTO','INTERFACE','DESTINO','SERVIÇO','OBSERVAÇÃO','STATUS','ZABBIX','VELOCIDADE','RX','TX','TIPO'].map(q).join(';')];
+  S.devices.forEach(d=>d.ports.forEach(p=>lines.push([d.site,d.rack||'',d.name,p.i,p.d,p.s,p.o,p.st,(p.z&&p.z.st)||'',(p.z&&p.z.sp)||'',(p.z&&p.z.rx)||'',(p.z&&p.z.tx)||'',p.tp||''].map(q).join(';'))));
   offer('DOC_SW_UPDOWN_'+new Date().toISOString().slice(0,10)+'.csv','\ufeff'+lines.join('\r\n'));
 };
 $('#bImport').onclick=()=>$('#fImport').click();
@@ -591,8 +603,10 @@ $('#fImport').onchange=async e=>{
   let added=0, upd=0;
   wb.SheetNames.forEach(sn=>{
     if(/^INVENTARIO$/i.test(sn)) return;
-    const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''}).slice(1).filter(r=>r.some(c=>String(c).trim()));
-    const ports=rows.map(r=>{ const p={i:String(r[0]).trim(),d:String(r[1]).trim(),s:String(r[2]).trim(),o:String(r[3]).trim()}; p.st=ST_KEYS.includes(String(r[4]).trim())?String(r[4]).trim():guess(p); return p; });
+    const all=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''}); const head=(all[0]||[]).map(h=>String(h).trim().toUpperCase()); const iTp=head.indexOf('TIPO');
+    const rows=all.slice(1).filter(r=>r.some(c=>String(c).trim()));
+    const ports=rows.map(r=>{ const p={i:String(r[0]).trim(),d:String(r[1]).trim(),s:String(r[2]).trim(),o:String(r[3]).trim()}; p.st=ST_KEYS.includes(String(r[4]).trim())?String(r[4]).trim():guess(p);
+      if(iTp>=0){ const v=String(r[iTp]||'').trim().toUpperCase(); const k=Object.keys(TIPOS).find(x=>x&&(x===v||TIPO_CURTO[x].toUpperCase()===v)); if(k) p.tp=k; } return p; });
     let d=S.devices.find(x=>x.name.toUpperCase()===sn.toUpperCase());
     if(d){ d.ports=ports; upd++; } else { S.devices.push({id:'d'+Date.now()+added,zabbix_hosts:[],name:sn,model:/F1A/i.test(sn)?'Huawei NetEngine 8000 F1A':/6750/.test(sn)?'Huawei S6750':'Huawei S6730',site:sn.split(' ').slice(1).join(' '),role:'',mgmt:'',notes:'',ports}); added++; }
   });
@@ -705,7 +719,7 @@ const R3 = (function(){
     const base=new THREE.Mesh(new THREE.PlaneGeometry(W+5,D+5),new THREE.MeshBasicMaterial({color:0x0B0FEE,transparent:true,opacity:.12,depthWrite:false})); base.rotation.x=-Math.PI/2; base.position.y=.02; g.add(base);
     return {g,H,x,edge};
   }
-  function unitsOf(d){ const n=d.ports.filter(p=>isPhys(p.i)).length; return Math.max(1,Math.ceil(n/56)); }
+  function unitsOf(d){ const n=d.ports.filter(physOf).length; return Math.max(1,Math.ceil(n/56)); }
   function buildDev(k, rackG, slot, n){
     const d=S.devices[k]; const u=unitsOf(d); const DH=u*U+(u-1)*GAP;
     const g=new THREE.Group(); const y=(n-slot-u)*(U+GAP)+0.9+DH/2; g.position.set(0,y,0); g.userData={k};
@@ -713,7 +727,7 @@ const R3 = (function(){
     const face=new THREE.Mesh(new THREE.PlaneGeometry(W,DH),faceMat); face.position.z=D/2+.01; face.userData={k}; g.add(face);
     const lab=new THREE.Mesh(new THREE.PlaneGeometry(4.4,1.1),new THREE.MeshBasicMaterial({map:labelTex(d)})); lab.position.set(-W/2+2.5,DH/2-U/2,D/2+.02); lab.userData={k}; g.add(lab);
     const so=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W+.12,DH+.12,D+.12)),new THREE.LineBasicMaterial({color:0x0BBBEF,transparent:true,opacity:0})); g.add(so);
-    const phys=d.ports.map((p,idx)=>({p,idx})).filter(x=>isPhys(x.p.i));
+    const phys=d.ports.map((p,idx)=>({p,idx})).filter(x=>physOf(x.p));
     const rows=u*2, rowH=DH/(rows+.4);
     const leds=[]; const cols=Math.max(1,Math.ceil(phys.length/rows)); const x0=-W/2+5.2, x1=W/2-.6; const step=Math.min(.52,(x1-x0)/cols);
     phys.forEach(({p,idx},j)=>{ const col=Math.floor(j/rows), row=j%rows; const m=new THREE.Mesh(portGeo,ledMats[p.st]||ledMats['N/D']);
@@ -799,7 +813,7 @@ const R3 = (function(){
     if(hovLed){ hovLed.scale.set(1,1,1); hovLed=null; }
     if(u&&u.safe){ tip(e,`<b>${esc(V.dono?'Cofre de '+V.dono:'Seu cofre de acessos')}</b><div class="t">Pessoal · ${V.key?'aberto':'trancado'} · clique para ${V.key?'ver':'abrir'}</div>`); return; }
     if(u&&u.port){ const p=S.devices[u.k].ports[u.idx]; if(!p) return; const led=devs[u.k].leds.find(l=>l.userData.idx===u.idx); if(led){ led.scale.set(1.5,1.5,2); hovLed=led; }
-      const z=p.z; tip(e,`<b>${esc(p.i)} <span style="color:${STATUS[p.st].c}">${STATUS[p.st].l}</span></b><div>${esc(p.d)||'—'}</div><div class="t">${esc(p.s)} · ${physSpeed(p.i)}</div>${z?`<div class="t">Zabbix: <span style="color:${z.st?STATUS[z.st].c:'inherit'}">${z.st||'—'}</span>${z.sp?' · '+z.sp:''}${z.rx?' · Rx '+z.rx+' / Tx '+z.tx+' dBm':''}${z.onus?' · '+z.onus+' ONUs, RX médio '+z.rxm+', pior '+z.worst+' dBm'+(+z.low?', '+z.low+' com sinal baixo':''):''}${isDiv(p)?' <span style="color:#ffb020">diverge do documentado</span>':''}</div>`:'<div class="t">Não monitorada no Zabbix</div>'}<div class="t">${esc(S.devices[u.k].name)} · ${esc(rackName(S.devices[u.k]))}</div>`); }
+      const z=p.z; tip(e,`<b>${esc(p.i)} <span style="color:${STATUS[p.st].c}">${STATUS[p.st].l}</span></b><div>${esc(p.d)||'—'}</div><div class="t">${esc(p.s)} · ${esc(tipoTxt(p))} · ${physSpeed(p.i)}</div>${z?`<div class="t">Zabbix: <span style="color:${z.st?STATUS[z.st].c:'inherit'}">${z.st||'—'}</span>${z.sp?' · '+z.sp:''}${z.rx?' · Rx '+z.rx+' / Tx '+z.tx+' dBm':''}${z.onus?' · '+z.onus+' ONUs, RX médio '+z.rxm+', pior '+z.worst+' dBm'+(+z.low?', '+z.low+' com sinal baixo':''):''}${isDiv(p)?' <span style="color:#ffb020">diverge do documentado</span>':''}</div>`:'<div class="t">Não monitorada no Zabbix</div>'}<div class="t">${esc(S.devices[u.k].name)} · ${esc(rackName(S.devices[u.k]))}</div>`); }
     else if(u){ const d=S.devices[u.k], c=counts(d.ports); tip(e,`<b>${esc(d.name)}</b><div class="t">${esc(d.model)} · ${esc(d.mgmt||'')}</div><div class="t">${esc(d.site)} · rack ${esc(rackName(d))}</div><div>${d.ports.length} interfaces · <span style="color:${STATUS.UP.c}">${c.UP} up</span> · <span style="color:${STATUS.DOWN.c}">${c.DOWN} down</span></div>`); }
     else tip(null);
   }
