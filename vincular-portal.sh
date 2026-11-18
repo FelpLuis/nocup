@@ -53,6 +53,7 @@ restaurar() {
     [ -d "$bk/$nome" ] || continue
     [ -f "$bk/$nome/server.py" ] && cp -a "$bk/$nome/server.py" "$pasta/server.py"
     [ -f "$bk/$nome/config.env" ] && cp -a "$bk/$nome/config.env" "$pasta/config.env"
+    [ -d "$bk/$nome/static" ] && { rm -rf "$pasta/static"; cp -a "$bk/$nome/static" "$pasta/static"; }
     systemctl restart "$servico" 2>/dev/null || true
   done
   nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
@@ -171,6 +172,13 @@ for a in "${APPS[@]}"; do
   [ -f "$pasta/config.env" ] && cp -a "$pasta/config.env" "$BK/$nome/"
   install -m 755 "$AQUI/$nome/server.py" "$pasta/server.py"
   python3 -m py_compile "$pasta/server.py" || falhou "$pasta/server.py não compilou"
+  # a página (static/) tem que acompanhar o server.py: página antiga com servidor novo
+  # mostrava "só consulta" para todo mundo
+  if [ -d "$AQUI/$nome/static" ] && [ -d "$pasta/static" ]; then
+    cp -a "$pasta/static" "$BK/$nome/static"
+    cp -a "$AQUI/$nome/static/." "$pasta/static/"
+    chown -R www-data: "$pasta/static" 2>/dev/null || true
+  fi
   if [ -f "$pasta/config.env" ]; then
     if grep -q '^PORTAL=' "$pasta/config.env"; then sed -i 's/^PORTAL=.*/PORTAL=1/' "$pasta/config.env"
     else printf '\n# Login único pelo Portal NOC (vincular-portal.sh)\nPORTAL=1\n' >> "$pasta/config.env"; fi
