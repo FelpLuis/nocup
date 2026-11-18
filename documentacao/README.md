@@ -7,7 +7,7 @@ Endereço: **https://documentacao.noc.updown.com.br**
 ## O que tem no site
 
 - **Racks por site em 3D**: cada porta física é um LED com a cor do status documentado (up, down, proto down, shutdown). Clique num equipamento ou porta para abrir a ficha e a linha na tabela. Com "Auto-giro" ligado a câmera passeia pelos sites.
-- **Tabela editável** por equipamento: interface, destino, serviço, observação e status. Colunas do Zabbix ao lado (status atual, velocidade, Rx/Tx em dBm) e o filtro **Divergem do Zabbix**.
+- **Tabela editável** por equipamento: interface, **tipo da porta**, destino, serviço, observação e status. O tipo começa em "Automático" (deduzido do nome da interface) e pode ser trocado por RJ45, SFP/SFP+, QSFP, GPON, gerência, LAG/trunk ou VLAN; portas físicas viram LEDs no rack 3D. A coluna TIPO sai e entra no XLSX. Colunas do Zabbix ao lado (status atual, velocidade, Rx/Tx em dBm) e o filtro **Divergem do Zabbix**.
 - **Ficha do equipamento**: modelo, site, rack, função, IP de gerência, host(s) no Zabbix e notas. O sysName, a sysLocation e a versão vêm do Zabbix.
 - **Importar do Zabbix**: quando o Zabbix tem interfaces que ainda não estão na documentação, aparece o botão "Importar N interfaces do Zabbix".
 - **Exportar XLSX/CSV** (uma aba por equipamento + inventário) e **Importar XLSX** no mesmo formato da planilha DOC_SW.
