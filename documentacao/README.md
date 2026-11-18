@@ -57,6 +57,11 @@ O instalador copia tudo para `/opt/documentacao-noc`, pede o token do Zabbix (ou
 
 ## Login
 
+**Com o Portal NOC (recomendado):** os usuários são os do portal (https://portal.updown.com.br); a documentação não tem cadastro próprio. Para ligar: `sudo bash vincular-portal.sh` (no repositório nocup). Depois, no portal, em **Usuários**, libere o sistema **Documentação** para quem deve acessar. Reinstalar com `instalar-documentacao.sh` mantém o vínculo. Se o nginx ficar sem o vínculo, o site manda para o login do portal e o log avisa (`journalctl -u documentacao-noc`).
+
+**Sem portal:** conta local abaixo.
+
+
 Usuário **NOC**. A senha não fica no repositório: o `config.env` guarda só o hash (PBKDF2). Depois de 5 senhas erradas em 15 min, o IP e o usuário ficam bloqueados por 15 min.
 
 Para trocar a senha (derruba as sessões abertas):

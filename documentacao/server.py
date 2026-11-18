@@ -93,6 +93,8 @@ COOKIE_SECURE = env("COOKIE_SECURE", "auto").strip().lower()
 # vincular-portal.sh do repositório já deixa assim. Com ele, o usuário e as permissões
 # vêm do portal e o login próprio desta tela deixa de ser usado.
 PORTAL = env("PORTAL", "0") == "1"
+PORTAL_URL = env("PORTAL_URL", "https://portal.updown.com.br").rstrip("/")
+PORTAL_SISTEMA = env("PORTAL_SISTEMA", "documentacao")
 # Conta do site (padrão: NOC). A senha fica só como hash PBKDF2; troque com: python3 server.py senha
 LOGIN_USUARIO_NOME = env("LOGIN_USUARIO", "NOC").strip()
 LOGIN_USUARIO = LOGIN_USUARIO_NOME.lower()
@@ -677,6 +679,15 @@ class Handler(SimpleHTTPRequestHandler):
             return None
         return read_session(self.headers.get("Cookie")) if self.login_on() else {"user": None}
 
+    _aviso_t = 0
+
+    def aviso_sem_portal(self):
+        now = time.time()
+        if now - Handler._aviso_t > 600:
+            Handler._aviso_t = now
+            log("login: PORTAL=1, mas o pedido chegou sem X-Portal-User do nginx local — o site do nginx "
+                "não está ligado ao portal. Rode: sudo bash vincular-portal.sh (no repositório nocup)")
+
     def can_edit(self, sess):
         if not sess:
             return False
@@ -707,6 +718,16 @@ class Handler(SimpleHTTPRequestHandler):
             return self.redirect("/login", [("Set-Cookie", f"{COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
                                              + ("; Secure" if self.secure() else ""))])
         sess = self.session()
+        if PORTAL and not sess:
+            # Modo portal sem usuário no cabeçalho: o nginx não está ligado ao portal (ex.: reinstalado
+            # sem o vínculo). Nunca mostra o login próprio: manda para o portal e avisa no log.
+            self.aviso_sem_portal()
+            if path.startswith("/api/"):
+                return self.send_json(401, {"error": "login", "portal": PORTAL_URL})
+            volta = f"https://{self.headers.get('Host', 'documentacao.noc.updown.com.br')}/"
+            return self.redirect(f"{PORTAL_URL}/login?sistema={PORTAL_SISTEMA}&volta={quote(volta, safe=':/')}")
+        if PORTAL and path in ("/login", "/login.html"):
+            return self.redirect("/")
         if path in ("/login", "/login.html"):
             if not self.login_on() or sess:
                 return self.redirect(safe_next(parse_qs(url.query).get("next", ["/"])[0]))

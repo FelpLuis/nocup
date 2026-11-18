@@ -214,6 +214,19 @@ $PROXY_BLOCO
 EOF
   install -d -m 755 "$WEBROOT"
   ln -sf "$SITE" /etc/nginx/sites-enabled/documentacao-noc
+  # Login único do Portal NOC: se a documentação já está ligada ao portal (PORTAL=1, feito pelo
+  # vincular-portal.sh), refaz a ligação no site novo. Sem isso, reinstalar apagava o vínculo e o
+  # site caía no login próprio, sem os usuários do portal.
+  if grep -q '^PORTAL=1' "$DEST/config.env"; then
+    if [ -f /etc/nginx/snippets/portal-sso.conf ] && [ -f "$AQUI/vincular-portal.py" ]; then
+      python3 "$AQUI/vincular-portal.py" "$SITE" documentacao --tipo proxy > "$SITE.portal" 2>/tmp/doc-noc-vinc.log \
+        || { cat /tmp/doc-noc-vinc.log; desfazer "Não consegui religar a documentação ao portal"; }
+      cat "$SITE.portal" > "$SITE"; rm -f "$SITE.portal"
+      ok "Login pelo Portal NOC mantido (usuários e permissões vêm do portal)"
+    else
+      info "Atenção: PORTAL=1, mas falta o snippet do portal no nginx. Rode: sudo bash vincular-portal.sh"
+    fi
+  fi
   nginx -t >/tmp/doc-noc-nginx.log 2>&1 || { cat /tmp/doc-noc-nginx.log; desfazer "O nginx recusou a configuração HTTPS"; }
   systemctl reload nginx
   if [ "$PORTA_HTTPS" = "443" ]; then ENDERECO="https://$DOMINIO"; else ENDERECO="https://$DOMINIO:$PORTA_HTTPS"; fi
@@ -232,7 +245,9 @@ if grep -qF "LOGIN_SENHA_HASH=$HASH_PUBLICO" "$DEST/config.env"; then
   info "ATENÇÃO: o config.env usa o hash de senha que estava publicado no GitHub. Troque já:"
   info "  sudo -u www-data python3 $DEST/server.py senha   (cole a linha em $DEST/config.env e reinicie)"
 fi
-if grep -qP '^LOGIN_SENHA_HASH=pbkdf2_sha256\$' "$DEST/config.env"; then
+if grep -q '^PORTAL=1' "$DEST/config.env"; then
+  ok "Login: Portal NOC (https://portal.updown.com.br). Libere o sistema \"Documentação\" para cada usuário em Usuários."
+elif grep -qP '^LOGIN_SENHA_HASH=pbkdf2_sha256\$' "$DEST/config.env"; then
   ok "Login: usuário $(grep -oP '^LOGIN_USUARIO=\K.*' "$DEST/config.env" || echo NOC) (trocar a senha: sudo -u www-data python3 $DEST/server.py senha)"
 else
   info "Atenção: LOGIN_SENHA_HASH vazio no config.env — sem PORTAL=1 o site responde 503 até configurar a senha"
