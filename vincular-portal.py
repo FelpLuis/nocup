@@ -85,12 +85,30 @@ def linhas_auth(indent, pagina, proxy):
     out = [
         f"{indent}auth_request /_portal_auth;",
         f"{indent}auth_request_set $portal_user $upstream_http_x_portal_user;",
+        f"{indent}auth_request_set $portal_role $upstream_http_x_portal_role;",
     ]
     if pagina:
         out += [f"{indent}error_page 401 = @portal_login;", f"{indent}error_page 403 = @portal_negado;"]
     if proxy:
         out.append(f"{indent}proxy_set_header X-Portal-User $portal_user;")
+        out.append(f"{indent}proxy_set_header X-Portal-Role $portal_role;")
     return "\n".join(out)
+
+
+def com_perfil(bloco):
+    """Location já vinculada numa rodada antiga: passa a repassar também o perfil do portal
+    (X-Portal-Role), para o app saber quem é administrador."""
+    if "proxy_pass" not in bloco or "X-Portal-Role" in bloco:
+        return bloco
+    m = re.search(r"^([ \t]*)auth_request_set\s+\$portal_user\s+\$upstream_http_x_portal_user\s*;[^\n]*\n", bloco, re.M)
+    if not m:
+        return bloco
+    ind = m.group(1)
+    bloco = bloco[:m.end()] + f"{ind}auth_request_set $portal_role $upstream_http_x_portal_role;\n" + bloco[m.end():]
+    m = re.search(r"^([ \t]*)proxy_set_header\s+X-Portal-User\s+\$portal_user\s*;[^\n]*\n", bloco, re.M)
+    if m:
+        bloco = bloco[:m.end()] + f"{m.group(1)}proxy_set_header X-Portal-Role $portal_role;\n" + bloco[m.end():]
+    return bloco
 
 
 def vincular_location(bloco, cab, sistema, tipo):
@@ -98,7 +116,7 @@ def vincular_location(bloco, cab, sistema, tipo):
     ind = re.search(r"\n([ \t]+)\S", bloco)
     indent = ind.group(1) if ind else "        "
     if "_portal_auth" in bloco:
-        return bloco
+        return com_perfil(bloco)
     tem_auth = re.search(r"\bauth_request\s+/_auth\w*\s*;", bloco)
     proxy = "proxy_pass" in bloco
     sis = sistema_da_location(pat, sistema)
