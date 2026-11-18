@@ -135,14 +135,14 @@ td.act{width:70px;text-align:center}
 .empty-msg p{margin:6px 0 16px;color:var(--ink3)}
 .foot{display:flex;justify-content:space-between;padding:10px 16px;font-size:12px;color:var(--ink3);border-top:1px solid var(--line2)}
 /* modal */
-.modal{position:fixed;inset:0;background:rgba(2,2,14,.7);backdrop-filter:blur(4px);display:none;place-items:center;z-index:60}
+.modal{position:fixed;inset:0;background:rgba(2,2,14,.7);backdrop-filter:blur(4px);display:none;place-items:center;z-index:75}
 .modal.on{display:grid}
 .modal .box{background:var(--panel-solid);border:1px solid var(--line);border-radius:16px;padding:22px;width:min(420px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .modal h3{margin:0 0 6px}
 .modal p{color:var(--ink2);font-size:14px;margin:0 0 14px}
 .modal .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 .modal .field{margin-bottom:10px}
-#toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--panel-solid);border:1px solid var(--cyan);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;z-index:70;pointer-events:none}
+#toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--panel-solid);border:1px solid var(--cyan);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;z-index:80;pointer-events:none}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 /* cofre */
 #vault{position:fixed;inset:0;z-index:65;display:none;background:rgba(2,2,14,.78);backdrop-filter:blur(6px)}
@@ -226,7 +226,7 @@ td.opt .lo{color:var(--part)}
     </div>
     <div class="spacer"></div>
     <div class="save-state"><span class="dot" id="dot"></span><span id="saveTxt">Carregando…</span></div>
-    <button class="btn" id="bCofre" title="Cofre de acessos (senhas cifradas)">Cofre</button>
+    <button class="btn" id="bCofre" title="Seu cofre de acessos (pessoal, cifrado)">Meu cofre</button>
     <button class="btn ghost" id="bSync" title="Ler o Zabbix agora">Ler Zabbix</button>
     <button class="edit-only btn" id="bImport" title="Importar uma planilha no mesmo formato (uma aba por equipamento)">Importar XLSX</button>
     <input type="file" id="fImport" accept=".xlsx,.xls" class="hidden">
@@ -284,7 +284,7 @@ td.opt .lo{color:var(--part)}
   </section>
 </div>
 <div id="vault" role="dialog" aria-modal="true" aria-label="Cofre de acessos"><div class="vbox">
-  <div class="vhd"><img src="/monograma.svg" alt=""><div><h3>Cofre de acessos</h3><small id="vSub">Plataformas, links, usuários e senhas do NOC</small></div><div class="spacer"></div>
+  <div class="vhd"><img src="/monograma.svg" alt=""><div><h3 id="vTitle">Cofre de acessos</h3><small id="vSub">Pessoal: cada usuário do portal tem o seu</small></div><div class="spacer"></div>
     <span class="save-state hidden" id="vState"><span class="dot dirty"></span>Alterações não salvas</span>
     <button class="btn primary hidden" id="vSave">Salvar cofre</button>
     <button class="btn hidden" id="vLockBtn">Trancar</button>
@@ -605,7 +605,7 @@ $('#bSave').onclick=save;
 let siteSel = '';
 function renderSites(){
   const sites=[...new Set(S.devices.map(d=>d.site||'Sem site'))];
-  $('#sites').innerHTML = `<span class="chip ${siteSel===''?'on':''}" data-s="">Todos</span><span class="chip ${siteSel==='__cofre'?'on':''}" data-s="__cofre">Cofre</span>` + sites.map(s=>`<span class="chip ${siteSel===s?'on':''}" data-s="${esc(s)}">${esc(s.split(' · ').pop().replace(/^POP /,''))}</span>`).join('');
+  $('#sites').innerHTML = `<span class="chip ${siteSel===''?'on':''}" data-s="">Todos</span><span class="chip ${siteSel==='__cofre'?'on':''}" data-s="__cofre">Meu cofre</span>` + sites.map(s=>`<span class="chip ${siteSel===s?'on':''}" data-s="${esc(s)}">${esc(s.split(' · ').pop().replace(/^POP /,''))}</span>`).join('');
   $('#sites').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ siteSel=c.dataset.s; renderSites(); if(siteSel==='__cofre'){ R3.focusSafe(); return; } R3.focusSite(siteSel); const k=S.devices.findIndex(d=>(d.site||'Sem site')===siteSel); if(siteSel&&k>=0&&k!==cur){ cur=k; renderTabs(); renderDetail(); renderFilters(); renderTable(); R3.select(k,undefined,true); } });
 }
 /* ---------- legend ---------- */
@@ -679,7 +679,7 @@ const R3 = (function(){
     const logo=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({map:canvasTex(256,256,(c,w,h)=>{ if(MONO.complete&&MONO.naturalWidth) c.drawImage(MONO,8,8,240,240); }),transparent:true})); logo.position.set(W2/2,3.6,.8); hinge.add(logo);
     const edge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W2+.1,H2+.1,D2+.1)),new THREE.LineBasicMaterial({color:0x0BBBEF,transparent:true,opacity:.6})); edge.position.y=.8+H2/2; g.add(edge);
     const lab=new THREE.Mesh(new THREE.PlaneGeometry(W2+1.5,(W2+1.5)*160/768),new THREE.MeshBasicMaterial({map:canvasTex(768,160,(c,w,h)=>{ c.fillStyle='rgba(20,0,117,.85)'; c.fillRect(0,0,w,h); const gr=c.createLinearGradient(0,0,w,0); gr.addColorStop(0,'#0BBBEF'); gr.addColorStop(1,'#9B00FF'); c.fillStyle=gr; c.fillRect(0,h-8,w,8);
-      c.fillStyle='#a9adda'; c.font='500 30px Space Grotesk, sans-serif'; c.fillText('ACESSOS',28,52); c.fillStyle='#eef0ff'; c.font='700 60px Space Grotesk, sans-serif'; c.fillText('Cofre',28,120); if(MONO.complete&&MONO.naturalWidth) c.drawImage(MONO,w-142,14,118,118); }),transparent:true}));
+      c.fillStyle='#a9adda'; c.font='500 30px Space Grotesk, sans-serif'; c.fillText('COFRE PESSOAL',28,52); c.fillStyle='#eef0ff'; c.font='700 56px Space Grotesk, sans-serif'; c.fillText(String((typeof V!=='undefined'&&V.dono)||USER||'Meu cofre').slice(0,18),28,120); if(MONO.complete&&MONO.naturalWidth) c.drawImage(MONO,w-142,14,118,118); }),transparent:true}));
     lab.position.set(0,.8+H2+2.4,D2/2); g.add(lab);
     const glow=new THREE.Mesh(new THREE.PlaneGeometry(W2+8,D2+8),new THREE.MeshBasicMaterial({color:0x9B00FF,transparent:true,opacity:.18,depthWrite:false})); glow.rotation.x=-Math.PI/2; glow.position.y=.02; g.add(glow);
     safe={g,hinge,dial,ring,glow,open:0,target:0};
@@ -797,7 +797,7 @@ const R3 = (function(){
   let hovLed=null;
   function hover(e){ if(drag) return; const u=pick(e); el.style.cursor=u?'pointer':'grab';
     if(hovLed){ hovLed.scale.set(1,1,1); hovLed=null; }
-    if(u&&u.safe){ tip(e,`<b>Cofre de acessos</b><div class="t">${V.key?'Aberto':'Trancado'} · clique para ${V.key?'ver':'abrir'}</div>`); return; }
+    if(u&&u.safe){ tip(e,`<b>${esc(V.dono?'Cofre de '+V.dono:'Seu cofre de acessos')}</b><div class="t">Pessoal · ${V.key?'aberto':'trancado'} · clique para ${V.key?'ver':'abrir'}</div>`); return; }
     if(u&&u.port){ const p=S.devices[u.k].ports[u.idx]; if(!p) return; const led=devs[u.k].leds.find(l=>l.userData.idx===u.idx); if(led){ led.scale.set(1.5,1.5,2); hovLed=led; }
       const z=p.z; tip(e,`<b>${esc(p.i)} <span style="color:${STATUS[p.st].c}">${STATUS[p.st].l}</span></b><div>${esc(p.d)||'—'}</div><div class="t">${esc(p.s)} · ${physSpeed(p.i)}</div>${z?`<div class="t">Zabbix: <span style="color:${z.st?STATUS[z.st].c:'inherit'}">${z.st||'—'}</span>${z.sp?' · '+z.sp:''}${z.rx?' · Rx '+z.rx+' / Tx '+z.tx+' dBm':''}${z.onus?' · '+z.onus+' ONUs, RX médio '+z.rxm+', pior '+z.worst+' dBm'+(+z.low?', '+z.low+' com sinal baixo':''):''}${isDiv(p)?' <span style="color:#ffb020">diverge do documentado</span>':''}</div>`:'<div class="t">Não monitorada no Zabbix</div>'}<div class="t">${esc(S.devices[u.k].name)} · ${esc(rackName(S.devices[u.k]))}</div>`); }
     else if(u){ const d=S.devices[u.k], c=counts(d.ports); tip(e,`<b>${esc(d.name)}</b><div class="t">${esc(d.model)} · ${esc(d.mgmt||'')}</div><div class="t">${esc(d.site)} · rack ${esc(rackName(d))}</div><div>${d.ports.length} interfaces · <span style="color:${STATUS.UP.c}">${c.UP} up</span> · <span style="color:${STATUS.DOWN.c}">${c.DOWN} down</span></div>`); }
@@ -858,7 +858,10 @@ async function vDerive(pw, salt, iter){
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
 }
-async function vLoad(){ try { const r = await api('GET','/api/cofre'); V.rev=r.rev; V.blob=r.blob; V.canEdit=!!r.can_edit; V.meta=r; } catch(e) {} }
+async function vLoad(){
+  try { const r = await api('GET','/api/cofre'); V.rev=r.rev; V.blob=r.blob; V.canEdit=true; V.meta=r; V.dono=r.dono||USER||''; V.legado=!!r.legado; V.err=null; }
+  catch(e) { V.err = e.status===403 ? e.message : ('Não foi possível carregar o cofre: '+e.message); }
+}
 async function vEncrypt(){
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, V.key, new TextEncoder().encode(JSON.stringify(V.data)));
@@ -871,7 +874,7 @@ async function vSaveNow(){
     const r = await api('PUT','/api/cofre',{rev:V.rev, blob});
     V.rev = r.rev; V.blob = blob; V.dirty = false; vRender(); toast('Cofre salvo (cifrado)'); return true;
   } catch(e) {
-    if (e.status===409) toast('Outra pessoa salvou o cofre antes. Tranque, abra de novo e refaça a alteração.');
+    if (e.status===409) toast('O seu cofre foi salvo em outra aba ou computador. Tranque, abra de novo e refaça a alteração.');
     else toast('Não foi possível salvar o cofre: '+e.message);
     return false;
   }
@@ -897,19 +900,21 @@ function devName(id){ const d=S.devices.find(x=>x.id===id); return d?d.name:'(eq
 function vRender(){
   const body=$('#vBody'); const un=!!V.key;
   $('#vLockBtn').classList.toggle('hidden',!un); $('#vSave').classList.toggle('hidden',!(un&&V.dirty)); $('#vState').classList.toggle('hidden',!(un&&V.dirty));
-  $('#vSub').textContent = un ? `${V.data.entradas.length} acessos · trancamento automático após 10 min parado` : 'Plataformas, links, usuários e senhas do NOC';
+  $('#vTitle').textContent = V.dono ? `Cofre de ${V.dono}` : 'Cofre de acessos';
+  $('#vSub').textContent = un ? `${V.data.entradas.length} acessos · só você vê · tranca sozinho após 10 min parado` : 'Pessoal: cada usuário do portal tem o seu, com a própria senha mestra';
+  if(V.err){ body.innerHTML=`<div class="vlock"><img src="/monograma.svg" alt=""><h4>Cofre indisponível</h4><p>${esc(V.err)}</p></div>`; return; }
   if(!hasCrypto){ body.innerHTML=`<div class="vlock"><img src="/monograma.svg" alt=""><h4>Cofre indisponível aqui</h4><p>O cofre cifra as senhas no navegador e isso só funciona em HTTPS. Abra pelo endereço https://documentacao.noc.updown.com.br.</p></div>`; return; }
   if(!un){
     const novo=!V.blob;
-    body.innerHTML=`<form class="vlock" id="vForm" autocomplete="off"><img src="/monograma.svg" alt=""><h4>${novo?'Criar o cofre':'Cofre trancado'}</h4>
-      <p>${novo?'Escolha a senha mestra. As senhas do cofre são cifradas no seu navegador com ela (AES-256); o servidor guarda só o conteúdo cifrado. <b>Se a senha mestra for esquecida, o cofre não pode ser aberto por ninguém.</b>':'Digite a senha mestra para abrir. Ela não é a senha do site.'}</p>
+    body.innerHTML=`<form class="vlock" id="vForm" autocomplete="off"><img src="/monograma.svg" alt=""><h4>${novo?'Criar o seu cofre':'Seu cofre está trancado'}</h4>
+      <p>${novo?`Este cofre é só de <b>${esc(V.dono||'você')}</b>: outros usuários do portal e o administrador não têm acesso. Escolha a senha mestra; os acessos são cifrados no seu navegador com ela (AES-256) e o servidor guarda só o conteúdo cifrado. <b>Se a senha mestra for esquecida, ninguém consegue abrir o cofre.</b>`:`Digite a sua senha mestra para abrir o cofre de <b>${esc(V.dono||'você')}</b>. Ela não é a senha do portal.`}</p>
       <input type="password" id="vPw" placeholder="Senha mestra" autocomplete="${novo?'new-password':'current-password'}">
       ${novo?'<input type="password" id="vPw2" placeholder="Repita a senha mestra" autocomplete="new-password">':''}
       <div class="err" id="vErr"></div><button class="btn primary" type="submit" id="vGo">${novo?'Criar cofre':'Abrir cofre'}</button></form>`;
     $('#vPw').focus();
     $('#vForm').onsubmit=async ev=>{ ev.preventDefault(); const pw=$('#vPw').value; const err=$('#vErr'); err.textContent='';
       if(novo){ if(pw.length<10) return err.textContent='Use pelo menos 10 caracteres.'; if(pw!==$('#vPw2').value) return err.textContent='As senhas não conferem.';
-        if(!V.canEdit) return err.textContent='Seu usuário pode só consultar.'; }
+      }
       $('#vGo').disabled=true; $('#vGo').textContent=novo?'Criando…':'Abrindo…';
       try{
         if(novo){ V.salt=crypto.getRandomValues(new Uint8Array(16)); V.iter=600000; V.key=await vDerive(pw,V.salt,V.iter); V.data={entradas:[]}; V.dirty=true; await vSaveNow(); }
@@ -923,7 +928,7 @@ function vRender(){
   const q=V.q.toLowerCase(); const list=V.data.entradas.filter(e=>(!V.cat||e.categoria===V.cat)&&(!q||[e.plataforma,e.url,e.usuario,e.notas,(e.extras||[]).map(x=>x.rotulo+' '+(x.secreto?'':x.valor)).join(' '),(e.devices||[]).map(devName).join(' ')].join(' ').toLowerCase().includes(q)));
   const cats=[...VCATS, ...new Set(V.data.entradas.map(e=>e.categoria).filter(c=>!VCATS.includes(c)))];
   const ed=V.canEdit;
-  body.innerHTML=`<div class="vtool"><input type="search" id="vQ" placeholder="Buscar plataforma, link, usuário, aparelho…" value="${esc(V.q)}">
+  body.innerHTML=`${V.legado?`<div class="ro" style="margin-bottom:14px;border-style:solid;border-color:var(--part)">Existe no servidor o <b>cofre compartilhado da versão anterior</b>. Se você sabe a senha mestra dele, traga os acessos para o seu cofre pessoal. <button class="lk" id="vLeg">trazer acessos</button></div>`:''}<div class="vtool"><input type="search" id="vQ" placeholder="Buscar plataforma, link, usuário, aparelho…" value="${esc(V.q)}">
     <select id="vCat"><option value="">Todas as categorias</option>${cats.map(c=>`<option ${c===V.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
     <div class="spacer"></div>${ed?`<button class="btn" id="vNew">Novo acesso</button><button class="btn" id="vImp">Importar arquivo</button><button class="btn ghost" id="vPwc">Trocar senha mestra</button>`:''}</div>
     ${V.edit==='__new'?`<div class="vgrid"><div class="ventry hl">${vFormHtml({id:'__new',categoria:V.cat||VCATS[0],plataforma:'',url:'',usuario:'',senha:'',notas:'',devices:[],extras:[]})}</div></div>`:''}
@@ -931,6 +936,7 @@ function vRender(){
       :`<div class="vempty">${V.data.entradas.length?'Nada encontrado com esse filtro.':'Cofre vazio. Use "Importar arquivo" para trazer os acessos do arquivo cofre-importar.json ou "Novo acesso".'}</div>`}`;
   $('#vQ').oninput=e=>{ V.q=e.target.value; const p=e.target.selectionStart; vRender(); const n=$('#vQ'); n.focus(); n.setSelectionRange(p,p); };
   $('#vCat').onchange=e=>{ V.cat=e.target.value; vRender(); };
+  if($('#vLeg')) $('#vLeg').onclick=vLegado;
   if(ed){ $('#vNew').onclick=()=>{ V.edit='__new'; vRender(); }; $('#vImp').onclick=()=>$('#vFile').click(); $('#vPwc').onclick=vChangePw; }
   body.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>vAct(b.dataset.act,b.dataset.id,b));
   body.querySelectorAll('.vdevs span[data-dev]').forEach(s=>s.onclick=()=>{ const k=S.devices.findIndex(d=>d.id===s.dataset.dev); if(k>=0){ closeVault(); select(k); } });
@@ -978,19 +984,38 @@ function vAct(act,id,btn){
   else if(act==='copyx'){ copyText(e.extras[+btn.dataset.i].valor); }
   else if(act==='edit'){ V.edit=id; vRender(); }
   else if(act==='cancel'){ V.edit=null; vRender(); }
-  else if(act==='del'){ confirmBox('Excluir acesso?', `${e.plataforma} sai do cofre (fica no histórico cifrado do servidor).`, 'Excluir', ()=>{ V.data.entradas=V.data.entradas.filter(x=>x.id!==id); vDirty(); renderDetail(); }); }
+  else if(act==='del'){ confirmBox('Excluir acesso?', `${e.plataforma} sai do seu cofre.`, 'Excluir', ()=>{ V.data.entradas=V.data.entradas.filter(x=>x.id!==id); vDirty(); renderDetail(); }); }
 }
 $('#vFile').onchange=async ev=>{
   const f=ev.target.files[0]; ev.target.value=''; if(!f||!V.key) return;
   let j; try{ j=JSON.parse(await f.text()); }catch(e){ return toast('Arquivo não é um JSON válido'); }
   const arr=Array.isArray(j)?j:(j.entradas||[]); if(!arr.length) return toast('Nenhum acesso no arquivo');
+  const n=vMerge(arr);
+  vDirty(); renderDetail(); toast(`${n} acessos importados${arr.length-n?' ('+(arr.length-n)+' já existiam)':''}. Clique em Salvar cofre.`);
+};
+function vMerge(arr){
   const seen=new Set(V.data.entradas.map(e=>(e.plataforma+'|'+e.usuario).toLowerCase())); let n=0;
   arr.forEach(e=>{ const key=(String(e.plataforma||'')+'|'+String(e.usuario||'')).toLowerCase(); if(seen.has(key)) return; seen.add(key);
     V.data.entradas.push({id:Math.random().toString(16).slice(2,12), categoria:e.categoria||'Outros', plataforma:String(e.plataforma||'(sem nome)'), url:e.url||'', usuario:e.usuario||'', senha:e.senha||'', notas:e.notas||'', devices:(e.devices||[]).filter(id=>S.devices.some(d=>d.id===id)), extras:(e.extras||[]).map(x=>({rotulo:x.rotulo||'',valor:x.valor||'',secreto:!!x.secreto}))}); n++; });
-  vDirty(); renderDetail(); toast(`${n} acessos importados${arr.length-n?' ('+(arr.length-n)+' já existiam)':''}. Clique em Salvar cofre.`);
-};
+  return n;
+}
+function vLegado(){
+  modal(`<h3>Trazer o cofre compartilhado antigo</h3><p>Digite a senha mestra que foi usada no cofre compartilhado (versão anterior). Os acessos entram no <b>seu</b> cofre, cifrados com a <b>sua</b> senha mestra.</p>
+    <div class="field"><label>Senha mestra antiga</label><input type="password" id="lgP" autocomplete="off"></div><div style="color:var(--down);font-size:13px" id="lgE"></div>
+    <div class="acts"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="lgOk">Trazer</button></div>`);
+  $('#lgP').focus();
+  $('#lgOk').onclick=async()=>{ $('#lgE').textContent=''; $('#lgOk').disabled=true;
+    try{ const r=await api('GET','/api/cofre/legado'); const b=r.blob; const k=await vDerive($('#lgP').value,b64d(b.salt),b.iter);
+      const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(b.iv)},k,b64d(b.ct)); const old=JSON.parse(new TextDecoder().decode(pt));
+      const n=vMerge(old.entradas||[]); closeModal(); vDirty(); renderDetail();
+      if(await vSaveNow()){
+        confirmBox('Retirar o cofre antigo do servidor?', `${n} acessos foram para o seu cofre. Retire o cofre compartilhado para que ninguém mais o use (fica só uma cópia cifrada de segurança no servidor).`, 'Retirar', async()=>{ try{ await api('DELETE','/api/cofre/legado'); V.legado=false; vRender(); toast('Cofre compartilhado antigo retirado'); }catch(e){ toast('Não foi possível retirar: '+e.message); } });
+      }
+    }catch(e){ $('#lgOk').disabled=false; $('#lgE').textContent = e.status===404 ? 'O cofre antigo já foi retirado.' : 'Senha mestra antiga incorreta.'; }
+  };
+}
 function vChangePw(){
-  modal(`<h3>Trocar senha mestra</h3><p>O cofre é cifrado de novo com a senha nova. Avise a equipe.</p>
+  modal(`<h3>Trocar senha mestra</h3><p>O seu cofre é cifrado de novo com a senha nova.</p>
     <div class="field"><label>Senha nova</label><input type="password" id="np1" autocomplete="new-password"></div>
     <div class="field"><label>Repita</label><input type="password" id="np2" autocomplete="new-password"></div><div style="color:var(--down);font-size:13px" id="npE"></div>
     <div class="acts"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="npOk">Trocar</button></div>`);
@@ -1000,10 +1025,11 @@ function vChangePw(){
 // acessos do aparelho na ficha
 function devAccessHtml(d){
   if(!hasCrypto) return '';
-  if(!V.key) return `<div><div class="sub">Acesso ao aparelho</div><div class="ro">Cofre trancado. <button class="lk" id="dOpen">abrir cofre</button></div></div>`;
+  if(V.err) return '';
+  if(!V.key) return `<div><div class="sub">Acesso ao aparelho</div><div class="ro">Seu cofre está trancado. <button class="lk" id="dOpen">abrir meu cofre</button></div></div>`;
   const acc=V.data.entradas.filter(e=>(e.devices||[]).includes(d.id));
-  if(!acc.length) return `<div><div class="sub">Acesso ao aparelho</div><div class="ro">Nenhum acesso do cofre ligado a este aparelho. <button class="lk" id="dOpen">abrir cofre</button></div></div>`;
-  return `<div><div class="sub">Acesso ao aparelho (cofre)</div><div class="dev-acc">${acc.map(e=>`<div class="ventry" data-id="${e.id}"><h5><span>${esc(e.plataforma)}</span><span class="acts"><button class="lk" data-dact="open" data-id="${e.id}">no cofre</button></span></h5>
+  if(!acc.length) return `<div><div class="sub">Acesso ao aparelho</div><div class="ro">Nenhum acesso do seu cofre ligado a este aparelho. <button class="lk" id="dOpen">abrir meu cofre</button></div></div>`;
+  return `<div><div class="sub">Acesso ao aparelho (seu cofre)</div><div class="dev-acc">${acc.map(e=>`<div class="ventry" data-id="${e.id}"><h5><span>${esc(e.plataforma)}</span><span class="acts"><button class="lk" data-dact="open" data-id="${e.id}">no cofre</button></span></h5>
     ${e.url?`<div class="vrow"><span class="k">Link</span><span class="v">${linkHtml(e.url)}</span><span class="acts"><button class="lk" data-dact="cu" data-id="${e.id}">copiar</button></span></div>`:''}
     ${e.usuario?`<div class="vrow"><span class="k">Usuário</span><span class="v">${esc(e.usuario)}</span><span class="acts"><button class="lk" data-dact="cus" data-id="${e.id}">copiar</button></span></div>`:''}
     ${e.senha?`<div class="vrow"><span class="k">Senha</span><span class="v">${V.show.has(e.id)?esc(e.senha):'••••••••'}</span><span class="acts"><button class="lk" data-dact="sh" data-id="${e.id}">${V.show.has(e.id)?'ocultar':'mostrar'}</button><button class="lk" data-dact="cp" data-id="${e.id}">copiar</button></span></div>`:''}</div>`).join('')}</div></div>`;
@@ -1029,7 +1055,7 @@ let booted = false;
     if (!S.devices.length) S.devices.push({id:'d'+Date.now(),name:'NOVO EQUIPAMENTO',model:'',site:'',rack:'',role:'',mgmt:'',notes:'',zabbix_hosts:[],ports:[]});
     const want = decodeURIComponent((location.hash||'').slice(1)).toLowerCase();
     let k0 = S.devices.findIndex(d => d.name.toLowerCase().replace(/\s+/g,'-') === want); if (k0 < 0) k0 = 0;
-    R3.init(); vLoad();
+    await vLoad(); R3.init();
     renderKPIs(); renderSites(); updSave(); select(k0,{fromUser:false}); booted = true;
     $('#boot').remove();
   } catch (e) {

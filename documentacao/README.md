@@ -12,15 +12,18 @@ Endereço: **https://documentacao.noc.updown.com.br**
 - **Importar do Zabbix**: quando o Zabbix tem interfaces que ainda não estão na documentação, aparece o botão "Importar N interfaces do Zabbix".
 - **Exportar XLSX/CSV** (uma aba por equipamento + inventário) e **Importar XLSX** no mesmo formato da planilha DOC_SW.
 
-## Cofre de acessos
+## Cofre de acessos (pessoal)
 
-O **Cofre** (botão no topo, ou o cofre no começo da cena 3D) guarda os acessos do NOC por plataforma: link, usuário, senha, campos extras (token, código…) e notas. Acessos SSH/web de aparelhos ficam **ligados aos equipamentos** e aparecem na ficha de cada um ("Acesso ao aparelho").
+Cada usuário tem o **seu próprio cofre** ("Meu cofre", no topo ou no cofre do começo da cena 3D), com a **sua** senha mestra. O que o luis.felipe guarda, o gabriel e os outros usuários **não veem**, nem o administrador do portal.
 
-- As senhas são **cifradas no navegador** (AES-256-GCM, chave derivada da senha mestra com PBKDF2-SHA256, 600 mil iterações). O servidor guarda só o conteúdo cifrado em `data/cofre.json` e não tem como abrir.
-- A **senha mestra** é criada na primeira vez que o cofre é aberto e não é a senha do site. **Se for esquecida, o cofre não pode ser recuperado** (guarde-a fora do site).
+- **Quem é o dono:** com `PORTAL=1` (ligado pelo `vincular-portal.sh`), o dono é o usuário do Portal NOC que o nginx repassa no cabeçalho `X-Portal-User`. O servidor só aceita esse cabeçalho vindo do nginx da própria máquina e nunca recebe o nome do usuário pelo navegador. Desativar ou derrubar a sessão de alguém no portal corta também o acesso ao cofre dele. Sem portal, o dono é a conta local (NOC).
+- **Cifrado no navegador:** AES-256-GCM, chave derivada da senha mestra (PBKDF2-SHA256, 600 mil iterações). O servidor guarda só o conteúdo cifrado, um arquivo por usuário em `data/cofres/`, e não tem como abrir.
+- **Senha mestra esquecida = cofre perdido.** Não existe recuperação, nem pelo administrador.
+- Conteúdo: plataforma, link, usuário, senha, campos extras (token, código…) e notas. Acessos de aparelhos ficam **ligados aos equipamentos** e aparecem na ficha de cada um, só para o dono.
 - Tranca sozinho depois de 10 minutos parado. Funciona só em HTTPS.
 - **Importar arquivo** aceita o `cofre-importar.json` (formato `updown-cofre`). Depois de importar e salvar, apague o arquivo do computador.
-- Nenhuma senha vai para o Git: o cofre existe só no servidor (`data/` está no `.gitignore`).
+- **Cofre compartilhado da versão anterior** (`data/cofre.json`): aparece um aviso no cofre de quem entrar. Quem souber a senha mestra antiga traz os acessos para o próprio cofre e retira o antigo do servidor (fica só uma cópia cifrada em `historico-cofre/`).
+- Nenhuma senha vai para o Git: os cofres existem só no servidor (`data/` está no `.gitignore`).
 
 ## Onde ficam os dados
 
@@ -28,7 +31,7 @@ O **Cofre** (botão no topo, ou o cofre no começo da cena 3D) guarda os acessos
 |---|---|
 | `equipamentos.json` | a documentação (o que a equipe edita). Criado na 1ª vez a partir de `dados-iniciais.json` |
 | `historico/` | cópia de cada versão anterior, com data e versão (mantém as últimas 200) |
-| `cofre.json` | cofre de acessos, **só cifrado** (versões anteriores em `historico-cofre/`) |
+| `cofres/` | um cofre por usuário, **só cifrado** (versões anteriores em `historico-cofre/usuarios/`) |
 | `zabbix.json` | cache do Zabbix, refeito a cada 5 min (`SYNC_MINUTES`) ou no botão "Ler Zabbix" |
 
 O status do Zabbix **não é gravado** na documentação: o site mostra os dois lado a lado. Se duas pessoas editarem ao mesmo tempo, quem salvar depois recebe um aviso para recarregar (nada é sobrescrito sem querer).
